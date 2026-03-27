@@ -1,0 +1,29 @@
+{
+  "name": "prixi-voice-gateway",
+  "version": "1.0.0",
+  "description": "Stateless Voice Gateway",
+  "main": "dist/app.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/app.js",
+    "dev": "ts-node src/app.ts"
+  },
+  "dependencies": {
+    "@fastify/formbody": "^7.4.0",
+    "axios": "^1.6.0",
+    "fastify": "^5.8.2",
+    "fastify-plugin": "^4.5.1",
+    "luxon": "^3.4.3",
+    "openai": "^4.14.0",
+    "pino": "^8.16.0",
+    "twilio": "^4.19.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.3.3",
+    "@types/node": "^20.8.10",
+    "@types/uuid": "^9.0.7",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2"
+  }
+}
