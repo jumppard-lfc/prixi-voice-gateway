@@ -6,11 +6,16 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/app.js",
-    "dev": "ts-node src/app.ts"
+    "dev": "ts-node src/app.ts",
+    "test": "node -r ts-node/register --test test/**/*.test.js",
+    "test:integration": "node -r ts-node/register --test test/integration/voice-gateway.test.js",
+    "test:smoke": "bash scripts/tests/smoke.sh",
+    "test:webhook": "bash scripts/tests/request-signed.sh"
   },
   "dependencies": {
-    "@fastify/formbody": "^7.4.0",
+    "@fastify/formbody": "^8.0.2",
     "axios": "^1.6.0",
+    "dotenv": "^16.4.5",
     "fastify": "^5.8.2",
     "fastify-plugin": "^4.5.1",
     "luxon": "^3.4.3",
@@ -23,6 +28,7 @@
     "@types/luxon": "^3.3.3",
     "@types/node": "^20.8.10",
     "@types/uuid": "^9.0.7",
+    "pino-pretty": "^11.0.0",
     "ts-node": "^10.9.1",
     "typescript": "^5.2.2"
   }

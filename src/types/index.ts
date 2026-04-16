@@ -20,6 +20,8 @@ export interface ClinicConfig {
   timezone: string;
 }
 
+export type PrixiConfig = ClinicConfig;
+
 export type PrixiEventName = 'call_forwarded' | 'voicemail_recorded';
 
 export interface BasePrixiEvent {
@@ -46,3 +48,5 @@ export interface VoicemailRecordedEvent extends BasePrixiEvent {
 }
 
 export type PrixiEvent = CallForwardedEvent | VoicemailRecordedEvent;
+
+export type CallCompletedEvent = PrixiEvent;

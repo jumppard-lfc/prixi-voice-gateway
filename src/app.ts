@@ -1,7 +1,28 @@
+import 'dotenv/config';
 import Fastify from 'fastify';
 import formbody from '@fastify/formbody';
 import twilio from 'twilio';
 import { voiceRoutes } from './routes/voice.controller';
+
+function normalizeHeaderValue(value: string | string[] | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  return Array.isArray(value) ? value[0] : value.split(',')[0]?.trim();
+}
+
+function buildTwilioValidationUrl(request: { headers: Record<string, string | string[] | undefined>; raw: { url?: string }; url: string }): string | null {
+  const forwardedProto = normalizeHeaderValue(request.headers['x-forwarded-proto']) || 'https';
+  const forwardedHost = normalizeHeaderValue(request.headers['x-forwarded-host']) || normalizeHeaderValue(request.headers.host);
+  const requestPath = request.raw.url || request.url;
+
+  if (!forwardedHost) {
+    return null;
+  }
+
+  return `${forwardedProto}://${forwardedHost}${requestPath}`;
+}
 
 const app = Fastify({
   logger: {
@@ -18,28 +39,27 @@ app.get('/health', async () => ({ status: 'UP' }));
 // Fastify preHandler to globally secure /voice routes with X-Twilio-Signature
 app.addHook('preHandler', async (request, reply) => {
   if (request.url.startsWith('/voice')) {
-    if (process.env.NODE_ENV === 'production') {
-      const twilioSignature = request.headers['x-twilio-signature'] as string;
-      const validationToken = process.env.TWILIO_AUTH_TOKEN || '';
-      
-      // Twilio requires full absolute URL for signature validation
-      const host = request.headers['host'];
-      const protocol = request.headers['x-forwarded-proto'] || 'https';
-      const url = `${protocol}://${host}${request.url}`;
-      
-      const payload = request.body as Record<string, string>;
-      
-      const isValid = twilio.validateRequest(
-        validationToken,
-        twilioSignature,
-        url,
-        payload
-      );
+    const twilioSignature = normalizeHeaderValue(request.headers['x-twilio-signature']);
+    const validationToken = process.env.TWILIO_AUTH_TOKEN || '';
+    const url = buildTwilioValidationUrl(request);
 
-      if (!isValid) {
-        app.log.warn({ url, signature: twilioSignature }, 'Rejecting request: Invalid Twilio Signature.');
-        return reply.code(403).send('Forbidden');
-      }
+    if (!twilioSignature || !validationToken || !url) {
+      app.log.warn({ url, hasSignature: Boolean(twilioSignature), hasToken: Boolean(validationToken) }, 'Rejecting request: Missing Twilio signature context.');
+      return reply.code(403).send('Forbidden');
+    }
+
+    const payload = request.body as Record<string, string>;
+
+    const isValid = twilio.validateRequest(
+      validationToken,
+      twilioSignature,
+      url,
+      payload
+    );
+
+    if (!isValid) {
+      app.log.warn({ url, signature: twilioSignature }, 'Rejecting request: Invalid Twilio Signature.');
+      return reply.code(403).send('Forbidden');
     }
   }
 });

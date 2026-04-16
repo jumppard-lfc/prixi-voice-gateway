@@ -4,6 +4,7 @@ import { prixiService } from '../services/prixi.service';
 import { sttService } from '../services/stt.service';
 import { ivrService } from '../services/ivr.service';
 import { CallForwardedEvent, VoicemailRecordedEvent } from '../types';
+import { claimVoiceEvent, completeVoiceEvent, failVoiceEvent, createVoiceEventKey } from '../utils/voice-event-ledger';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
@@ -88,11 +89,18 @@ export async function voiceRoutes(fastify: FastifyInstance) {
             timestamp: new Date().toISOString()
           };
 
-          // Dispatch event async
-          prixiService.sendEvent(event).catch((err: any) => {
-             fastify.log.error(err, 'Failed to report call forwarding');
-          });
+          const eventKey = createVoiceEventKey(event.event, event.callSid);
 
+          if (claimVoiceEvent(eventKey)) {
+            prixiService.sendEvent(event, 3, eventKey)
+              .then(() => completeVoiceEvent(eventKey))
+              .catch((err: any) => {
+                failVoiceEvent(eventKey);
+                fastify.log.error(err, 'Failed to report call forwarding');
+              });
+          }
+
+          // Dispatch event async
         } else {
           // Fallback to record if forwarding isn't allowed
           twiml.record({ action: '/voice/recording-complete', playBeep: true, maxLength: 120 });
@@ -126,10 +134,18 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
     if (!recordingUrl) return;
 
+    const eventKey = createVoiceEventKey('voicemail_recorded', providerCallId);
+
+    if (!claimVoiceEvent(eventKey)) {
+      fastify.log.info({ providerCallId }, 'Duplicate voicemail webhook ignored');
+      return;
+    }
+
     try {
       const config = await prixiService.getConfig(fromNumber);
       
-      sttService.transcribeAudioUrl(recordingUrl).then(async transcript => {
+      try {
+        const transcript = await sttService.transcribeAudioUrl(recordingUrl);
         const event: VoicemailRecordedEvent = {
           event: 'voicemail_recorded',
           clinicId: config.clinicId,
@@ -141,8 +157,10 @@ export async function voiceRoutes(fastify: FastifyInstance) {
           audioUrl: recordingUrl,
           transcript
         };
-        await prixiService.sendEvent(event);
-      }).catch(async err => {
+
+        await prixiService.sendEvent(event, 3, eventKey);
+        completeVoiceEvent(eventKey);
+      } catch (err) {
         fastify.log.error(err, 'STT processing failed, sending event without transcript');
         const fallbackEvent: VoicemailRecordedEvent = {
           event: 'voicemail_recorded',
@@ -155,12 +173,18 @@ export async function voiceRoutes(fastify: FastifyInstance) {
           audioUrl: recordingUrl,
           transcript: ''
         };
-        await prixiService.sendEvent(fallbackEvent).catch(reportErr => {
+
+        try {
+          await prixiService.sendEvent(fallbackEvent, 3, eventKey);
+          completeVoiceEvent(eventKey);
+        } catch (reportErr) {
+          failVoiceEvent(eventKey);
           fastify.log.error(reportErr, 'Failed to report fallback voicemail event');
-        });
-      });
+        }
+      }
       
     } catch (err) {
+      failVoiceEvent(eventKey);
       fastify.log.error(err, 'Failed to process recording complete');
     }
   });

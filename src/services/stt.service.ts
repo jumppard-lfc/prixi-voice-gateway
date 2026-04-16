@@ -20,15 +20,19 @@ export class SttService {
    */
   async transcribeAudioUrl(audioUrl: string): Promise<string> {
     const tempFilePath = path.join(os.tmpdir(), `${uuidv4()}.wav`);
+    const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+    const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
 
     try {
       // 1. Fetch binary audio
-      // Note: Twilio recording URLs usually require HTTP Basic Auth with Account SID & Auth Token if secured,
-      // but assuming public/signed URLs for simplicity unless specified otherwise.
       const response = await axios({
         method: 'get',
         url: audioUrl,
         responseType: 'stream',
+        auth: twilioAccountSid && twilioAuthToken ? {
+          username: twilioAccountSid,
+          password: twilioAuthToken,
+        } : undefined,
       });
 
       // 2. Write to /tmp
