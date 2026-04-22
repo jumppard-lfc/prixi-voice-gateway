@@ -7,8 +7,19 @@ export class PrixiService {
   private client: AxiosInstance;
   private processedEventKeys = new Map<string, number>();
   private inFlightEventKeys = new Set<string>();
+  private readonly mockMode: boolean;
 
   constructor() {
+    const hasApiUrl = Boolean(process.env.PRIXI_API_URL);
+    const hasApiKey = Boolean(process.env.PRIXI_API_KEY);
+    const explicitMockMode = process.env.PRIXI_MOCK_MODE === 'true';
+
+    this.mockMode = explicitMockMode || !hasApiUrl || !hasApiKey;
+
+    if (this.mockMode) {
+      console.warn('Prixi API mock mode enabled: remote config/events are bypassed.');
+    }
+
     this.client = axios.create({
       baseURL: process.env.PRIXI_API_URL || 'https://api.prixi.sk',
       timeout: 5000, // 5 seconds timeout protection
@@ -42,6 +53,15 @@ export class PrixiService {
    * Provides a fallback configuration if the API call fails or times out.
    */
   async getConfig(phoneNumber: string): Promise<ClinicConfig> {
+    if (this.mockMode) {
+      return {
+        clinicId: process.env.PRIXI_FALLBACK_CLINIC_ID || 'local-dev',
+        voiceBotEnabled: true,
+        timezone: process.env.PRIXI_FALLBACK_TIMEZONE || 'Europe/Bratislava',
+        allowForwardDuringOfficeHours: false,
+      };
+    }
+
     try {
       const response = await this.client.get<ClinicConfig>('/voice/config', {
         params: { phoneNumber },
@@ -72,33 +92,44 @@ export class PrixiService {
       return;
     }
 
-    this.inFlightEventKeys.add(resolvedIdempotencyKey);
-
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        await this.client.post('/voice/call-completed', event, {
-          headers: {
-            'Idempotency-Key': resolvedIdempotencyKey,
-          },
-        });
-
-        this.processedEventKeys.set(resolvedIdempotencyKey, Date.now() + IDEMPOTENCY_TTL_MS);
-        return; // Success
-      } catch (error: any) {
-        const is5xxError = error.response && error.response.status >= 500 && error.response.status < 600;
-        
-        if (is5xxError && attempt < retries) {
-          console.warn(`Attempt ${attempt} failed to send event ${event.event} to Prixi API. Retrying...`);
-          // Exponential backoff
-          await new Promise(resolve => setTimeout(resolve, attempt * 1000));
-        } else {
-          console.error(`Failed to send event ${event.event} after ${attempt} attempts:`, error);
-          throw error;
-        }
-      }
+    if (this.mockMode) {
+      console.info('Prixi mock mode: event accepted locally', {
+        event: event.event,
+        key: resolvedIdempotencyKey,
+      });
+      this.processedEventKeys.set(resolvedIdempotencyKey, Date.now() + IDEMPOTENCY_TTL_MS);
+      return;
     }
 
-    this.inFlightEventKeys.delete(resolvedIdempotencyKey);
+    this.inFlightEventKeys.add(resolvedIdempotencyKey);
+
+    try {
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          await this.client.post('/voice/call-completed', event, {
+            headers: {
+              'Idempotency-Key': resolvedIdempotencyKey,
+            },
+          });
+
+          this.processedEventKeys.set(resolvedIdempotencyKey, Date.now() + IDEMPOTENCY_TTL_MS);
+          return; // Success
+        } catch (error: any) {
+          const is5xxError = error.response && error.response.status >= 500 && error.response.status < 600;
+
+          if (is5xxError && attempt < retries) {
+            console.warn(`Attempt ${attempt} failed to send event ${event.event} to Prixi API. Retrying...`);
+            // Exponential backoff
+            await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+          } else {
+            console.error(`Failed to send event ${event.event} after ${attempt} attempts:`, error);
+            throw error;
+          }
+        }
+      }
+    } finally {
+      this.inFlightEventKeys.delete(resolvedIdempotencyKey);
+    }
   }
 
   releaseEvent(event: PrixiEvent, idempotencyKey?: string): void {
