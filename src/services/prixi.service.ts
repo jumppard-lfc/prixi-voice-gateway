@@ -97,7 +97,7 @@ export class PrixiService {
       // Fallback configuration to prevent total failure
       return {
         clinicId: 'fallback',
-        voiceBotEnabled: false,
+        voiceBotEnabled: true,
         timezone: 'Europe/Bratislava',
         professionalId: 1,
         healthcareProviderId: 1,
