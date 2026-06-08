@@ -13,7 +13,8 @@ export async function voiceRoutes(fastify: FastifyInstance) {
   fastify.post('/incoming', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as Record<string, string>;
     const fromNumber = body.From;
-
+    fastify.log.info({ from: fromNumber }, 'Incoming voice call received');
+    
     const twiml = new VoiceResponse();
 
     try {
@@ -42,17 +43,19 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         twiml.record({
           action: '/voice/recording-complete',
           playBeep: true,
-          maxLength: 120
+          maxLength: 120,
+          timeout: 3
         });
       } else {
         twiml.say(
-          { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
+          { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 
           'Momentálne sa nachádzate mimo ordinačných hodín. Prosím, po zaznení tónu povedzte svoje meno a zanechajte hlasovú správu.'
         );
         twiml.record({
           action: '/voice/recording-complete',
           playBeep: true,
-          maxLength: 120
+          maxLength: 120,
+          timeout: 3
         });
       }
 
@@ -79,7 +82,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
         if (config.allowForwardDuringOfficeHours && config.forwardPhoneNumber) {
           twiml.dial(config.forwardPhoneNumber);
-
+          
           const event: CallForwardedEvent = {
             event: 'call_forwarded',
             clinicId: config.clinicId,
@@ -103,16 +106,16 @@ export async function voiceRoutes(fastify: FastifyInstance) {
           // Dispatch event async
         } else {
           // Fallback to record if forwarding isn't allowed
-          twiml.record({ action: '/voice/recording-complete', playBeep: true, maxLength: 120 });
+          twiml.record({ action: '/voice/recording-complete', playBeep: true, maxLength: 120, timeout: 3 });
         }
       } else {
         // Did not press 1 -> Voicemail
-        twiml.record({ action: '/voice/recording-complete', playBeep: true, maxLength: 120 });
+        twiml.record({ action: '/voice/recording-complete', playBeep: true, maxLength: 120, timeout: 3 });
       }
       return reply.type('text/xml').send(twiml.toString());
     } catch (err) {
       fastify.log.error(err, 'Error in /gather');
-      twiml.record({ action: '/voice/recording-complete', playBeep: true, maxLength: 120 });
+      twiml.record({ action: '/voice/recording-complete', playBeep: true, maxLength: 120, timeout: 3 });
       return reply.type('text/xml').send(twiml.toString());
     }
   });
@@ -127,8 +130,10 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const callStartedAt = new Date(Date.now() - durationSeconds * 1000).toISOString();
     const callEndedAt = new Date().toISOString();
 
+    fastify.log.info({ from: fromNumber, durationSeconds, recordingUrl }, 'Voicemail recording complete');
+
     const twiml = new VoiceResponse();
-    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, '\u010eakujeme, va\u0161a spr\u00e1va bola zaznamenan\u00e1. Dovidenia.');
+    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Rozumiem, vaša požiadavka je zaznamenaná. Ozveme sa vám na toto číslo do 24 hodín. Dovidenia.');
     twiml.hangup();
     reply.type('text/xml').send(twiml.toString());
 
