@@ -9,11 +9,11 @@ import { claimVoiceEvent, completeVoiceEvent, failVoiceEvent, createVoiceEventKe
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 export async function voiceRoutes(fastify: FastifyInstance) {
-  
+
   fastify.post('/incoming', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as Record<string, string>;
     const fromNumber = body.From;
-    
+
     const twiml = new VoiceResponse();
 
     try {
@@ -30,14 +30,14 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       if (isDuringHours) {
         const gather = twiml.gather({
           numDigits: 1,
-          action: '/voice/gather', 
+          action: '/voice/gather',
           timeout: 5
         });
         gather.say(
-          { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 
+          { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
           'Dobrý deň. Ak ide o urgentný stav, stlačte 1. V opačnom prípade po zaznení tónu povedzte svoje meno a popíšte svoj problém.'
         );
-        
+
         // Timeout/No input -> fallback to voicemail (skipping the gather)
         twiml.record({
           action: '/voice/recording-complete',
@@ -46,7 +46,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         });
       } else {
         twiml.say(
-          { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 
+          { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
           'Momentálne sa nachádzate mimo ordinačných hodín. Prosím, po zaznení tónu povedzte svoje meno a zanechajte hlasovú správu.'
         );
         twiml.record({
@@ -72,14 +72,14 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const callSid = body.CallSid;
 
     const twiml = new VoiceResponse();
-    
+
     try {
       if (digits === '1') {
         const config = await prixiService.getConfig(fromNumber);
-        
+
         if (config.allowForwardDuringOfficeHours && config.forwardPhoneNumber) {
           twiml.dial(config.forwardPhoneNumber);
-          
+
           const event: CallForwardedEvent = {
             event: 'call_forwarded',
             clinicId: config.clinicId,
@@ -124,8 +124,8 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const providerCallId = body.CallSid;
     const durationSeconds = parseInt(body.RecordingDuration || '0', 10);
     // Rough estimation if exact start/end differ
-    const callStartedAt = new Date(Date.now() - durationSeconds * 1000).toISOString(); 
-    const callEndedAt = new Date().toISOString(); 
+    const callStartedAt = new Date(Date.now() - durationSeconds * 1000).toISOString();
+    const callEndedAt = new Date().toISOString();
 
     const twiml = new VoiceResponse();
     twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, '\u010eakujeme, va\u0161a spr\u00e1va bola zaznamenan\u00e1. Dovidenia.');
@@ -143,7 +143,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
     try {
       const config = await prixiService.getConfig(fromNumber);
-      
+
       try {
         const transcript = await sttService.transcribeAudioUrl(recordingUrl);
         const event: VoicemailRecordedEvent = {
@@ -182,7 +182,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
           fastify.log.error(reportErr, 'Failed to report fallback voicemail event');
         }
       }
-      
+
     } catch (err) {
       failVoiceEvent(eventKey);
       fastify.log.error(err, 'Failed to process recording complete');
