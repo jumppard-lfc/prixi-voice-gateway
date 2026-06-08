@@ -18,6 +18,8 @@ export interface ClinicConfig {
   allowForwardDuringOfficeHours?: boolean;
   forwardPhoneNumber?: string;
   timezone: string;
+  professionalId?: number;
+  healthcareProviderId?: number;
 }
 
 export type PrixiConfig = ClinicConfig;
