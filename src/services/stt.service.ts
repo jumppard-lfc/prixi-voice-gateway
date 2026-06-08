@@ -48,6 +48,8 @@ export class SttService {
       const transcription = await this.openai.audio.transcriptions.create({
         file: fs.createReadStream(tempFilePath),
         model: 'whisper-1',
+        language: 'sk',
+        prompt: 'Hlasová správa pre lekára v ambulancii PriXi. Pacient uvádza svoje meno, priezvisko a dôvod volania, napríklad recept na lieky ako Ibalgin, Paralen, kontrola alebo choroba.',
       });
 
       return transcription.text;
