@@ -20,7 +20,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       const config = await prixiService.getConfig(fromNumber);
 
       if (!ivrService.shouldAllowCall(config)) {
-        twiml.say({ language: 'en-US' }, 'This number is currently unavailable.');
+        twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Toto číslo je momentálne nedostupné.');
         twiml.reject();
         return reply.type('text/xml').send(twiml.toString());
       }
@@ -34,8 +34,8 @@ export async function voiceRoutes(fastify: FastifyInstance) {
           timeout: 5
         });
         gather.say(
-          { language: 'sk-SK' }, 
-          'Dobr\u00fd de\u0148. Ak ide o urgentn\u00fd stav, stla\u010dte 1. V opa\u010dnom pr\u00edpade pop\u00ed\u0161te svoj probl\u00e9m po zaznen\u00ed t\u00f3nu.'
+          { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 
+          'Dobrý deň. Ak ide o urgentný stav, stlačte 1. V opačnom prípade po zaznení tónu povedzte svoje meno a popíšte svoj problém.'
         );
         
         // Timeout/No input -> fallback to voicemail (skipping the gather)
@@ -46,8 +46,8 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         });
       } else {
         twiml.say(
-          { language: 'sk-SK' }, 
-          'Moment\u00e1lne sa nach\u00e1dzate mimo ordina\u010dn\u00fdch hod\u00edn. Pros\u00edm, zanechajte hlasov\u00fa spr\u00e1vu.'
+          { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 
+          'Momentálne sa nachádzate mimo ordinačných hodín. Prosím, po zaznení tónu povedzte svoje meno a zanechajte hlasovú správu.'
         );
         twiml.record({
           action: '/voice/recording-complete',
@@ -59,7 +59,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       return reply.type('text/xml').send(twiml.toString());
     } catch (err) {
       fastify.log.error(err, 'Error in /incoming');
-      twiml.say({ language: 'en-US' }, 'We are currently experiencing technical difficulties.');
+      twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Momentálne máme technické problémy.');
       twiml.reject();
       return reply.type('text/xml').send(twiml.toString());
     }
@@ -128,7 +128,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const callEndedAt = new Date().toISOString(); 
 
     const twiml = new VoiceResponse();
-    twiml.say({ language: 'sk-SK' }, '\u010eakujeme, va\u0161a spr\u00e1va bola zaznamenan\u00e1. Dovidenia.');
+    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, '\u010eakujeme, va\u0161a spr\u00e1va bola zaznamenan\u00e1. Dovidenia.');
     twiml.hangup();
     reply.type('text/xml').send(twiml.toString());
 

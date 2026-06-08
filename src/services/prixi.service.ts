@@ -93,10 +93,7 @@ export class PrixiService {
     }
 
     if (this.mockMode) {
-      console.info('Prixi mock mode: event accepted locally', {
-        event: event.event,
-        key: resolvedIdempotencyKey,
-      });
+      console.info('Prixi mock mode: event accepted locally\\nPayload:', JSON.stringify(event, null, 2));
       this.processedEventKeys.set(resolvedIdempotencyKey, Date.now() + IDEMPOTENCY_TTL_MS);
       return;
     }
