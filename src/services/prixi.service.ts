@@ -125,7 +125,7 @@ export class PrixiService {
     if (event.event === 'voicemail_recorded') {
       apiEndpoint = '/api/requests/store';
       const config = await this.getConfig(event.phone);
-      
+
       apiPayload = {
         professional_id: config.professionalId || 1,
         patient: {
@@ -139,8 +139,8 @@ export class PrixiService {
             healthcare_provider_id: config.healthcareProviderId || 1,
             request_title: 'Hlasová správa',
             request_priority: 'medium',
-            request_type: 'general',
-            request_description: `${event.transcript}\n\n[Hlasový záznam: ${event.audioUrl}]`,
+            request_type: 'phone_call',
+            request_description: `${event.transcript}\n\nDĺžka nahrávky: ${event.durationSeconds} sekúnd\n\n[Hlasový záznam: </br><a href="${event.audioUrl}">${event.audioUrl}</a>]`,
           }
         ],
         online: false,
@@ -161,7 +161,7 @@ export class PrixiService {
       const curlCommand = generateCurlCommand('POST', fullUrl, requestHeaders, apiPayload);
       console.info(`[Prixi Mock Mode] Simulated API Request to ${apiEndpoint}\nEquivalent cURL:\n${curlCommand}`);
       console.info(`[Prixi Mock Mode] Simulated API Response (200 OK):\n{ "success": true }`);
-      
+
       this.processedEventKeys.set(resolvedIdempotencyKey, Date.now() + IDEMPOTENCY_TTL_MS);
       return;
     }
