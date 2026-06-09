@@ -127,7 +127,7 @@ export class PrixiService {
       const config = await this.getConfig(event.phone);
 
       apiPayload = {
-        professional_id: config.professionalId || 1,
+        professional_id: config.professionalId || 81,
         patient: {
           name: 'Pacient',
           surname: 'Zmeškaný Hovor',
@@ -136,7 +136,7 @@ export class PrixiService {
         },
         requests: [
           {
-            healthcare_provider_id: config.healthcareProviderId || 1,
+            healthcare_provider_id: config.healthcareProviderId || 64,
             request_title: 'Hlasová správa',
             request_priority: 'medium',
             request_type: 'phone_call',
