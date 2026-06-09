@@ -141,9 +141,7 @@ export class PrixiService {
             request_priority: 'medium',
             request_type: 'phone_call',
             request_description: `${event.transcript}\n\nDĺžka nahrávky: ${event.durationSeconds} sekúnd\n\n[Hlasový záznam: </br><a href="${event.audioUrl}">${event.audioUrl}</a>]`,
-            data: {
-              phone_duration_seconds: event.durationSeconds,
-            }
+            data: '{\'phone_duration_seconds\': event.durationSeconds}'
           }
         ],
         online: false,
