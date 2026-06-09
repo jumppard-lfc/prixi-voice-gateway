@@ -185,7 +185,17 @@ export class PrixiService {
           this.processedEventKeys.set(resolvedIdempotencyKey, Date.now() + IDEMPOTENCY_TTL_MS);
           return; // Success
         } catch (error: any) {
-          const is5xxError = error.response && error.response.status >= 500 && error.response.status < 600;
+          const status = error.response?.status;
+          const data = error.response?.data;
+
+          // If the request was already created, treat it as a successful idempotency block
+          if (status === 422 && data && typeof data.message === 'string' && (data.message.includes('vytvorená') || data.message.includes('vytvorena'))) {
+            console.info(`[Outbound API Response] ${apiEndpoint} returned status 422 (Duplicate request). Treating as success.`);
+            this.processedEventKeys.set(resolvedIdempotencyKey, Date.now() + IDEMPOTENCY_TTL_MS);
+            return;
+          }
+
+          const is5xxError = status >= 500 && status < 600;
 
           if (is5xxError && attempt < retries) {
             console.warn(`Attempt ${attempt} failed to send event ${event.event} to Prixi API. Retrying...`);

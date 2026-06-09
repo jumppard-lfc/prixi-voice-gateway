@@ -14,7 +14,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const body = request.body as Record<string, string>;
     const fromNumber = body.From;
     fastify.log.info({ from: fromNumber }, 'Incoming voice call received');
-    
+
     const twiml = new VoiceResponse();
 
     try {
@@ -48,8 +48,8 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         });
       } else {
         twiml.say(
-          { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 
-          'Momentálne sa nachádzate mimo ordinačných hodín. Prosím, po zaznení tónu povedzte svoje meno a zanechajte hlasovú správu.'
+          { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
+          'Dovolali ste sa mimo ordinačých hodín. Prosím, po zaznení tónu povedzte svoje meno a zanechajte hlasovú správu. Následne sa vám ozveme do 24 hodín.'
         );
         twiml.record({
           action: '/voice/recording-complete',
@@ -82,7 +82,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
         if (config.allowForwardDuringOfficeHours && config.forwardPhoneNumber) {
           twiml.dial(config.forwardPhoneNumber);
-          
+
           const event: CallForwardedEvent = {
             event: 'call_forwarded',
             clinicId: config.clinicId,
@@ -120,29 +120,17 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/recording-complete', async (request: FastifyRequest, reply: FastifyReply) => {
-    const body = request.body as Record<string, string>;
-    const recordingUrl = body.RecordingUrl;
-    const fromNumber = body.From;
-    const providerCallId = body.CallSid;
-    const durationSeconds = parseInt(body.RecordingDuration || '0', 10);
-    // Rough estimation if exact start/end differ
-    const callStartedAt = new Date(Date.now() - durationSeconds * 1000).toISOString();
-    const callEndedAt = new Date().toISOString();
-
-    fastify.log.info({ from: fromNumber, durationSeconds, recordingUrl }, 'Voicemail recording complete');
-
-    const twiml = new VoiceResponse();
-    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Rozumiem, vaša požiadavka je zaznamenaná. Ozveme sa vám na toto číslo do 24 hodín. Dovidenia.');
-    twiml.hangup();
-    reply.type('text/xml').send(twiml.toString());
-
-    if (!recordingUrl) return;
-
-    const eventKey = createVoiceEventKey('voicemail_recorded', providerCallId);
-
+  async function handleVoicemailBackground(
+    fromNumber: string,
+    recordingUrl: string,
+    durationSeconds: number,
+    callStartedAt: string,
+    callEndedAt: string,
+    providerCallId: string,
+    eventKey: string
+  ) {
     if (!claimVoiceEvent(eventKey)) {
-      fastify.log.info({ providerCallId }, 'Duplicate voicemail webhook ignored');
+      fastify.log.info({ providerCallId }, 'Duplicate voicemail webhook ignored in background');
       return;
     }
 
@@ -191,6 +179,33 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     } catch (err) {
       failVoiceEvent(eventKey);
       fastify.log.error(err, 'Failed to process recording complete');
+    }
+  }
+
+  fastify.post('/recording-complete', async (request: FastifyRequest, reply: FastifyReply) => {
+    const body = request.body as Record<string, string>;
+    const recordingUrl = body.RecordingUrl;
+    const fromNumber = body.From;
+    const providerCallId = body.CallSid;
+    const durationSeconds = parseInt(body.RecordingDuration || '0', 10);
+    // Rough estimation if exact start/end differ
+    const callStartedAt = new Date(Date.now() - durationSeconds * 1000).toISOString();
+    const callEndedAt = new Date().toISOString();
+
+    fastify.log.info({ from: fromNumber, durationSeconds, recordingUrl }, 'Voicemail recording complete');
+
+    const twiml = new VoiceResponse();
+    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Rozumiem, vaša požiadavka je zaznamenaná. Ozveme sa vám na toto číslo do 24 hodín. Ďakujeme a dovidenia.');
+    twiml.hangup();
+
+    // Return XML to Twilio immediately to prevent timeouts
+    reply.type('text/xml').send(twiml.toString());
+
+    if (recordingUrl) {
+      const eventKey = createVoiceEventKey('voicemail_recorded', providerCallId);
+      // Run heavy processing asynchronously in background
+      handleVoicemailBackground(fromNumber, recordingUrl, durationSeconds, callStartedAt, callEndedAt, providerCallId, eventKey)
+        .catch(err => fastify.log.error(err, 'Background voicemail task failed'));
     }
   });
 }
