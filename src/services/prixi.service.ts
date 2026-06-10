@@ -141,7 +141,10 @@ export class PrixiService {
             request_title: 'Hlasová správa',
             request_priority: 'medium',
             request_type: 'phone_call',
-            request_description: `Meno: ${event.nameTranscript}\nRok narodenia: ${event.birthYearTranscript}\nProblém: ${event.problemTranscript}\n\nDĺžka hovoru: ${event.durationSeconds} sekúnd\n\n[Hlasové záznamy: </br>Meno: <a href="${event.nameUrl}">${event.nameUrl}</a></br>Rok narodenia: <a href="${event.birthYearUrl}">${event.birthYearUrl}</a></br>Problém: <a href="${event.problemUrl}">${event.problemUrl}</a>]`,
+            request_description: `<b>Meno:</b> ${event.nameTranscript} (<a href="${event.nameUrl}">prehrať nahrávku</a>)<br />\n` +
+                                 `<b>Rok narodenia:</b> ${event.birthYearTranscript} (<a href="${event.birthYearUrl}">prehrať nahrávku</a>)<br />\n` +
+                                 `<b>Problém:</b> ${event.problemTranscript} (<a href="${event.problemUrl}">prehrať nahrávku</a>)<br /><br />\n` +
+                                 `<i>Dĺžka hovoru: ${event.durationSeconds} sekúnd</i>`,
             data: JSON.stringify({
               patient_name: event.nameTranscript,
               patient_birth_year: event.birthYearTranscript,

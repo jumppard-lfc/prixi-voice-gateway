@@ -130,11 +130,12 @@ export async function voiceRoutes(fastify: FastifyInstance) {
   fastify.post('/record-name', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as Record<string, string>;
     const nameUrl = body.RecordingUrl;
+    const nameDuration = body.RecordingDuration || '0';
     
     const twiml = new VoiceResponse();
     twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Teraz prosím povedzte svoj rok narodenia.');
     twiml.record({
-      action: `/voice/record-birthyear?nameUrl=${encodeURIComponent(nameUrl || '')}`,
+      action: `/voice/record-birthyear?nameUrl=${encodeURIComponent(nameUrl || '')}&nameDuration=${nameDuration}`,
       playBeep: true,
       maxLength: 5,
       timeout: 3
@@ -147,12 +148,14 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const body = request.body as Record<string, string>;
     const query = request.query as Record<string, string>;
     const birthYearUrl = body.RecordingUrl;
+    const birthYearDuration = body.RecordingDuration || '0';
     const nameUrl = query.nameUrl || '';
+    const nameDuration = query.nameDuration || '0';
     
     const twiml = new VoiceResponse();
     twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Nakoniec prosím popíšte svoj problém.');
     twiml.record({
-      action: `/voice/recording-complete?nameUrl=${encodeURIComponent(nameUrl)}&birthYearUrl=${encodeURIComponent(birthYearUrl || '')}`,
+      action: `/voice/recording-complete?nameUrl=${encodeURIComponent(nameUrl)}&birthYearUrl=${encodeURIComponent(birthYearUrl || '')}&nameDuration=${nameDuration}&birthYearDuration=${birthYearDuration}`,
       playBeep: true,
       maxLength: 120,
       timeout: 3
@@ -248,7 +251,12 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     
     const fromNumber = body.From;
     const providerCallId = body.CallSid;
-    const durationSeconds = parseInt(body.RecordingDuration || '0', 10);
+    
+    const nameDuration = parseInt(query.nameDuration || '0', 10);
+    const birthYearDuration = parseInt(query.birthYearDuration || '0', 10);
+    const problemDuration = parseInt(body.RecordingDuration || '0', 10);
+    const durationSeconds = nameDuration + birthYearDuration + problemDuration;
+    
     // Rough estimation if exact start/end differ
     const callStartedAt = new Date(Date.now() - durationSeconds * 1000).toISOString();
     const callEndedAt = new Date().toISOString();
