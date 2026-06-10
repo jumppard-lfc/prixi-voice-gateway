@@ -45,8 +45,12 @@ export interface VoicemailRecordedEvent extends BasePrixiEvent {
   callStartedAt: string;
   callEndedAt: string;
   providerCallId: string;
-  audioUrl: string;
-  transcript: string;
+  nameUrl: string;
+  birthYearUrl: string;
+  problemUrl: string;
+  nameTranscript: string;
+  birthYearTranscript: string;
+  problemTranscript: string;
 }
 
 export type PrixiEvent = CallForwardedEvent | VoicemailRecordedEvent;

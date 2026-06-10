@@ -131,7 +131,7 @@ export class PrixiService {
         patient: {
           name: 'Pacient',
           surname: 'Zmeškaný Hovor',
-          email: 'voice-gateway@prixi.sk',
+          email: null,
           phone_number: event.phone,
         },
         requests: [
@@ -140,8 +140,12 @@ export class PrixiService {
             request_title: 'Hlasová správa',
             request_priority: 'medium',
             request_type: 'phone_call',
-            request_description: `${event.transcript}\n\nDĺžka nahrávky: ${event.durationSeconds} sekúnd\n\n[Hlasový záznam: </br><a href="${event.audioUrl}">${event.audioUrl}</a>]`,
-            data: '{\'phone_duration_seconds\': event.durationSeconds}'
+            request_description: `Meno: ${event.nameTranscript}\nRok narodenia: ${event.birthYearTranscript}\nProblém: ${event.problemTranscript}\n\nDĺžka hovoru: ${event.durationSeconds} sekúnd\n\n[Hlasové záznamy: </br>Meno: <a href="${event.nameUrl}">${event.nameUrl}</a></br>Rok narodenia: <a href="${event.birthYearUrl}">${event.birthYearUrl}</a></br>Problém: <a href="${event.problemUrl}">${event.problemUrl}</a>]`,
+            data: {
+              patient_name: event.nameTranscript,
+              patient_birth_year: event.birthYearTranscript,
+              phone_duration_seconds: event.durationSeconds
+            }
           }
         ],
         online: false,
