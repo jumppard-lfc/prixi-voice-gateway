@@ -26,103 +26,22 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         return reply.type('text/xml').send(twiml.toString());
       }
 
-      const isDuringHours = ivrService.isDuringOfficeHours(config);
-
-      if (isDuringHours) {
-        const gather = twiml.gather({
-          numDigits: 1,
-          action: '/voice/gather',
-          timeout: 5
-        });
-        gather.say(
-          { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
-          'Dobrý deň. Ak ide o urgentný stav, stlačte 1. V opačnom prípade po zaznení tónu povedzte svoje meno a popíšte svoj problém.'
-        );
-
-        // Timeout/No input -> fallback to voicemail (skipping the gather)
-        twiml.say(
-          { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
-          'Prosím, po zaznení tónu povedzte svoje celé meno.'
-        );
-        twiml.record({
-          action: '/voice/record-name',
-          playBeep: true,
-          maxLength: 10,
-          timeout: 3
-        });
-      } else {
-        twiml.say(
-          { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
-          'Dovolali ste sa mimo ordinačných hodín. Ozveme sa vám do 24 hodín. Prosím, po zaznení tónu povedzte svoje celé meno.'
-        );
-        twiml.record({
-          action: '/voice/record-name',
-          playBeep: true,
-          maxLength: 10,
-          timeout: 3
-        });
-      }
+      twiml.say(
+        { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
+        'Dobrý deň. Dovolali ste sa do ambulancie. Prosím, po zaznení tónu povedzte svoje celé meno.'
+      );
+      twiml.record({
+        action: '/voice/record-name',
+        playBeep: true,
+        maxLength: 10,
+        timeout: 3
+      });
 
       return reply.type('text/xml').send(twiml.toString());
     } catch (err) {
       fastify.log.error(err, 'Error in /incoming');
       twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Momentálne máme technické problémy.');
       twiml.reject();
-      return reply.type('text/xml').send(twiml.toString());
-    }
-  });
-
-  fastify.post('/gather', async (request: FastifyRequest, reply: FastifyReply) => {
-    const body = request.body as Record<string, string>;
-    const digits = body.Digits;
-    const fromNumber = body.From;
-    const callSid = body.CallSid;
-
-    const twiml = new VoiceResponse();
-
-    try {
-      if (digits === '1') {
-        const config = await prixiService.getConfig(fromNumber);
-
-        if (config.allowForwardDuringOfficeHours && config.forwardPhoneNumber) {
-          twiml.dial(config.forwardPhoneNumber);
-
-          const event: CallForwardedEvent = {
-            event: 'call_forwarded',
-            clinicId: config.clinicId,
-            phone: fromNumber,
-            forwardedTo: config.forwardPhoneNumber,
-            callSid: callSid,
-            timestamp: new Date().toISOString()
-          };
-
-          const eventKey = createVoiceEventKey(event.event, event.callSid);
-
-          if (claimVoiceEvent(eventKey)) {
-            prixiService.sendEvent(event, 3, eventKey)
-              .then(() => completeVoiceEvent(eventKey))
-              .catch((err: any) => {
-                failVoiceEvent(eventKey);
-                fastify.log.error(err, 'Failed to report call forwarding');
-              });
-          }
-
-          // Dispatch event async
-        } else {
-          // Fallback to record if forwarding isn't allowed
-          twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Prosím, po zaznení tónu povedzte svoje celé meno.');
-          twiml.record({ action: '/voice/record-name', playBeep: true, maxLength: 10, timeout: 3 });
-        }
-      } else {
-        // Did not press 1 -> Voicemail
-        twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Prosím, po zaznení tónu povedzte svoje celé meno.');
-        twiml.record({ action: '/voice/record-name', playBeep: true, maxLength: 10, timeout: 3 });
-      }
-      return reply.type('text/xml').send(twiml.toString());
-    } catch (err) {
-      fastify.log.error(err, 'Error in /gather');
-      twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Prosím, povedzte svoje celé meno.');
-      twiml.record({ action: '/voice/record-name', playBeep: true, maxLength: 10, timeout: 3 });
       return reply.type('text/xml').send(twiml.toString());
     }
   });
