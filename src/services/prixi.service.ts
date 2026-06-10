@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import { ClinicConfig, PrixiEvent } from '../types';
+import { v4 as uuidv4 } from 'uuid';
 
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -131,7 +132,7 @@ export class PrixiService {
         patient: {
           name: 'Pacient',
           surname: 'Zmeškaný Hovor',
-          email: null,
+          email: `voicebot.noreply.${uuidv4()}@email.com`,
           phone_number: event.phone,
         },
         requests: [
@@ -141,11 +142,11 @@ export class PrixiService {
             request_priority: 'medium',
             request_type: 'phone_call',
             request_description: `Meno: ${event.nameTranscript}\nRok narodenia: ${event.birthYearTranscript}\nProblém: ${event.problemTranscript}\n\nDĺžka hovoru: ${event.durationSeconds} sekúnd\n\n[Hlasové záznamy: </br>Meno: <a href="${event.nameUrl}">${event.nameUrl}</a></br>Rok narodenia: <a href="${event.birthYearUrl}">${event.birthYearUrl}</a></br>Problém: <a href="${event.problemUrl}">${event.problemUrl}</a>]`,
-            data: {
+            data: JSON.stringify({
               patient_name: event.nameTranscript,
               patient_birth_year: event.birthYearTranscript,
               phone_duration_seconds: event.durationSeconds
-            }
+            })
           }
         ],
         online: false,
