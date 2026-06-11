@@ -28,13 +28,13 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
       twiml.say(
         { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
-        'Dobrý deň. Dovolali ste sa do ambulancie. Prosím, po zaznení tónu povedzte svoje celé meno.'
+        'Dobrý deň som digitálna sestra PriXi v ambulancii všeobecného lekára Slovenský Grob. Nakoľko sa moji kolegovia aktuálne venujú pacientom v ambulancii, pomáham im vybavovať telefonáty aby sa na nič nezabudlo. Prosím uveďte vaše meno.'
       );
       twiml.record({
         action: '/voice/record-name',
         playBeep: true,
         maxLength: 10,
-        timeout: 3
+        timeout: 2
       });
 
       return reply.type('text/xml').send(twiml.toString());
@@ -57,7 +57,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       action: `/voice/record-birthyear?nameUrl=${encodeURIComponent(nameUrl || '')}&nameDuration=${nameDuration}`,
       playBeep: true,
       maxLength: 5,
-      timeout: 3
+      timeout: 2
     });
 
     return reply.type('text/xml').send(twiml.toString());
@@ -77,7 +77,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       action: `/voice/recording-complete?nameUrl=${encodeURIComponent(nameUrl)}&birthYearUrl=${encodeURIComponent(birthYearUrl || '')}&nameDuration=${nameDuration}&birthYearDuration=${birthYearDuration}`,
       playBeep: true,
       maxLength: 120,
-      timeout: 3
+      timeout: 2
     });
 
     return reply.type('text/xml').send(twiml.toString());
