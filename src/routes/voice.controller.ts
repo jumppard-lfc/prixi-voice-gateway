@@ -28,7 +28,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
       twiml.say(
         { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
-        'Dobrý deň som digitálna sestra PriXi v ambulancii všeobecného lekára Slovenský Grob. Nakoľko sa moji kolegovia aktuálne venujú pacientom v ambulancii, pomáham im vybavovať telefonáty aby sa na nič nezabudlo. Prosím uveďte vaše meno.'
+        'Dobrý deň, som digitálna sestra PriXi. Ak ste akútne chorý, príďte na vyšetrenie bez objednania počas ordinačných hodín, ktoré nájdete na webe ambulancie www.medisim.sk. Taktiež web ambulancie slúži na objednanie na preventívnu prehliadku, žiadosti o recept alebo vystavenie potvrdení a podobne. Prosíme, uprednostnite možnosť komunikácie cez webovú stránku www.medisim.sk. Ak si prajete ponechať telefonický odkaz, uveďte prosím najprv vaše meno:'
       );
       twiml.record({
         action: '/voice/record-name',
