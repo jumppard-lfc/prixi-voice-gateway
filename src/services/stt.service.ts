@@ -18,7 +18,7 @@ export class SttService {
    * Downloads an audio file from a given URL and transcribes it using OpenAI Whisper.
    * Cleans up the temporary file after processing.
    */
-  async transcribeAudioUrl(audioUrl: string): Promise<string> {
+  async transcribeAudioUrl(audioUrl: string, prompt?: string): Promise<string> {
     const tempFilePath = path.join(os.tmpdir(), `${uuidv4()}.wav`);
     const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
     const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
@@ -49,7 +49,7 @@ export class SttService {
         file: fs.createReadStream(tempFilePath),
         model: 'whisper-1',
         language: 'sk',
-        prompt: 'Hlasová správa pre lekára v ambulancii PriXi. Pacient uvádza svoje meno, priezvisko a dôvod volania, napríklad recept na lieky ako Ibalgin, Paralen, kontrola alebo choroba.',
+        prompt: prompt || 'Hlasová správa pre lekára v ambulancii PriXi. Pacient uvádza svoje meno, priezvisko a dôvod volania, napríklad recept na lieky ako Ibalgin, Paralen, kontrola alebo choroba.',
       });
 
       return transcription.text;

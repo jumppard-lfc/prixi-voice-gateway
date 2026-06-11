@@ -104,9 +104,15 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
       try {
         const [nameTranscript, birthYearTranscript, problemTranscript] = await Promise.all([
-          nameUrl ? sttService.transcribeAudioUrl(nameUrl) : Promise.resolve(''),
-          birthYearUrl ? sttService.transcribeAudioUrl(birthYearUrl) : Promise.resolve(''),
-          problemUrl ? sttService.transcribeAudioUrl(problemUrl) : Promise.resolve('')
+          nameUrl
+            ? sttService.transcribeAudioUrl(nameUrl, 'Meno a priezvisko pacienta, napríklad Ján Kováč, Mária Nováková.')
+            : Promise.resolve(''),
+          birthYearUrl
+            ? sttService.transcribeAudioUrl(birthYearUrl, 'Rok narodenia pacienta vo formáte 4-miestneho čísla, napríklad 1985, 1990, 2003, 1952. Nevymýšľaj si webové stránky ani vety, uveď len číslo.')
+            : Promise.resolve(''),
+          problemUrl
+            ? sttService.transcribeAudioUrl(problemUrl, 'Popis zdravotného problému pacienta pre lekára. Napríklad bolesť chrbta, recept na lieky, kašeľ, teplota. Alebo sa len jednoducho chce objednať na termín, alebo sa zaujíma o výsledky z vyšetrenia, a pod.')
+            : Promise.resolve('')
         ]);
 
         const event: VoicemailRecordedEvent = {
