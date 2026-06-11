@@ -183,7 +183,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     fastify.log.info({ from: fromNumber, durationSeconds, problemUrl }, 'Voicemail recording complete');
 
     const twiml = new VoiceResponse();
-    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Rozumiem, vaša požiadavka je zaznamenaná, budeme Vás kontaktovať v krátkom čase. Ďakujeme a dovidenia.');
+    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Rozumiem, vaša požiadavka je zaznamenaná, ambulancia sa vám po jej prijatí ozve. Ďakujeme a dovidenia.');
     twiml.hangup();
 
     // Return XML to Twilio immediately to prevent timeouts
