@@ -21,6 +21,23 @@ function generateCurlCommand(method: string, url: string, headers: Record<string
   return curl;
 }
 
+function parsePatientName(transcript?: string): { name: string; surname: string } {
+  let clean = (transcript || '').trim();
+  if (clean.endsWith('.')) {
+    clean = clean.slice(0, -1).trim();
+  }
+  if (!clean) {
+    return { name: 'Pacient', surname: 'Zmeškaný Hovor' };
+  }
+  const parts = clean.split(/\s+/);
+  if (parts.length === 1) {
+    return { name: parts[0], surname: 'Zmeškaný Hovor' };
+  }
+  const name = parts[0];
+  const surname = parts.slice(1).join(' ');
+  return { name, surname };
+}
+
 export class PrixiService {
   private client: AxiosInstance;
   private processedEventKeys = new Map<string, number>();
@@ -126,13 +143,14 @@ export class PrixiService {
     if (event.event === 'voicemail_recorded') {
       apiEndpoint = '/api/requests/store';
       const config = await this.getConfig(event.phone);
+      const parsedName = parsePatientName(event.nameTranscript);
 
       apiPayload = {
         professional_id: config.professionalId || 1,
         patient: {
-          name: 'Pacient',
-          surname: 'Zmeškaný Hovor',
-          email: `voicebot.noreply.${uuidv4()}@email.com`,
+          name: parsedName.name,
+          surname: parsedName.surname,
+          email: null,
           phone_number: event.phone,
         },
         requests: [
