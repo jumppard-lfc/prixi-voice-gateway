@@ -103,5 +103,5 @@ test('POST /voice/incoming s validnym podpisom vrati TwiML', async () => {
 
   assert.equal(response.statusCode, 200);
   assert.match(response.body, /<Response>/);
-  assert.match(response.body, /This number is currently unavailable\./);
+  assert.match(response.body, /Toto číslo je momentálne nedostupné\./);
 });

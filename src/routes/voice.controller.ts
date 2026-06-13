@@ -28,13 +28,13 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
       twiml.say(
         { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
-        'Dobrý deň, som digitálna sestra PriXi. Ak ste akútne chorý, príďte na vyšetrenie bez objednania počas ordinačných hodín, ktoré nájdete na webe ambulancie www.medisim.sk. Taktiež web ambulancie slúži na objednanie na preventívnu prehliadku, žiadosti o recept alebo vystavenie potvrdení a podobne. Prosíme, uprednostnite možnosť komunikácie cez webovú stránku www.medisim.sk. Ak si prajete ponechať telefonický odkaz, uveďte prosím najprv vaše meno:'
+        'Dobrý deň, som digitálna sestra PriXi v ambulancii všeobecného lekára Slovenský Grob. Ak ste akútne chorý, príďte na vyšetrenie bez objednania počas ordinačných hodín, ktoré nájdete na webe ambulancie www.medisim.sk. Taktiež web ambulancie slúži na objednanie na preventívnu prehliadku, žiadosti o recept alebo vystavenie potvrdení a podobne. Prosíme, uprednostnite možnosť komunikácie cez webovú stránku www.medisim.sk. Ak si prajete ponechať telefonický odkaz, popíšte prosím po zaznení tónu najprv váš problém:'
       );
       twiml.record({
-        action: '/voice/record-name',
+        action: '/voice/record-problem',
         playBeep: true,
-        maxLength: 10,
-        timeout: 2
+        maxLength: 120,
+        timeout: 4
       });
 
       return reply.type('text/xml').send(twiml.toString());
@@ -46,37 +46,37 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.post('/record-name', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/record-problem', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as Record<string, string>;
-    const nameUrl = body.RecordingUrl;
-    const nameDuration = body.RecordingDuration || '0';
+    const problemUrl = body.RecordingUrl;
+    const problemDuration = body.RecordingDuration || '0';
 
     const twiml = new VoiceResponse();
-    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Rozumiem. Teraz prosím povedzte svoj rok narodenia.');
+    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Ďakujem. Teraz prosím uveďte vaše meno a priezvisko.');
     twiml.record({
-      action: `/voice/record-birthyear?nameUrl=${encodeURIComponent(nameUrl || '')}&nameDuration=${nameDuration}`,
+      action: `/voice/record-name?problemUrl=${encodeURIComponent(problemUrl || '')}&problemDuration=${problemDuration}`,
       playBeep: true,
-      maxLength: 5,
+      maxLength: 10,
       timeout: 2
     });
 
     return reply.type('text/xml').send(twiml.toString());
   });
 
-  fastify.post('/record-birthyear', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.post('/record-name', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as Record<string, string>;
     const query = request.query as Record<string, string>;
-    const birthYearUrl = body.RecordingUrl;
-    const birthYearDuration = body.RecordingDuration || '0';
-    const nameUrl = query.nameUrl || '';
-    const nameDuration = query.nameDuration || '0';
+    const nameUrl = body.RecordingUrl;
+    const nameDuration = body.RecordingDuration || '0';
+    const problemUrl = query.problemUrl || '';
+    const problemDuration = query.problemDuration || '0';
 
     const twiml = new VoiceResponse();
-    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Nakoniec prosím popíšte svoj problém.');
+    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Rozumiem. Na záver prosím uveďte váš rok narodenia.');
     twiml.record({
-      action: `/voice/recording-complete?nameUrl=${encodeURIComponent(nameUrl)}&birthYearUrl=${encodeURIComponent(birthYearUrl || '')}&nameDuration=${nameDuration}&birthYearDuration=${birthYearDuration}`,
+      action: `/voice/recording-complete?problemUrl=${encodeURIComponent(problemUrl)}&problemDuration=${problemDuration}&nameUrl=${encodeURIComponent(nameUrl || '')}&nameDuration=${nameDuration}`,
       playBeep: true,
-      maxLength: 120,
+      maxLength: 5,
       timeout: 2
     });
 
@@ -170,16 +170,16 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const body = request.body as Record<string, string>;
     const query = request.query as Record<string, string>;
 
-    const problemUrl = body.RecordingUrl;
+    const birthYearUrl = body.RecordingUrl;
     const nameUrl = query.nameUrl || '';
-    const birthYearUrl = query.birthYearUrl || '';
+    const problemUrl = query.problemUrl || '';
 
     const fromNumber = body.From;
     const providerCallId = body.CallSid;
 
     const nameDuration = parseInt(query.nameDuration || '0', 10);
-    const birthYearDuration = parseInt(query.birthYearDuration || '0', 10);
-    const problemDuration = parseInt(body.RecordingDuration || '0', 10);
+    const problemDuration = parseInt(query.problemDuration || '0', 10);
+    const birthYearDuration = parseInt(body.RecordingDuration || '0', 10);
     const durationSeconds = nameDuration + birthYearDuration + problemDuration;
 
     // Rough estimation if exact start/end differ
