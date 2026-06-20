@@ -26,9 +26,15 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         return reply.type('text/xml').send(twiml.toString());
       }
 
+      if (ivrService.isLiveCallWindow(config.timezone)) {
+        twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Prepájam vás do ambulancie, prosím čakajte na linke.');
+        twiml.dial('+421940610160');
+        return reply.type('text/xml').send(twiml.toString());
+      }
+
       twiml.say(
         { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
-        'Dobrý deň, som digitálna sestra PriXi v ambulancii všeobecného lekára Slovenský Grob. Ak ste akútne chorý, príďte na vyšetrenie bez objednania počas ordinačných hodín, ktoré nájdete na webe ambulancie www.medisim.sk. Taktiež web ambulancie slúži na objednanie na preventívnu prehliadku, žiadosti o recept alebo vystavenie potvrdení a podobne. Prosíme, uprednostnite možnosť komunikácie cez webovú stránku www.medisim.sk. Ak si prajete ponechať telefonický odkaz, popíšte prosím po zaznení tónu najprv váš problém:'
+        'Dobrý deň, som digitálna sestra PriXi v ambulancii všeobecného lekára Slovenský Grob. Ak ste akútne chorý, príďte na vyšetrenie bez objednania počas ordinačných hodín, ktoré nájdete na webe ambulancie www.medisim.sk. Taktiež web ambulancie slúži na objednanie na preventívnu prehliadku, žiadosti o recept alebo vystavenie potvrdení a podobne. Prosíme, uprednostnite možnosť komunikácie cez webovú stránku www.medisim.sk. Ak si prajete ponechať telefonický odkaz, popíšte prosím po zaznení tónu najprv váš problém a po skončení stlačte mriežku.'
       );
       twiml.record({
         action: '/voice/record-problem',
@@ -52,7 +58,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const problemDuration = body.RecordingDuration || '0';
 
     const twiml = new VoiceResponse();
-    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Ďakujem. Teraz prosím uveďte vaše meno a priezvisko.');
+    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Ďakujem. Teraz prosím uveďte vaše meno a priezvisko, a po skončení stlačte mriežku.');
     twiml.record({
       action: `/voice/record-name?problemUrl=${encodeURIComponent(problemUrl || '')}&problemDuration=${problemDuration}`,
       playBeep: true,
@@ -72,7 +78,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const problemDuration = query.problemDuration || '0';
 
     const twiml = new VoiceResponse();
-    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Rozumiem. Na záver prosím uveďte váš rok narodenia.');
+    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Rozumiem. Na záver prosím uveďte váš rok narodenia a stlačte mriežku.');
     twiml.record({
       action: `/voice/recording-complete?problemUrl=${encodeURIComponent(problemUrl)}&problemDuration=${problemDuration}&nameUrl=${encodeURIComponent(nameUrl || '')}&nameDuration=${nameDuration}`,
       playBeep: true,

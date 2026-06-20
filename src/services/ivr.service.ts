@@ -49,6 +49,28 @@ export class IvrService {
   shouldAllowCall(config: ClinicConfig): boolean {
     return config.voiceBotEnabled === true;
   }
+
+  /**
+   * Evaluates if the current time falls within the dedicated live call windows.
+   */
+  isLiveCallWindow(timezone: string = 'Europe/Bratislava'): boolean {
+    const now = DateTime.now().setZone(timezone);
+    if (!now.isValid) return false;
+
+    const day = now.weekday; // 1 = Monday, 7 = Sunday
+    const timeInt = now.hour * 100 + now.minute;
+
+    // Mon(1), Tue(2), Thu(4), Fri(5): 12:00 - 13:30
+    if ([1, 2, 4, 5].includes(day) && timeInt >= 1200 && timeInt < 1330) {
+      return true;
+    }
+    // Wed(3): 13:30 - 15:00
+    if (day === 3 && timeInt >= 1330 && timeInt < 1500) {
+      return true;
+    }
+
+    return false;
+  }
 }
 
 export const ivrService = new IvrService();
