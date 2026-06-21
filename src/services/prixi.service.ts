@@ -99,8 +99,8 @@ export class PrixiService {
         voiceBotEnabled: true,
         timezone: process.env.PRIXI_FALLBACK_TIMEZONE || 'Europe/Bratislava',
         allowForwardDuringOfficeHours: false,
-        professionalId: Number(process.env.PRIXI_DEFAULT_PROFESSIONAL_ID) || 1,
-        healthcareProviderId: Number(process.env.PRIXI_DEFAULT_HEALTHCARE_PROVIDER_ID) || 1,
+        professionalId: Number(process.env.PRIXI_DEFAULT_PROFESSIONAL_ID) || 81,
+        healthcareProviderId: Number(process.env.PRIXI_DEFAULT_HEALTHCARE_PROVIDER_ID) || 64,
       };
     }
 
@@ -117,8 +117,8 @@ export class PrixiService {
         clinicId: 'fallback',
         voiceBotEnabled: true,
         timezone: 'Europe/Bratislava',
-        professionalId: 1,
-        healthcareProviderId: 1,
+        professionalId: 81,
+        healthcareProviderId: 64,
       };
     }
   }
@@ -146,7 +146,7 @@ export class PrixiService {
       const parsedName = parsePatientName(event.nameTranscript);
 
       apiPayload = {
-        professional_id: config.professionalId || 1,
+        professional_id: config.professionalId || 81,
         patient: {
           name: parsedName.name,
           surname: parsedName.surname,
@@ -155,7 +155,7 @@ export class PrixiService {
         },
         requests: [
           {
-            healthcare_provider_id: config.healthcareProviderId || 1,
+            healthcare_provider_id: config.healthcareProviderId || 64,
             request_title: 'Hlasová správa',
             request_priority: 'low',
             request_type: 'phone_call',
