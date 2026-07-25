@@ -13,12 +13,19 @@ export async function voiceRoutes(fastify: FastifyInstance) {
   fastify.post('/incoming', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as Record<string, string>;
     const fromNumber = body.From;
-    fastify.log.info({ from: fromNumber }, 'Incoming voice call received');
+    let forwardedFrom = body.ForwardedFrom;
+
+    if (!forwardedFrom) {
+      fastify.log.error({ from: fromNumber, to: body.To }, '[CRITICAL ALERT] Missing ForwardedFrom header! The SIP Diversion header was dropped by the carrier. Routing cannot reliably identify the clinic.');
+      forwardedFrom = '';
+    }
+
+    fastify.log.info({ from: fromNumber, forwardedFrom }, 'Incoming voice call received');
 
     const twiml = new VoiceResponse();
 
     try {
-      const config = await prixiService.getConfig(fromNumber);
+      const config = await prixiService.getConfig(forwardedFrom || fromNumber);
 
       if (!ivrService.shouldAllowCall(config)) {
         twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Toto číslo je momentálne nedostupné.');
@@ -26,21 +33,17 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         return reply.type('text/xml').send(twiml.toString());
       }
 
-      if (ivrService.isLiveCallWindow(config.timezone)) {
-        twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Prepájam vás do ambulancie, prosím čakajte na linke.');
-        twiml.dial('+421940610160');
-        return reply.type('text/xml').send(twiml.toString());
-      }
+      const greeting = config.greetingMessage || 'Dobrý deň, dovolali ste sa do ambulancie. Pre zanechanie odkazu popíšte po zaznení tónu najprv váš problém a po skončení stlačte hociktoré tlačidlo.';
 
       twiml.say(
         { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
-        'Dobrý deň, som digitálna sestra PriXi v ambulancii všeobecného lekára Slovenský Grob. Ak ste akútne chorý, príďte na vyšetrenie bez objednania počas ordinačných hodín, ktoré nájdete na webe ambulancie www.medisim.sk. Taktiež web ambulancie slúži na objednanie na preventívnu prehliadku, žiadosti o recept alebo vystavenie potvrdení a podobne. Prosíme, uprednostnite možnosť komunikácie cez webovú stránku www.medisim.sk. Ak si prajete ponechať telefonický odkaz, popíšte prosím po zaznení tónu najprv váš problém a po skončení stlačte hociktoré tlačidlo.'
+        greeting
       );
       twiml.record({
-        action: '/voice/record-problem',
+        action: `/voice/record-problem?forwardedFrom=${encodeURIComponent(forwardedFrom)}`,
         playBeep: true,
         maxLength: 120,
-        timeout: 4
+        timeout: 10
       });
 
       return reply.type('text/xml').send(twiml.toString());
@@ -54,16 +57,18 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
   fastify.post('/record-problem', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as Record<string, string>;
+    const query = request.query as Record<string, string>;
     const problemUrl = body.RecordingUrl;
     const problemDuration = body.RecordingDuration || '0';
+    const forwardedFrom = query.forwardedFrom || '';
 
     const twiml = new VoiceResponse();
     twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Ďakujem. Teraz prosím uveďte vaše meno a priezvisko, a po skončení stlačte hociktoré tlačidlo.');
     twiml.record({
-      action: `/voice/record-name?problemUrl=${encodeURIComponent(problemUrl || '')}&problemDuration=${problemDuration}`,
+      action: `/voice/record-name?problemUrl=${encodeURIComponent(problemUrl || '')}&problemDuration=${problemDuration}&forwardedFrom=${encodeURIComponent(forwardedFrom)}`,
       playBeep: true,
-      maxLength: 10,
-      timeout: 2
+      maxLength: 20,
+      timeout: 5
     });
 
     return reply.type('text/xml').send(twiml.toString());
@@ -76,14 +81,15 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const nameDuration = body.RecordingDuration || '0';
     const problemUrl = query.problemUrl || '';
     const problemDuration = query.problemDuration || '0';
+    const forwardedFrom = query.forwardedFrom || '';
 
     const twiml = new VoiceResponse();
     twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Rozumiem. Na záver prosím uveďte váš rok narodenia a stlačte hociktoré tlačidlo.');
     twiml.record({
-      action: `/voice/recording-complete?problemUrl=${encodeURIComponent(problemUrl)}&problemDuration=${problemDuration}&nameUrl=${encodeURIComponent(nameUrl || '')}&nameDuration=${nameDuration}`,
+      action: `/voice/recording-complete?problemUrl=${encodeURIComponent(problemUrl)}&problemDuration=${problemDuration}&nameUrl=${encodeURIComponent(nameUrl || '')}&nameDuration=${nameDuration}&forwardedFrom=${encodeURIComponent(forwardedFrom)}`,
       playBeep: true,
-      maxLength: 5,
-      timeout: 2
+      maxLength: 10,
+      timeout: 5
     });
 
     return reply.type('text/xml').send(twiml.toString());
@@ -91,6 +97,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
   async function handleVoicemailBackground(
     fromNumber: string,
+    forwardedFrom: string,
     nameUrl: string,
     birthYearUrl: string,
     problemUrl: string,
@@ -106,19 +113,25 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     }
 
     try {
-      const config = await prixiService.getConfig(fromNumber);
+      const config = await prixiService.getConfig(forwardedFrom || fromNumber);
 
       try {
+        const transcribeSafe = async (url: string, prompt: string) => {
+          if (!url) return '';
+          // Ensure URL ends with .mp3 to get the compressed format and avoid Twilio issues
+          const finalUrl = url.includes('.mp3') || url.includes('.wav') ? url : `${url}.mp3`;
+          try {
+            return await sttService.transcribeAudioUrl(finalUrl, prompt);
+          } catch (err) {
+            fastify.log.error(err, `Transcription failed for URL: ${finalUrl}`);
+            return ''; // Return empty string so other transcripts are not lost
+          }
+        };
+
         const [nameTranscript, birthYearTranscript, problemTranscript] = await Promise.all([
-          nameUrl
-            ? sttService.transcribeAudioUrl(nameUrl, 'Meno a priezvisko pacienta, napríklad Ján Kováč, Mária Nováková.')
-            : Promise.resolve(''),
-          birthYearUrl
-            ? sttService.transcribeAudioUrl(birthYearUrl, 'Rok narodenia pacienta vo formáte 4-miestneho čísla, napríklad 1985, 1990, 2003, 1952. Nevymýšľaj si webové stránky ani vety, uveď len číslo.')
-            : Promise.resolve(''),
-          problemUrl
-            ? sttService.transcribeAudioUrl(problemUrl, 'Popis zdravotného problému pacienta pre lekára. Napríklad bolesť chrbta, recept na lieky, kašeľ, teplota. Alebo sa len jednoducho chce objednať na termín, alebo sa zaujíma o výsledky z vyšetrenia, a pod.')
-            : Promise.resolve('')
+          transcribeSafe(nameUrl, 'Meno a priezvisko pacienta, napríklad Ján Kováč, Mária Nováková.'),
+          transcribeSafe(birthYearUrl, 'Rok narodenia pacienta vo formáte 4-miestneho čísla, napríklad 1985, 1990, 2003, 1952. Nevymýšľaj si webové stránky ani vety, uveď len číslo.'),
+          transcribeSafe(problemUrl, 'Popis zdravotného problému pacienta pre lekára. Napríklad bolesť chrbta, recept na lieky, kašeľ, teplota. Alebo sa len jednoducho chce objednať na termín, alebo sa zaujíma o výsledky z vyšetrenia, a pod.')
         ]);
 
         const event: VoicemailRecordedEvent = {
@@ -179,6 +192,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const birthYearUrl = body.RecordingUrl;
     const nameUrl = query.nameUrl || '';
     const problemUrl = query.problemUrl || '';
+    const forwardedFrom = query.forwardedFrom || '';
 
     const fromNumber = body.From;
     const providerCallId = body.CallSid;
@@ -204,7 +218,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     if (problemUrl || nameUrl || birthYearUrl) {
       const eventKey = createVoiceEventKey('voicemail_recorded', providerCallId);
       // Run heavy processing asynchronously in background
-      handleVoicemailBackground(fromNumber, nameUrl, birthYearUrl, problemUrl, durationSeconds, callStartedAt, callEndedAt, providerCallId, eventKey)
+      handleVoicemailBackground(fromNumber, forwardedFrom, nameUrl, birthYearUrl, problemUrl, durationSeconds, callStartedAt, callEndedAt, providerCallId, eventKey)
         .catch(err => fastify.log.error(err, 'Background voicemail task failed'));
     }
   });

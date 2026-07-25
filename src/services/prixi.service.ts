@@ -21,22 +21,6 @@ function generateCurlCommand(method: string, url: string, headers: Record<string
   return curl;
 }
 
-function parsePatientName(transcript?: string): { name: string; surname: string } {
-  let clean = (transcript || '').trim();
-  if (clean.endsWith('.')) {
-    clean = clean.slice(0, -1).trim();
-  }
-  if (!clean) {
-    return { name: 'Pacient', surname: 'Zmeškaný Hovor' };
-  }
-  const parts = clean.split(/\s+/);
-  if (parts.length === 1) {
-    return { name: parts[0], surname: 'Zmeškaný Hovor' };
-  }
-  const name = parts[0];
-  const surname = parts.slice(1).join(' ');
-  return { name, surname };
-}
 
 export class PrixiService {
   private client: AxiosInstance;
@@ -105,7 +89,7 @@ export class PrixiService {
     }
 
     try {
-      const response = await this.client.get<ClinicConfig>('/voice/config', {
+      const response = await this.client.get<ClinicConfig>('/api/voice/config', {
         params: { phoneNumber },
         timeout: 2000,
       });
@@ -137,43 +121,12 @@ export class PrixiService {
     }
 
     // 1. Process payload converting voice events to API requests
-    let apiEndpoint = '/voice/call-completed';
+    let apiEndpoint = '/api/voice/call-completed';
     let apiPayload: any = event;
 
     if (event.event === 'voicemail_recorded') {
-      apiEndpoint = '/api/requests/store';
-      const config = await this.getConfig(event.phone);
-      const parsedName = parsePatientName(event.nameTranscript);
-
-      apiPayload = {
-        professional_id: config.professionalId || 81,
-        patient: {
-          name: parsedName.name,
-          surname: parsedName.surname,
-          email: null,
-          phone_number: event.phone,
-        },
-        requests: [
-          {
-            healthcare_provider_id: config.healthcareProviderId || 64,
-            request_title: 'Hlasová správa',
-            request_priority: 'low',
-            request_type: 'phone_call',
-            request_description: `<b>Meno:</b> ${event.nameTranscript} (<a href="${event.nameUrl}">prehrať nahrávku</a>)<br />\n` +
-              `<b>Rok narodenia:</b> ${event.birthYearTranscript} (<a href="${event.birthYearUrl}">prehrať nahrávku</a>)<br />\n` +
-              `<b>Problém:</b> ${event.problemTranscript} (<a href="${event.problemUrl}">prehrať nahrávku</a>)<br /><br />\n` +
-              `<i>Dĺžka hovoru: ${event.durationSeconds} sekúnd</i>`,
-            data: JSON.stringify({
-              patient_name: event.nameTranscript,
-              patient_birth_year: event.birthYearTranscript,
-              phone_duration_seconds: event.durationSeconds
-            })
-          }
-        ],
-        online: false,
-        appointment_date: null,
-        returnURL: 'https://prixi.sk',
-      };
+      apiEndpoint = '/api/voice/event';
+      apiPayload = event;
     }
 
     const fullUrl = `${this.client.defaults.baseURL}${apiEndpoint}`;

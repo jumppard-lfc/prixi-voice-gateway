@@ -18,6 +18,7 @@ export interface ClinicConfig {
   allowForwardDuringOfficeHours?: boolean;
   forwardPhoneNumber?: string;
   timezone: string;
+  greetingMessage?: string;
   professionalId?: number;
   healthcareProviderId?: number;
 }
