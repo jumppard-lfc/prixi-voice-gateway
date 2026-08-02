@@ -16,8 +16,13 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     let forwardedFrom = body.ForwardedFrom;
 
     if (!forwardedFrom) {
-      fastify.log.error({ from: fromNumber, to: body.To }, '[CRITICAL ALERT] Missing ForwardedFrom header! The SIP Diversion header was dropped by the carrier. Routing cannot reliably identify the clinic.');
-      forwardedFrom = '';
+      if (body.To === '+421800232793' || body.To === '0322289055' || body.To === '+421322289055' || body.To === 'sip:0322289055@sip.twilio.com') {
+        forwardedFrom = '+421940610160'; // Hardcoded fallback for Martin
+        fastify.log.info({ from: fromNumber, to: body.To }, 'Applied hardcoded ForwardedFrom fallback for Martin');
+      } else {
+        fastify.log.error({ from: fromNumber, to: body.To }, '[CRITICAL ALERT] Missing ForwardedFrom header! The SIP Diversion header was dropped by the carrier. Routing cannot reliably identify the clinic.');
+        forwardedFrom = '';
+      }
     }
 
     fastify.log.info({ from: fromNumber, forwardedFrom }, 'Incoming voice call received');
