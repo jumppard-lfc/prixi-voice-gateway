@@ -17,8 +17,8 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
     if (!forwardedFrom) {
       if (body.To === '+421800232793' || body.To === '0322289055' || body.To === '+421322289055' || body.To === 'sip:0322289055@sip.twilio.com') {
-        forwardedFrom = '+421940610160'; // Hardcoded fallback for Martin
-        fastify.log.info({ from: fromNumber, to: body.To }, 'Applied hardcoded ForwardedFrom fallback for Martin');
+        forwardedFrom = '+421911500609'; // Hardcoded fallback for MUDr. Dobrovodska
+        fastify.log.info({ from: fromNumber, to: body.To }, 'Applied hardcoded ForwardedFrom fallback for Dobrovodska');
       } else {
         fastify.log.error({ from: fromNumber, to: body.To }, '[CRITICAL ALERT] Missing ForwardedFrom header! The SIP Diversion header was dropped by the carrier. Routing cannot reliably identify the clinic.');
         forwardedFrom = '';
@@ -32,7 +32,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     try {
       const config = await prixiService.getConfig(forwardedFrom || fromNumber);
 
-      if (!ivrService.shouldAllowCall(config)) {
+      if (!ivrService.shouldAllowCall(config, forwardedFrom)) {
         twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Toto číslo je momentálne nedostupné.');
         twiml.reject();
         return reply.type('text/xml').send(twiml.toString());

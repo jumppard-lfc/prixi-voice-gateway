@@ -46,7 +46,15 @@ export class IvrService {
   /**
    * Evaluates if the call should be allowed to go to the IVR prompt based on config.
    */
-  shouldAllowCall(config: ClinicConfig): boolean {
+  shouldAllowCall(config: ClinicConfig, forwardedFrom?: string): boolean {
+    // Hardcoded office hours for MUDr. Dobrovodska
+    if (forwardedFrom === '+421911500609') {
+      const now = DateTime.now().setZone(config.timezone || 'Europe/Bratislava');
+      if (now.weekday > 5 || now.hour >= 15 || now.hour < 7) {
+        return false;
+      }
+    }
+    
     return config.voiceBotEnabled === true;
   }
 
