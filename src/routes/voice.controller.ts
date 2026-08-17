@@ -28,7 +28,9 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
         client.messages.create({
           body: 'Dobrý deň, pre objednanie do ambulancie použite tento odkaz: klostermann.sk/rezervacia',
-          from: body.To,
+          // 0800 number is not SMS-capable in Slovakia. 
+          // You must use an SMS-capable Twilio number you own, or an Alphanumeric Sender ID (if enabled).
+          from: process.env.TWILIO_SMS_FROM_NUMBER || 'PriXi', 
           to: fromNumber
         }).catch(err => fastify.log.error(err, 'Failed to send SMS for Klostermann demo'));
       } catch (err) {
