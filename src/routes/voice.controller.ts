@@ -19,9 +19,15 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     if (body.To === '+421800232793') {
       fastify.log.info({ from: fromNumber }, 'Triggering Klostermann demo');
       const twiml = new VoiceResponse();
+      const sayGreeting = twiml.say(
+        { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
+        'Dobrý deň, dovolali ste sa na zubnú kliniku '
+      );
+      sayGreeting.phoneme({ alphabet: 'ipa', ph: 'ˈklostɛrman' }, 'Klostermann');
+      
       twiml.say(
         { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
-        'Dobrý deň, dovolali ste sa na zubnú kliniku Klostermann. Linka je momentálne obsadená. Aby ste nemuseli čakať, práve vám posielame SMS správu s odkazom na objednanie. Ďakujeme.'
+        '. Linka je momentálne obsadená. Aby ste nemuseli čakať, práve vám posielame SMS správu s odkazom na objednanie. Ďakujeme.'
       );
       
       try {
