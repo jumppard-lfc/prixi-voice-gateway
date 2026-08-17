@@ -15,6 +15,31 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const fromNumber = body.From;
     let forwardedFrom = body.ForwardedFrom;
 
+    // --- KLOSTERMANN DEMO ---
+    if (body.To === '+421800232793') {
+      fastify.log.info({ from: fromNumber }, 'Triggering Klostermann demo');
+      const twiml = new VoiceResponse();
+      twiml.say(
+        { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
+        'Dobrý deň, dovolali ste sa na zubnú kliniku Klostermann. Linka je momentálne obsadená. Aby ste nemuseli čakať, práve vám posielame SMS správu s odkazom na objednanie. Ďakujeme.'
+      );
+      
+      try {
+        const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+        client.messages.create({
+          body: 'Dobrý deň, pre objednanie do ambulancie použite tento odkaz: klostermann.sk/rezervacia',
+          from: body.To,
+          to: fromNumber
+        }).catch(err => fastify.log.error(err, 'Failed to send SMS for Klostermann demo'));
+      } catch (err) {
+        fastify.log.error(err, 'Error initializing Twilio client for SMS');
+      }
+
+      twiml.hangup();
+      return reply.type('text/xml').send(twiml.toString());
+    }
+    // ------------------------
+
     if (!forwardedFrom) {
       if (body.To === '+421800232793' || body.To === '0322289055' || body.To === '+421322289055' || body.To === 'sip:0322289055@sip.twilio.com') {
         forwardedFrom = '+421911500609'; // Hardcoded fallback for MUDr. Dobrovodska
