@@ -136,7 +136,7 @@ test('Pediatricky rezim pyta udaje dietata v celom IVR toku', async () => {
       CallSid: 'CA99999999999999999999999999999991',
     });
     assert.equal(incoming.statusCode, 200);
-    assert.match(incoming.body, /pediatrickej ambulancie MUDr\. Celkovej/);
+    assert.match(incoming.body, /pediatrickej ambulancie doktorky Čelkovej/);
     assert.match(incoming.body, /155 alebo 112/);
     assert.match(incoming.body, /pediatricMode=true/);
 
@@ -199,9 +199,63 @@ test('Twilio cislo MUDr. Celkovej automaticky aktivuje pediatricky voice bot', a
 
     assert.equal(response.statusCode, 200);
     assert.equal(requestedPhoneNumber, '+420910927082');
-    assert.match(response.body, /pediatrickej ambulancie MUDr\. Celkovej/);
+    assert.match(response.body, /pediatrickej ambulancie doktorky Čelkovej/);
     assert.match(response.body, /forwardedFrom=%2B420910927082/);
     assert.match(response.body, /pediatricMode=true/);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+  }
+});
+
+test('Twilio cislo MUDr. Benovej Baloghovej aktivuje ortopedicky voice bot', async () => {
+  let requestedPhoneNumber = null;
+  prixiService.getConfig = async (phoneNumber) => {
+    requestedPhoneNumber = phoneNumber;
+    return {
+      clinicId: 'mudr-benova-baloghova',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+      pediatricMode: true,
+    };
+  };
+
+  try {
+    const incoming = await signedVoicePost('/voice/incoming', {
+      From: '+421900000004',
+      To: '+420910927739',
+      CallSid: 'CA99999999999999999999999999999996',
+    });
+
+    assert.equal(incoming.statusCode, 200);
+    assert.equal(requestedPhoneNumber, '+420910927739');
+    assert.match(incoming.body, /ortopedickej ambulancie pani doktorky Miroslavy Beňovej Baloghovej/);
+    assert.match(incoming.body, /s čím vám môžeme pomôcť/);
+    assert.match(incoming.body, /forwardedFrom=%2B420910927739/);
+    assert.match(incoming.body, /pediatricMode=false/);
+
+    const problemEndpoint = '/voice/record-problem?forwardedFrom=%2B420910927739&pediatricMode=false';
+    const problem = await signedVoicePost(problemEndpoint, {
+      From: '+421900000004',
+      CallSid: 'CA99999999999999999999999999999997',
+      RecordingUrl: 'https://api.twilio.test/problem',
+      RecordingDuration: '12',
+    });
+    assert.equal(problem.statusCode, 200);
+    assert.match(problem.body, /vaše meno a priezvisko/);
+
+    const nameEndpoint = '/voice/record-name?problemUrl=https%3A%2F%2Fapi.twilio.test%2Fproblem&problemDuration=12&forwardedFrom=%2B420910927739&pediatricMode=false';
+    const name = await signedVoicePost(nameEndpoint, {
+      From: '+421900000004',
+      CallSid: 'CA99999999999999999999999999999998',
+      RecordingUrl: 'https://api.twilio.test/name',
+      RecordingDuration: '4',
+    });
+    assert.equal(name.statusCode, 200);
+    assert.match(name.body, /váš rok narodenia/);
   } finally {
     prixiService.getConfig = async () => ({
       clinicId: 'test-clinic',

@@ -9,8 +9,10 @@ import { claimVoiceEvent, completeVoiceEvent, failVoiceEvent, createVoiceEventKe
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 const CELKOVA_PHONE_NUMBER = '+420910927082';
+const BENOVA_BALOGHOVA_PHONE_NUMBER = '+420910927739';
 const DEFAULT_GREETING = 'Dobrý deň, dovolali ste sa do ambulancie. Pre zanechanie odkazu popíšte po zaznení tónu najprv váš problém a po skončení stlačte hociktoré tlačidlo.';
 const PEDIATRIC_GREETING = 'Dobrý deň, dovolali ste sa do pediatrickej ambulancie doktorky Čelkovej. Ak ide o náhly život ohrozujúci stav, volajte tiesňovú linku 155 alebo 112. V opačnom prípade nám prosím po zaznení tónu stručne povedzte, s čím sa na ambulanciu obraciate. Môže ísť napríklad o zdravotné ťažkosti dieťaťa, predpis liekov, výsledky vyšetrenia alebo objednanie. Po skončení stlačte ľubovoľné tlačidlo.';
+const ORTHOPEDIC_GREETING = 'Dobrý deň, dovolali ste sa do ortopedickej ambulancie pani doktorky Miroslavy Beňovej Baloghovej. Po zaznení tónu nám, prosím, povedzte, s čím vám môžeme pomôcť. Po skončení stlačte ľubovoľné tlačidlo.';
 
 export async function voiceRoutes(fastify: FastifyInstance) {
 
@@ -56,6 +58,9 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       if (body.To === CELKOVA_PHONE_NUMBER) {
         forwardedFrom = CELKOVA_PHONE_NUMBER;
         fastify.log.info({ from: fromNumber, to: body.To }, 'Applied direct Twilio number routing for MUDr. Celkova');
+      } else if (body.To === BENOVA_BALOGHOVA_PHONE_NUMBER) {
+        forwardedFrom = BENOVA_BALOGHOVA_PHONE_NUMBER;
+        fastify.log.info({ from: fromNumber, to: body.To }, 'Applied direct Twilio number routing for MUDr. Benova Baloghova');
       } else if (body.To === '+421800232793' || body.To === '0322289055' || body.To === '+421322289055' || body.To === 'sip:0322289055@sip.twilio.com') {
         forwardedFrom = '+421911500609'; // Hardcoded fallback for MUDr. Dobrovodska
         fastify.log.info({ from: fromNumber, to: body.To }, 'Applied hardcoded ForwardedFrom fallback for Dobrovodska');
@@ -73,15 +78,18 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       const config = await prixiService.getConfig(forwardedFrom || fromNumber);
 
       const isCelkovaNumber = forwardedFrom === CELKOVA_PHONE_NUMBER;
+      const isBenovaBaloghovaNumber = forwardedFrom === BENOVA_BALOGHOVA_PHONE_NUMBER;
+      const isDedicatedVoiceBotNumber = isCelkovaNumber || isBenovaBaloghovaNumber;
 
-      if (!isCelkovaNumber && !ivrService.shouldAllowCall(config, forwardedFrom)) {
+      if (!isDedicatedVoiceBotNumber && !ivrService.shouldAllowCall(config, forwardedFrom)) {
         twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Toto číslo je momentálne nedostupné.');
         twiml.reject();
         return reply.type('text/xml').send(twiml.toString());
       }
 
-      const pediatricMode = isCelkovaNumber || config.pediatricMode === true;
-      const greeting = config.greetingMessage || (pediatricMode ? PEDIATRIC_GREETING : DEFAULT_GREETING);
+      const pediatricMode = isCelkovaNumber || (!isBenovaBaloghovaNumber && config.pediatricMode === true);
+      const greeting = config.greetingMessage
+        || (isBenovaBaloghovaNumber ? ORTHOPEDIC_GREETING : pediatricMode ? PEDIATRIC_GREETING : DEFAULT_GREETING);
 
       twiml.say(
         { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
