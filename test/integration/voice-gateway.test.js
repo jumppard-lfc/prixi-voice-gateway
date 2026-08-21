@@ -264,3 +264,13 @@ test('Twilio cislo MUDr. Benovej Baloghovej aktivuje ortopedicky voice bot', asy
     });
   }
 });
+
+test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
+  const celkovaConfig = await originalGetConfig('+420910927082');
+  const benovaBaloghovaConfig = await originalGetConfig('+420910927739');
+
+  assert.equal(celkovaConfig.clinicId, '142');
+  assert.equal(celkovaConfig.pediatricMode, true);
+  assert.equal(benovaBaloghovaConfig.clinicId, '143');
+  assert.equal(benovaBaloghovaConfig.pediatricMode, false);
+});

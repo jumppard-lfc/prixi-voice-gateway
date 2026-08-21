@@ -86,6 +86,15 @@ export class PrixiService {
       };
     }
 
+    if (phoneNumber === '+420910927739') {
+      return {
+        clinicId: '143',
+        voiceBotEnabled: true,
+        timezone: 'Europe/Bratislava',
+        pediatricMode: false,
+      };
+    }
+
     if (this.mockMode) {
       return {
         clinicId: process.env.PRIXI_FALLBACK_CLINIC_ID || 'local-dev',
