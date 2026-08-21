@@ -105,3 +105,18 @@ test('POST /voice/incoming s validnym podpisom vrati TwiML', async () => {
   assert.match(response.body, /<Response>/);
   assert.match(response.body, /Toto číslo je momentálne nedostupné\./);
 });
+
+test('POST /voice/booking/start zacne hlasovy booking flow', async () => {
+  const endpoint = '/voice/booking/start';
+  const params = { From: '+421900000001', CallSid: 'CA99999999999999999999999999999999' };
+  const signature = buildSignature(`https://127.0.0.1:3000${endpoint}`, params);
+  const response = await app.inject({
+    method: 'POST', url: endpoint,
+    headers: { 'content-type': 'application/x-www-form-urlencoded', host: '127.0.0.1:3000', 'x-forwarded-proto': 'https', 'x-twilio-signature': signature },
+    payload: 'From=%2B421900000001&CallSid=CA99999999999999999999999999999999',
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /<Gather/);
+  assert.match(response.body, /Aké vyšetrenie potrebujete/);
+});

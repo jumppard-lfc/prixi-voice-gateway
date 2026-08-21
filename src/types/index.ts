@@ -21,7 +21,12 @@ export interface ClinicConfig {
   greetingMessage?: string;
   professionalId?: number;
   healthcareProviderId?: number;
+  bookingEnabled?: boolean;
 }
+
+export type BookingServiceCode = 'initial_exam' | 'follow_up' | 'acute_exam' | 'certificate_exam' | 'aesthetic_medicine';
+export interface DatePreference { kind: 'earliest' | 'next_available'; timeOfDay?: 'morning' | 'afternoon'; }
+export interface OfferedSlot { id: string; startAt: string; serviceName: string; }
 
 export type PrixiConfig = ClinicConfig;
 
