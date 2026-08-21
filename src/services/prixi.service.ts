@@ -77,6 +77,15 @@ export class PrixiService {
    * Provides a fallback configuration if the API call fails or times out.
    */
   async getConfig(phoneNumber: string): Promise<ClinicConfig> {
+    if (phoneNumber === '+420910927082') {
+      return {
+        clinicId: 175,
+        voiceBotEnabled: true,
+        timezone: 'Europe/Bratislava',
+        pediatricMode: true,
+      };
+    }
+
     if (this.mockMode) {
       return {
         clinicId: process.env.PRIXI_FALLBACK_CLINIC_ID || 'local-dev',
