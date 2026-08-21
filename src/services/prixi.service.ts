@@ -79,7 +79,7 @@ export class PrixiService {
   async getConfig(phoneNumber: string): Promise<ClinicConfig> {
     if (phoneNumber === '+420910927082') {
       return {
-        clinicId: '175',
+        clinicId: '142',
         voiceBotEnabled: true,
         timezone: 'Europe/Bratislava',
         pediatricMode: true,
