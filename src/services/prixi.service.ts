@@ -83,6 +83,7 @@ export class PrixiService {
         voiceBotEnabled: true,
         timezone: process.env.PRIXI_FALLBACK_TIMEZONE || 'Europe/Bratislava',
         allowForwardDuringOfficeHours: false,
+        pediatricMode: process.env.PRIXI_FALLBACK_PEDIATRIC_MODE === 'true',
         professionalId: Number(process.env.PRIXI_DEFAULT_PROFESSIONAL_ID) || 81,
         healthcareProviderId: Number(process.env.PRIXI_DEFAULT_HEALTHCARE_PROVIDER_ID) || 64,
       };
