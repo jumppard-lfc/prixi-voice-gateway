@@ -10,7 +10,7 @@ const VoiceResponse = twilio.twiml.VoiceResponse;
 
 const CELKOVA_PHONE_NUMBER = '+420910927082';
 const DEFAULT_GREETING = 'Dobrý deň, dovolali ste sa do ambulancie. Pre zanechanie odkazu popíšte po zaznení tónu najprv váš problém a po skončení stlačte hociktoré tlačidlo.';
-const PEDIATRIC_GREETING = 'Dobrý deň, dovolali ste sa do pediatrickej ambulancie MUDr. Celkovej. Ak ide o náhly život ohrozujúci stav, volajte tiesňovú linku 155 alebo 112. Po zaznení tónu nám, prosím, stručne povedzte, s čím sa na ambulanciu obraciate. Môže ísť napríklad o zdravotné ťažkosti dieťaťa, predpis liekov, výsledky vyšetrenia alebo objednanie. Po skončení stlačte ľubovoľné tlačidlo.';
+const PEDIATRIC_GREETING = 'Dobrý deň, dovolali ste sa do pediatrickej ambulancie doktorky Čelkovej. Ak ide o náhly život ohrozujúci stav, volajte tiesňovú linku 155 alebo 112. V opačnom prípade nám prosím po zaznení tónu stručne povedzte, s čím sa na ambulanciu obraciate. Môže ísť napríklad o zdravotné ťažkosti dieťaťa, predpis liekov, výsledky vyšetrenia alebo objednanie. Po skončení stlačte ľubovoľné tlačidlo.';
 
 export async function voiceRoutes(fastify: FastifyInstance) {
 
@@ -28,19 +28,19 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         'Dobrý deň, dovolali ste sa na zubnú kliniku '
       );
       sayGreeting.phoneme({ alphabet: 'ipa', ph: 'ˈklostɛrman' }, 'Klostermann');
-      
+
       twiml.say(
         { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
         '. Linka je momentálne obsadená. Aby ste nemuseli čakať, práve vám posielame SMS správu s odkazom na objednanie. Ďakujeme.'
       );
-      
+
       try {
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
         client.messages.create({
           body: 'Dobrý deň, pre objednanie do ambulancie použite tento odkaz: klostermann.sk/rezervacia',
           // 0800 number is not SMS-capable in Slovakia. 
           // You must use an SMS-capable Twilio number you own, or an Alphanumeric Sender ID (if enabled).
-          from: process.env.TWILIO_SMS_FROM_NUMBER || 'PriXi', 
+          from: process.env.TWILIO_SMS_FROM_NUMBER || 'PriXi',
           to: fromNumber
         }).catch(err => fastify.log.error(err, 'Failed to send SMS for Klostermann demo'));
       } catch (err) {
