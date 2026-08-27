@@ -70,6 +70,19 @@ test('GET /health vracia UP', async () => {
   assert.deepEqual(response.json(), { status: 'UP' });
 });
 
+test('Klostermann audio je dostupne v Twilio-kompatibilnom WAV formate', async () => {
+  const response = await app.inject({
+    method: 'GET',
+    url: '/media/klostermann-greeting-v1.wav',
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.headers['content-type'], /^audio\/wav/);
+  assert.equal(response.headers['cache-control'], 'public, max-age=31536000, immutable');
+  assert.ok(response.rawPayload.length > 100_000);
+  assert.equal(response.rawPayload.subarray(0, 4).toString('ascii'), 'RIFF');
+});
+
 test('POST /voice/incoming s neplatnym podpisom vrati 403', async () => {
   const endpoint = '/voice/incoming';
   const params = {
@@ -118,6 +131,33 @@ test('POST /voice/incoming s validnym podpisom vrati TwiML', async () => {
 
   assert.equal(response.statusCode, 200);
   assert.match(response.body, /<Response>/);
+  assert.match(response.body, /Toto číslo je momentálne nedostupné\./);
+});
+
+test('Klostermann fallback prehra dodanu nahravku a ukonci hovor', async () => {
+  const response = await signedVoicePost('/voice/incoming', {
+    From: '+421900000005',
+    To: '+420910924239',
+    ForwardedFrom: '+421917950507',
+    CallSid: 'CA99999999999999999999999999999990',
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /<Play>https:\/\/127\.0\.0\.1:3000\/media\/klostermann-greeting-v1\.wav<\/Play>/);
+  assert.match(response.body, /<Hangup\/>/);
+  assert.doesNotMatch(response.body, /<Say/);
+  assert.doesNotMatch(response.body, /<Record/);
+});
+
+test('Zdielane Twilio cislo bez Klostermann presmerovania ostava dostupne inym ambulanciam', async () => {
+  const response = await signedVoicePost('/voice/incoming', {
+    From: '+421900000006',
+    To: '+421800232793',
+    CallSid: 'CA99999999999999999999999999999989',
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.doesNotMatch(response.body, /Klostermann Orthodontics/);
   assert.match(response.body, /Toto číslo je momentálne nedostupné\./);
 });
 

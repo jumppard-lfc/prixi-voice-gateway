@@ -3,13 +3,22 @@ import twilio from 'twilio';
 import { prixiService } from '../services/prixi.service';
 import { sttService } from '../services/stt.service';
 import { ivrService } from '../services/ivr.service';
+import { bulkGateSmsService } from '../services/bulkgate-sms.service';
 import { CallForwardedEvent, VoicemailRecordedEvent } from '../types';
 import { claimVoiceEvent, completeVoiceEvent, failVoiceEvent, createVoiceEventKey } from '../utils/voice-event-ledger';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 const CELKOVA_PHONE_NUMBER = '+420910927082';
 const BENOVA_BALOGHOVA_PHONE_NUMBER = '+420910927739';
+const KLOSTERMANN_PHONE_NUMBER = '+420910924239';
+const KLOSTERMANN_SK_GREETING = 'Dobrý deň, dovolali ste sa do Ortodoncia Klostermann. Aby ste nemuseli čakať, posielame Vám SMS správu s odkazom na objednanie. Ďakujeme.';
+const KLOSTERMANN_EN_GREETING = 'Hello, you have reached Klostermann Orthodontics. So that you don’t have to wait, we will send you an SMS with a link to order. Thank you.';
+const KLOSTERMANN_SMS = 'Dobrý deň, pre objednanie do ambulancie kliknite na odkaz klostermann.sk/rezervacia.\n\nHello, to make an appointment for the clinic, click on the link klostermann.sk/rezervacia';
+const KLOSTERMANN_GREETING_MEDIA_PATH = '/media/klostermann-greeting-v1.wav';
+const KLOSTERMANN_GREETING_FILE = resolve(__dirname, '../assets/audio/klostermann-greeting-v1.wav');
 const DEFAULT_GREETING = 'Dobrý deň, dovolali ste sa do ambulancie. Pre zanechanie odkazu popíšte po zaznení tónu najprv váš problém a po skončení stlačte hociktoré tlačidlo.';
 const PEDIATRIC_GREETING = 'Dobrý deň, dovolali ste sa do pediatrickej ambulancie doktorky Čelkovej. Ak ide o náhly život ohrozujúci stav, volajte tiesňovú linku 155 alebo 112. V opačnom prípade nám prosím po zaznení tónu stručne povedzte, s čím sa na ambulanciu obraciate. Môže ísť napríklad o zdravotné ťažkosti dieťaťa, predpis liekov, výsledky vyšetrenia alebo objednanie. Po skončení stlačte ľubovoľné tlačidlo.';
 const ORTHOPEDIC_GREETING = 'Dobrý deň, dovolali ste sa do ortopedickej ambulancie pani doktorky Miroslavy Beňovej Baloghovej. Po zaznení tónu nám, prosím, povedzte, s čím vám môžeme pomôcť. Po skončení stlačte ľubovoľné tlačidlo.';
@@ -21,39 +30,43 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const fromNumber = body.From;
     let forwardedFrom = body.ForwardedFrom;
 
-    // --- KLOSTERMANN DEMO ---
-    if (body.To === '+421800232793') {
-      fastify.log.info({ from: fromNumber }, 'Triggering Klostermann demo');
+    // Klostermann's carrier forwards an unanswered call from the clinic mobile
+    // to this dedicated bot number after approximately 15 seconds.
+    const isKlostermannCall = body.ForwardedFrom === KLOSTERMANN_PHONE_NUMBER
+      || body.To === KLOSTERMANN_PHONE_NUMBER;
+
+    if (isKlostermannCall) {
+      fastify.log.info({ from: fromNumber, to: body.To, forwardedFrom: body.ForwardedFrom }, 'Handling unanswered Klostermann call');
       const twiml = new VoiceResponse();
-      const sayGreeting = twiml.say(
-        { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
-        'Dobrý deň, dovolali ste sa na zubnú kliniku '
-      );
-      sayGreeting.phoneme({ alphabet: 'ipa', ph: 'ˈklostɛrman' }, 'Klostermann');
+      if (existsSync(KLOSTERMANN_GREETING_FILE)) {
+        const forwardedProto = String(request.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
+        const forwardedHost = String(request.headers['x-forwarded-host'] || request.headers.host || '').split(',')[0].trim();
+        const publicBaseUrl = (process.env.PUBLIC_BASE_URL || `${forwardedProto}://${forwardedHost}`).replace(/\/$/, '');
+        twiml.play(`${publicBaseUrl}${KLOSTERMANN_GREETING_MEDIA_PATH}`);
+      } else {
+        fastify.log.error({ path: KLOSTERMANN_GREETING_FILE }, 'Klostermann greeting file is missing; using TTS fallback');
+        twiml.say(
+          { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-B' as any },
+          KLOSTERMANN_SK_GREETING
+        );
+        twiml.say(
+          { language: 'en-GB', voice: 'Google.en-GB-Wavenet-A' as any },
+          KLOSTERMANN_EN_GREETING
+        );
+      }
 
-      twiml.say(
-        { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
-        '. Linka je momentálne obsadená. Aby ste nemuseli čakať, práve vám posielame SMS správu s odkazom na objednanie. Ďakujeme.'
-      );
-
-      try {
-        const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-        client.messages.create({
-          body: 'Dobrý deň, pre objednanie do ambulancie použite tento odkaz: klostermann.sk/rezervacia',
-          // 0800 number is not SMS-capable in Slovakia. 
-          // You must use an SMS-capable Twilio number you own, or an Alphanumeric Sender ID (if enabled).
-          from: process.env.TWILIO_SMS_FROM_NUMBER || 'PriXi',
-          to: fromNumber
-        }).catch(err => fastify.log.error(err, 'Failed to send SMS for Klostermann demo'));
-      } catch (err) {
-        fastify.log.error(err, 'Error initializing Twilio client for SMS');
+      if (process.env.NODE_ENV !== 'test') {
+        bulkGateSmsService.sendTransactionalSms(fromNumber, KLOSTERMANN_SMS).then(result => {
+          fastify.log.info({ messageId: result.messageId, status: result.status, to: fromNumber }, 'Klostermann booking SMS accepted by BulkGate');
+        }).catch(err => {
+          const error = err instanceof Error ? { name: err.name, message: err.message } : { message: String(err) };
+          fastify.log.error({ err: error, to: fromNumber }, 'Failed to send Klostermann booking SMS through BulkGate');
+        });
       }
 
       twiml.hangup();
       return reply.type('text/xml').send(twiml.toString());
     }
-    // ------------------------
-
     if (!forwardedFrom) {
       if (body.To === CELKOVA_PHONE_NUMBER) {
         forwardedFrom = CELKOVA_PHONE_NUMBER;
