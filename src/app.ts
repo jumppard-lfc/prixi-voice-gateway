@@ -6,7 +6,7 @@ import { createReadStream, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { voiceRoutes } from './routes/voice.controller';
 
-const KLOSTERMANN_GREETING_PATH = resolve(__dirname, 'assets/audio/klostermann-greeting-v2.wav');
+const KLOSTERMANN_GREETING_PATH = resolve(__dirname, 'assets/audio/klostermann-greeting-v3.wav');
 
 function normalizeHeaderValue(value: string | string[] | undefined): string | undefined {
   if (!value) {
@@ -40,7 +40,7 @@ app.register(formbody);
 
 app.get('/health', async () => ({ status: 'UP' }));
 
-app.get('/media/klostermann-greeting-v2.wav', async (_request, reply) => {
+app.get('/media/klostermann-greeting-v3.wav', async (_request, reply) => {
   const audioStats = statSync(KLOSTERMANN_GREETING_PATH);
 
   return reply
