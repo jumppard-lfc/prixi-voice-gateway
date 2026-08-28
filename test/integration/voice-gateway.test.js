@@ -73,7 +73,7 @@ test('GET /health vracia UP', async () => {
 test('Klostermann audio je dostupne v Twilio-kompatibilnom WAV formate', async () => {
   const response = await app.inject({
     method: 'GET',
-    url: '/media/klostermann-greeting-v4.wav',
+    url: '/media/klostermann-greeting-v5.wav',
   });
 
   assert.equal(response.statusCode, 200);
@@ -143,7 +143,7 @@ test('Klostermann fallback prehra dodanu nahravku a ukonci hovor', async () => {
   });
 
   assert.equal(response.statusCode, 200);
-  assert.match(response.body, /<Play>https:\/\/127\.0\.0\.1:3000\/media\/klostermann-greeting-v4\.wav<\/Play>/);
+  assert.match(response.body, /<Play>https:\/\/127\.0\.0\.1:3000\/media\/klostermann-greeting-v5\.wav<\/Play>/);
   assert.match(response.body, /<Hangup\/>/);
   assert.doesNotMatch(response.body, /<Say/);
   assert.doesNotMatch(response.body, /<Record/);

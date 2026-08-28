@@ -4,7 +4,7 @@
   "description": "Stateless Voice Gateway",
   "main": "dist/app.js",
   "scripts": {
-    "build": "tsc && mkdir -p dist/assets/audio && cp src/assets/audio/klostermann-greeting-v1.wav src/assets/audio/klostermann-greeting-v2.wav src/assets/audio/klostermann-greeting-v3.wav src/assets/audio/klostermann-greeting-v4.wav dist/assets/audio/",
+    "build": "tsc && mkdir -p dist/assets/audio && cp src/assets/audio/klostermann-greeting-v1.wav src/assets/audio/klostermann-greeting-v2.wav src/assets/audio/klostermann-greeting-v3.wav src/assets/audio/klostermann-greeting-v4.wav src/assets/audio/klostermann-greeting-v5.wav dist/assets/audio/",
     "start": "node dist/app.js",
     "dev": "ts-node src/app.ts",
     "test": "node -r ts-node/register --test test/**/*.test.js",
