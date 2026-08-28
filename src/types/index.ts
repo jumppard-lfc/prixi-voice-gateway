@@ -19,6 +19,7 @@ export interface ClinicConfig {
   forwardPhoneNumber?: string;
   timezone: string;
   greetingMessage?: string;
+  pediatricMode?: boolean;
   professionalId?: number;
   healthcareProviderId?: number;
   bookingEnabled?: boolean;

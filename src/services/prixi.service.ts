@@ -77,12 +77,31 @@ export class PrixiService {
    * Provides a fallback configuration if the API call fails or times out.
    */
   async getConfig(phoneNumber: string): Promise<ClinicConfig> {
+    if (phoneNumber === '+420910927082') {
+      return {
+        clinicId: '142',
+        voiceBotEnabled: true,
+        timezone: 'Europe/Bratislava',
+        pediatricMode: true,
+      };
+    }
+
+    if (phoneNumber === '+420910927739') {
+      return {
+        clinicId: '143',
+        voiceBotEnabled: true,
+        timezone: 'Europe/Bratislava',
+        pediatricMode: false,
+      };
+    }
+
     if (this.mockMode) {
       return {
         clinicId: process.env.PRIXI_FALLBACK_CLINIC_ID || 'local-dev',
         voiceBotEnabled: true,
         timezone: process.env.PRIXI_FALLBACK_TIMEZONE || 'Europe/Bratislava',
         allowForwardDuringOfficeHours: false,
+        pediatricMode: process.env.PRIXI_FALLBACK_PEDIATRIC_MODE === 'true',
         professionalId: Number(process.env.PRIXI_DEFAULT_PROFESSIONAL_ID) || 81,
         healthcareProviderId: Number(process.env.PRIXI_DEFAULT_HEALTHCARE_PROVIDER_ID) || 64,
       };
