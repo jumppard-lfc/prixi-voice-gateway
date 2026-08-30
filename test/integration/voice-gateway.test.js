@@ -9,16 +9,13 @@ process.env.TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || 'test-auth-toke
 
 const appModule = require('../../src/app');
 const serviceModule = require('../../src/services/prixi.service');
-const sttModule = require('../../src/services/stt.service');
 
 const app = appModule.default;
 const prixiService = serviceModule.prixiService;
-const sttService = sttModule.sttService;
 const projectRoot = path.join(__dirname, '../..');
 
 const originalGetConfig = prixiService.getConfig.bind(prixiService);
 const originalSendEvent = prixiService.sendEvent.bind(prixiService);
-const originalTranscribeAudioUrl = sttService.transcribeAudioUrl.bind(sttService);
 
 function buildSignature(url, params) {
   return twilio.getExpectedTwilioSignature(process.env.TWILIO_AUTH_TOKEN, url, params);
@@ -50,7 +47,6 @@ test.before(() => {
 test.after(async () => {
   prixiService.getConfig = originalGetConfig;
   prixiService.sendEvent = originalSendEvent;
-  sttService.transcribeAudioUrl = originalTranscribeAudioUrl;
   await app.close();
 });
 
@@ -174,7 +170,6 @@ test('Pediatricky rezim pyta udaje dietata v celom IVR toku', async () => {
     timezone: 'Europe/Bratislava',
     pediatricMode: true,
   });
-  sttService.transcribeAudioUrl = async () => 'Volám kvôli očkovaniu.';
 
   try {
     const incoming = await signedVoicePost('/voice/incoming', {
@@ -218,7 +213,6 @@ test('Pediatricky rezim pyta udaje dietata v celom IVR toku', async () => {
     assert.equal(complete.statusCode, 200);
     assert.match(complete.body, /telefónne číslo, z ktorého voláte/);
   } finally {
-    sttService.transcribeAudioUrl = originalTranscribeAudioUrl;
     prixiService.getConfig = async () => ({
       clinicId: 'test-clinic',
       voiceBotEnabled: false,

@@ -4,7 +4,7 @@ import { prixiService } from '../services/prixi.service';
 import { sttService } from '../services/stt.service';
 import { ivrService } from '../services/ivr.service';
 import { bulkGateSmsService } from '../services/bulkgate-sms.service';
-import { getCelkovaContextMessage } from '../services/pediatric-call-context.service';
+import { getCelkovaTimeMessage } from '../services/pediatric-call-context.service';
 import { CallForwardedEvent, VoicemailRecordedEvent } from '../types';
 import { claimVoiceEvent, completeVoiceEvent, failVoiceEvent, createVoiceEventKey } from '../utils/voice-event-ledger';
 import { existsSync } from 'node:fs';
@@ -24,28 +24,6 @@ const KLOSTERMANN_GREETING_FILE = resolve(__dirname, '../assets/audio/klosterman
 const DEFAULT_GREETING = 'Dobrý deň, dovolali ste sa do ambulancie. Pre zanechanie odkazu popíšte po zaznení tónu najprv váš problém a po skončení stlačte hociktoré tlačidlo.';
 const PEDIATRIC_GREETING = 'Dobrý deň, dovolali ste sa do pediatrickej ambulancie doktorky Čelkovej. Ak ide o náhly život ohrozujúci stav, volajte tiesňovú linku 155 alebo 112. V opačnom prípade nám prosím po zaznení tónu stručne povedzte, s čím sa na ambulanciu obraciate. Môže ísť napríklad o zdravotné ťažkosti dieťaťa, predpis liekov, výsledky vyšetrenia alebo objednanie. Po skončení stlačte ľubovoľné tlačidlo.';
 const ORTHOPEDIC_GREETING = 'Dobrý deň, dovolali ste sa do ortopedickej ambulancie pani doktorky Miroslavy Beňovej Baloghovej. Po zaznení tónu nám, prosím, povedzte, s čím vám môžeme pomôcť. Po skončení stlačte ľubovoľné tlačidlo.';
-
-async function transcribeProblemForCallContext(recordingUrl: string): Promise<string> {
-  if (!recordingUrl) return '';
-
-  const finalUrl = recordingUrl.includes('.mp3') || recordingUrl.includes('.wav')
-    ? recordingUrl
-    : `${recordingUrl}.mp3`;
-  const transcription = sttService.transcribeAudioUrl(
-    finalUrl,
-    'Stručný dôvod telefonátu rodiča do pediatrickej ambulancie. Prepíš presne zdravotné ťažkosti alebo požiadavku, napríklad objednanie, očkovanie, preventívna prehliadka, recept alebo výsledky.'
-  ).catch(() => '');
-  let timeoutHandle: NodeJS.Timeout | undefined;
-  const timeout = new Promise<string>(resolve => {
-    timeoutHandle = setTimeout(() => resolve(''), 8000);
-  });
-
-  try {
-    return await Promise.race([transcription, timeout]);
-  } finally {
-    if (timeoutHandle) clearTimeout(timeoutHandle);
-  }
-}
 
 export async function voiceRoutes(fastify: FastifyInstance) {
 
@@ -161,11 +139,10 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
     const twiml = new VoiceResponse();
     if (pediatricMode) {
-      const problemTranscript = await transcribeProblemForCallContext(problemUrl || '');
-      const contextMessage = getCelkovaContextMessage(problemTranscript);
-      if (contextMessage) {
-        twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, contextMessage);
-      }
+      twiml.say(
+        { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
+        getCelkovaTimeMessage()
+      );
     }
     const namePrompt = pediatricMode
       ? 'Ďakujem. Teraz, prosím, uveďte meno a priezvisko dieťaťa, ktorého sa požiadavka týka. Po skončení stlačte ľubovoľné tlačidlo.'
