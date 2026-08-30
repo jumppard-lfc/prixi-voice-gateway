@@ -4,6 +4,7 @@ import { prixiService } from '../services/prixi.service';
 import { sttService } from '../services/stt.service';
 import { ivrService } from '../services/ivr.service';
 import { bulkGateSmsService } from '../services/bulkgate-sms.service';
+import { getCelkovaContextMessage } from '../services/pediatric-call-context.service';
 import { CallForwardedEvent, VoicemailRecordedEvent } from '../types';
 import { claimVoiceEvent, completeVoiceEvent, failVoiceEvent, createVoiceEventKey } from '../utils/voice-event-ledger';
 import { existsSync } from 'node:fs';
@@ -12,6 +13,7 @@ import { resolve } from 'node:path';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 const CELKOVA_PHONE_NUMBER = '+420910927082';
+const CELKOVA_CLINIC_ID = '142';
 const BENOVA_BALOGHOVA_PHONE_NUMBER = '+420910927739';
 const KLOSTERMANN_PHONE_NUMBER = '+420910924239';
 const KLOSTERMANN_SK_GREETING = 'Dobrý deň, dovolali ste sa do Ortodoncia Klostermann. Aby ste nemuseli čakať, posielame Vám SMS správu s odkazom na objednanie. Ďakujeme.';
@@ -23,11 +25,34 @@ const DEFAULT_GREETING = 'Dobrý deň, dovolali ste sa do ambulancie. Pre zanech
 const PEDIATRIC_GREETING = 'Dobrý deň, dovolali ste sa do pediatrickej ambulancie doktorky Čelkovej. Ak ide o náhly život ohrozujúci stav, volajte tiesňovú linku 155 alebo 112. V opačnom prípade nám prosím po zaznení tónu stručne povedzte, s čím sa na ambulanciu obraciate. Môže ísť napríklad o zdravotné ťažkosti dieťaťa, predpis liekov, výsledky vyšetrenia alebo objednanie. Po skončení stlačte ľubovoľné tlačidlo.';
 const ORTHOPEDIC_GREETING = 'Dobrý deň, dovolali ste sa do ortopedickej ambulancie pani doktorky Miroslavy Beňovej Baloghovej. Po zaznení tónu nám, prosím, povedzte, s čím vám môžeme pomôcť. Po skončení stlačte ľubovoľné tlačidlo.';
 
+async function transcribeProblemForCallContext(recordingUrl: string): Promise<string> {
+  if (!recordingUrl) return '';
+
+  const finalUrl = recordingUrl.includes('.mp3') || recordingUrl.includes('.wav')
+    ? recordingUrl
+    : `${recordingUrl}.mp3`;
+  const transcription = sttService.transcribeAudioUrl(
+    finalUrl,
+    'Stručný dôvod telefonátu rodiča do pediatrickej ambulancie. Prepíš presne zdravotné ťažkosti alebo požiadavku, napríklad objednanie, očkovanie, preventívna prehliadka, recept alebo výsledky.'
+  ).catch(() => '');
+  let timeoutHandle: NodeJS.Timeout | undefined;
+  const timeout = new Promise<string>(resolve => {
+    timeoutHandle = setTimeout(() => resolve(''), 8000);
+  });
+
+  try {
+    return await Promise.race([transcription, timeout]);
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
+}
+
 export async function voiceRoutes(fastify: FastifyInstance) {
 
   fastify.post('/incoming', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as Record<string, string>;
     const fromNumber = body.From;
+    const carrierForwardedFrom = body.ForwardedFrom;
     let forwardedFrom = body.ForwardedFrom;
 
     // Klostermann's carrier forwards an unanswered call from the clinic mobile
@@ -67,14 +92,16 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       twiml.hangup();
       return reply.type('text/xml').send(twiml.toString());
     }
-    if (!forwardedFrom) {
-      if (body.To === CELKOVA_PHONE_NUMBER) {
-        forwardedFrom = CELKOVA_PHONE_NUMBER;
-        fastify.log.info({ from: fromNumber, to: body.To }, 'Applied direct Twilio number routing for MUDr. Celkova');
-      } else if (body.To === BENOVA_BALOGHOVA_PHONE_NUMBER) {
-        forwardedFrom = BENOVA_BALOGHOVA_PHONE_NUMBER;
-        fastify.log.info({ from: fromNumber, to: body.To }, 'Applied direct Twilio number routing for MUDr. Benova Baloghova');
-      } else if (body.To === '+421800232793' || body.To === '0322289055' || body.To === '+421322289055' || body.To === 'sip:0322289055@sip.twilio.com') {
+    // Dedicated Twilio numbers are authoritative routing keys. Carrier-provided
+    // ForwardedFrom identifies the forwarding line, not the destination clinic.
+    if (body.To === CELKOVA_PHONE_NUMBER) {
+      forwardedFrom = CELKOVA_PHONE_NUMBER;
+      fastify.log.info({ from: fromNumber, to: body.To, carrierForwardedFrom }, 'Applied dedicated Twilio number routing for MUDr. Celkova');
+    } else if (body.To === BENOVA_BALOGHOVA_PHONE_NUMBER) {
+      forwardedFrom = BENOVA_BALOGHOVA_PHONE_NUMBER;
+      fastify.log.info({ from: fromNumber, to: body.To, carrierForwardedFrom }, 'Applied dedicated Twilio number routing for MUDr. Benova Baloghova');
+    } else if (!forwardedFrom) {
+      if (body.To === '+421800232793' || body.To === '0322289055' || body.To === '+421322289055' || body.To === 'sip:0322289055@sip.twilio.com') {
         forwardedFrom = '+421911500609'; // Hardcoded fallback for MUDr. Dobrovodska
         fastify.log.info({ from: fromNumber, to: body.To }, 'Applied hardcoded ForwardedFrom fallback for Dobrovodska');
       } else {
@@ -133,6 +160,13 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const pediatricMode = query.pediatricMode === 'true';
 
     const twiml = new VoiceResponse();
+    if (pediatricMode) {
+      const problemTranscript = await transcribeProblemForCallContext(problemUrl || '');
+      const contextMessage = getCelkovaContextMessage(problemTranscript);
+      if (contextMessage) {
+        twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, contextMessage);
+      }
+    }
     const namePrompt = pediatricMode
       ? 'Ďakujem. Teraz, prosím, uveďte meno a priezvisko dieťaťa, ktorého sa požiadavka týka. Po skončení stlačte ľubovoľné tlačidlo.'
       : 'Ďakujem. Teraz prosím uveďte vaše meno a priezvisko, a po skončení stlačte hociktoré tlačidlo.';
@@ -192,6 +226,10 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
     try {
       const config = await prixiService.getConfig(forwardedFrom || fromNumber);
+
+      if (forwardedFrom === CELKOVA_PHONE_NUMBER && config.clinicId !== CELKOVA_CLINIC_ID) {
+        throw new Error(`Blocked Celkova voice event: expected clinic ${CELKOVA_CLINIC_ID}, received ${config.clinicId}`);
+      }
 
       try {
         const transcribeSafe = async (url: string, prompt: string) => {
