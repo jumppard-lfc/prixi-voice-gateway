@@ -4,6 +4,11 @@ const normalize = (value: string) => value.toLocaleLowerCase('sk-SK').normalize(
 
 export function parseService(value: string): BookingServiceCode | undefined {
   const text = normalize(value);
+  if (text === '1') return 'initial_exam';
+  if (text === '2') return 'follow_up';
+  if (text === '3') return 'acute_exam';
+  if (text === '4') return 'certificate_exam';
+  if (text === '5') return 'aesthetic_medicine';
   if (/(prvykrat|prva navsteva|vstupn)/.test(text)) return 'initial_exam';
   if (/(kontrol)/.test(text)) return 'follow_up';
   if (/(akut|zap[a-z]*l|cudzie teleso|nieco.*oku)/.test(text)) return 'acute_exam';
@@ -14,6 +19,9 @@ export function parseService(value: string): BookingServiceCode | undefined {
 
 export function parseDatePreference(value: string): DatePreference | undefined {
   const text = normalize(value);
+  if (text === '1') return { kind: 'earliest' };
+  if (text === '2') return { kind: 'next_available', timeOfDay: 'morning' };
+  if (text === '3') return { kind: 'next_available', timeOfDay: 'afternoon' };
   if (/(najbliz|co najskor|cim skor|prvy volny)/.test(text)) return { kind: 'earliest' };
   const timeOfDay = /(poobede|popoludni|odpoludnia)/.test(text) ? 'afternoon' : /(dopoludnia|rano)/.test(text) ? 'morning' : undefined;
   // Relative calendar language is deliberately confirmed in the next prompt. We do not guess an exact date.
@@ -44,10 +52,4 @@ export function parseName(value: string): { firstName: string; lastName: string 
   const words = value.trim().split(/\s+/).filter(Boolean);
   if (words.length < 2) return undefined;
   return { firstName: words[0], lastName: words.slice(1).join(' ') };
-}
-
-export function parseEmail(value: string): string | undefined {
-  const compact = value.toLocaleLowerCase('sk-SK')
-    .replace(/zavinac|zavináč/g, '@').replace(/bodka/g, '.').replace(/\s+/g, '');
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(compact) ? compact : undefined;
 }

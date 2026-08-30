@@ -5,7 +5,6 @@ export interface CreateBookioBookingInput {
   slotId: string;
   firstName: string;
   lastName: string;
-  email: string;
   phone: string;
   note: string;
   acceptedTerms: true;

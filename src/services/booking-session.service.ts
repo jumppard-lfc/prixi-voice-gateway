@@ -5,7 +5,6 @@ export type BookingStep =
   | 'date_preference'
   | 'slot'
   | 'name'
-  | 'email'
   | 'terms'
   | 'marketing'
   | 'confirmation';
@@ -20,7 +19,6 @@ export interface BookingSession {
   selectedSlot?: OfferedSlot;
   firstName?: string;
   lastName?: string;
-  email?: string;
   acceptedTerms?: boolean;
   marketingConsent?: boolean;
   attempts: number;

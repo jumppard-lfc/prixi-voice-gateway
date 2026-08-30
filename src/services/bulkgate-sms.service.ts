@@ -29,7 +29,7 @@ export interface SmsSendResult {
 export class BulkGateSmsService {
   constructor(private readonly httpClient: HttpClient = axios) {}
 
-  async sendTransactionalSms(to: string, text: string): Promise<SmsSendResult> {
+  async sendTransactionalSms(to: string, text: string, tag = 'klostermann-missed-call'): Promise<SmsSendResult> {
     const applicationId = process.env.BULKGATE_APPLICATION_ID;
     const applicationToken = process.env.BULKGATE_APPLICATION_TOKEN;
     const sender = process.env.BULKGATE_SMS_SENDER || 'Klostermann';
@@ -47,7 +47,7 @@ export class BulkGateSmsService {
         number,
         text,
         duplicates_check: 'on',
-        tag: 'klostermann-missed-call',
+        tag,
         channel: {
           sms: {
             sender_id: 'gText',

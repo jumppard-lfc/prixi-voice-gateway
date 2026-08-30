@@ -9,9 +9,11 @@ process.env.TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || 'test-auth-toke
 
 const appModule = require('../../src/app');
 const serviceModule = require('../../src/services/prixi.service');
+const auditModule = require('../../src/services/booking-audit.service');
 
 const app = appModule.default;
 const prixiService = serviceModule.prixiService;
+const bookingAuditService = auditModule.bookingAuditService;
 const projectRoot = path.join(__dirname, '../..');
 
 const originalGetConfig = prixiService.getConfig.bind(prixiService);
@@ -132,6 +134,50 @@ test('POST /voice/incoming s validnym podpisom vrati TwiML', async () => {
   assert.equal(response.statusCode, 200);
   assert.match(response.body, /<Response>/);
   assert.match(response.body, /Toto číslo je momentálne nedostupné\./);
+});
+
+test('booking flow funguje kompletne cez tlacidla a odosle mock SMS', async () => {
+  const originalMockMode = process.env.BOOKIO_MOCK_MODE;
+  process.env.BOOKIO_MOCK_MODE = 'true';
+  const callSid = 'CA99999999999999999999999999999988';
+  const base = { From: '+421900000123', CallSid: callSid };
+
+  try {
+    const start = await signedVoicePost('/voice/booking/start', base);
+    assert.equal(start.statusCode, 200);
+    assert.match(start.body, /stlačte 1/);
+
+    const service = await signedVoicePost('/voice/booking/answer', { ...base, Digits: '2' });
+    assert.match(service.body, /najbližší termín/);
+
+    const preference = await signedVoicePost('/voice/booking/answer', { ...base, Digits: '1' });
+    assert.match(preference.body, /Mám tieto termíny/);
+
+    const slot = await signedVoicePost('/voice/booking/answer', { ...base, Digits: '2' });
+    assert.match(slot.body, /meno a priezvisko/);
+
+    const name = await signedVoicePost('/voice/booking/answer', { ...base, SpeechResult: 'Ján Novák' });
+    assert.match(name.body, /všeobecnými obchodnými podmienkami/);
+
+    const terms = await signedVoicePost('/voice/booking/answer', { ...base, Digits: '1' });
+    assert.match(terms.body, /marketingové informácie/);
+
+    const marketing = await signedVoicePost('/voice/booking/answer', { ...base, Digits: '2' });
+    assert.match(marketing.body, /Môžem termín záväzne objednať/);
+
+    const confirmation = await signedVoicePost('/voice/booking/answer', { ...base, Digits: '1' });
+    assert.match(confirmation.body, /Potvrdenie vám posielame SMS správou/);
+    assert.match(confirmation.body, /<Hangup\/>/);
+
+    const events = bookingAuditService.get(callSid);
+    assert.deepEqual(events.map(({ event }) => event), [
+      'started', 'service_selected', 'slots_offered', 'slot_selected', 'identity_collected',
+      'terms_accepted', 'marketing_recorded', 'booking_created', 'sms_sent', 'completed',
+    ]);
+  } finally {
+    if (originalMockMode === undefined) delete process.env.BOOKIO_MOCK_MODE;
+    else process.env.BOOKIO_MOCK_MODE = originalMockMode;
+  }
 });
 
 test('Klostermann fallback prehra dodanu nahravku a ukonci hovor', async () => {
