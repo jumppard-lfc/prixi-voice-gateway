@@ -289,6 +289,40 @@ test('Poziadavka MUDr. Celkovej sa pri nespravnom clinicId neodosle inej ambulan
   }
 });
 
+test('Poziadavka MUDr. Novotneho sa pri nespravnom clinicId neodosle inej ambulancii', async () => {
+  let sendEventCalls = 0;
+  prixiService.getConfig = async () => ({
+    clinicId: '999',
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+  });
+  prixiService.sendEvent = async () => {
+    sendEventCalls += 1;
+  };
+
+  try {
+    const endpoint = '/voice/recording-complete?forwardedFrom=%2B420910928021&pediatricMode=false&dentalMode=true';
+    const response = await signedVoicePost(endpoint, {
+      From: '+421900000009',
+      To: '+420910928021',
+      CallSid: 'CA99999999999999999999999999999983',
+      RecordingUrl: 'https://api.twilio.test/birth-year',
+      RecordingDuration: '2',
+    });
+
+    assert.equal(response.statusCode, 200);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(sendEventCalls, 0);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+    prixiService.sendEvent = originalSendEvent;
+  }
+});
+
 test('Twilio cislo MUDr. Benovej Baloghovej aktivuje ortopedicky voice bot', async () => {
   let requestedPhoneNumber = null;
   prixiService.getConfig = async (phoneNumber) => {
@@ -343,12 +377,114 @@ test('Twilio cislo MUDr. Benovej Baloghovej aktivuje ortopedicky voice bot', asy
   }
 });
 
+test('Konfigurovane Twilio cislo MUDr. Novotneho aktivuje zubarsky voice bot', async () => {
+  const previousPhoneNumber = process.env.NOVOTNY_VOICE_BOT_PHONE_NUMBER;
+  process.env.NOVOTNY_VOICE_BOT_PHONE_NUMBER = '+420910927999';
+  let requestedPhoneNumber = null;
+  prixiService.getConfig = async (phoneNumber) => {
+    requestedPhoneNumber = phoneNumber;
+    return {
+      clinicId: 'mudr-novotny',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+      pediatricMode: true,
+    };
+  };
+
+  try {
+    const incoming = await signedVoicePost('/voice/incoming', {
+      From: '+421900000007',
+      To: '+420910927999',
+      CallSid: 'CA99999999999999999999999999999987',
+    });
+
+    assert.equal(incoming.statusCode, 200);
+    assert.equal(requestedPhoneNumber, '+420910927999');
+    assert.match(incoming.body, /zubnej ambulancie doktora Miroslava Novotného v Kvetoslavove/);
+    assert.match(incoming.body, /nedostupný alebo obsadený/);
+    assert.match(incoming.body, /forwardedFrom=%2B420910927999/);
+    assert.match(incoming.body, /pediatricMode=false/);
+    assert.match(incoming.body, /dentalMode=true/);
+
+    const problemEndpoint = '/voice/record-problem?forwardedFrom=%2B420910927999&pediatricMode=false&dentalMode=true';
+    const problem = await signedVoicePost(problemEndpoint, {
+      From: '+421900000007',
+      CallSid: 'CA99999999999999999999999999999986',
+      RecordingUrl: 'https://api.twilio.test/problem',
+      RecordingDuration: '12',
+    });
+    assert.equal(problem.statusCode, 200);
+    assert.match(problem.body, /dentalMode=true/);
+
+    const completeEndpoint = '/voice/recording-complete?forwardedFrom=%2B420910927999&pediatricMode=false&dentalMode=true';
+    const complete = await signedVoicePost(completeEndpoint, {
+      From: '+421900000007',
+      CallSid: 'CA99999999999999999999999999999985',
+      RecordingDuration: '0',
+    });
+    assert.equal(complete.statusCode, 200);
+    assert.match(complete.body, /kontaktovať do 24 hodín/);
+    assert.match(complete.body, /telefónnom čísle, z ktorého voláte/);
+  } finally {
+    if (previousPhoneNumber === undefined) {
+      delete process.env.NOVOTNY_VOICE_BOT_PHONE_NUMBER;
+    } else {
+      process.env.NOVOTNY_VOICE_BOT_PHONE_NUMBER = previousPhoneNumber;
+    }
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+  }
+});
+
+test('Predvolene Twilio cislo MUDr. Novotneho je +420910928021', async () => {
+  const previousPhoneNumber = process.env.NOVOTNY_VOICE_BOT_PHONE_NUMBER;
+  delete process.env.NOVOTNY_VOICE_BOT_PHONE_NUMBER;
+  let requestedPhoneNumber = null;
+  prixiService.getConfig = async (phoneNumber) => {
+    requestedPhoneNumber = phoneNumber;
+    return {
+      clinicId: 'mudr-novotny',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    };
+  };
+
+  try {
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000008',
+      To: '+420910928021',
+      CallSid: 'CA99999999999999999999999999999984',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(requestedPhoneNumber, '+420910928021');
+    assert.match(response.body, /zubnej ambulancie doktora Miroslava Novotného v Kvetoslavove/);
+    assert.match(response.body, /forwardedFrom=%2B420910928021/);
+    assert.match(response.body, /dentalMode=true/);
+  } finally {
+    if (previousPhoneNumber !== undefined) {
+      process.env.NOVOTNY_VOICE_BOT_PHONE_NUMBER = previousPhoneNumber;
+    }
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+  }
+});
+
 test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
   const celkovaConfig = await originalGetConfig('+420910927082');
   const benovaBaloghovaConfig = await originalGetConfig('+420910927739');
+  const novotnyConfig = await originalGetConfig('+420910928021');
 
   assert.equal(celkovaConfig.clinicId, '142');
   assert.equal(celkovaConfig.pediatricMode, true);
   assert.equal(benovaBaloghovaConfig.clinicId, '143');
   assert.equal(benovaBaloghovaConfig.pediatricMode, false);
+  assert.equal(novotnyConfig.clinicId, '112');
+  assert.equal(novotnyConfig.pediatricMode, false);
 });
