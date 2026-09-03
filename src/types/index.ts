@@ -32,6 +32,7 @@ export interface BasePrixiEvent {
   event: PrixiEventName;
   clinicId: string;
   phone: string;
+  routingPhoneNumber: string;
 }
 
 export interface CallForwardedEvent extends BasePrixiEvent {

@@ -5,7 +5,7 @@ import { sttService } from '../services/stt.service';
 import { ivrService } from '../services/ivr.service';
 import { bulkGateSmsService } from '../services/bulkgate-sms.service';
 import { getCelkovaTimeMessage } from '../services/pediatric-call-context.service';
-import { CallForwardedEvent, VoicemailRecordedEvent } from '../types';
+import { CallForwardedEvent, ClinicConfig, VoicemailRecordedEvent } from '../types';
 import { claimVoiceEvent, completeVoiceEvent, failVoiceEvent, createVoiceEventKey } from '../utils/voice-event-ledger';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -15,9 +15,16 @@ const VoiceResponse = twilio.twiml.VoiceResponse;
 const CELKOVA_PHONE_NUMBER = '+420910927082';
 const CELKOVA_CLINIC_ID = '142';
 const BENOVA_BALOGHOVA_PHONE_NUMBER = '+420910927739';
+const BENOVA_BALOGHOVA_CLINIC_ID = '143';
 const KLOSTERMANN_PHONE_NUMBER = '+420910924239';
 const NOVOTNY_PHONE_NUMBER = '+420910928021';
 const NOVOTNY_CLINIC_ID = '112';
+const DOBROVODSKA_ROUTING_PHONE_NUMBER = '+421911500609';
+const DOBROVODSKA_CLINIC_ID = '95';
+const PEKARCIK_VIPTEL_PHONE_NUMBER = '+421332289010';
+const PEKARCIK_ROUTING_PHONE_NUMBER = '+421940610160';
+const PEKARCIK_CLINIC_ID = '64';
+const UNRESOLVED_CLINIC_IDS = new Set(['', 'orphan', 'fallback', 'local-dev']);
 const KLOSTERMANN_SK_GREETING = 'Dobrý deň, dovolali ste sa do Ortodoncia Klostermann. Aby ste nemuseli čakať, posielame Vám SMS správu s odkazom na objednanie. Ďakujeme.';
 const KLOSTERMANN_EN_GREETING = 'Hello, you have reached Klostermann Orthodontics. So that you don’t have to wait, we will send you an SMS with a link to order. Thank you.';
 const KLOSTERMANN_SMS = 'Dobry den, pre objednanie do ambulancie kliknite na klostermann.sk/rezervacia\n\nHello, to make an appointment for the clinic, click on klostermann.sk/rezervacia';
@@ -32,6 +39,53 @@ function getNovotnyVoiceBotPhoneNumber(): string {
   return process.env.NOVOTNY_VOICE_BOT_PHONE_NUMBER?.trim() || NOVOTNY_PHONE_NUMBER;
 }
 
+function normalizeSlovakPhoneAddress(value?: string): string {
+  if (!value) return '';
+
+  const address = value.trim().replace(/^sip:/i, '').split('@')[0].split(';')[0];
+  const digits = address.replace(/\D/g, '');
+
+  if (digits.startsWith('00421')) return `+421${digits.slice(5)}`;
+  if (digits.startsWith('421')) return `+${digits}`;
+  if (digits.startsWith('0')) return `+421${digits.slice(1)}`;
+
+  return address;
+}
+
+function assertClinicRoutingIsolation(
+  config: ClinicConfig,
+  routingPhoneNumber: string,
+  novotnyVoiceBotPhoneNumber: string = getNovotnyVoiceBotPhoneNumber()
+): void {
+  const clinicId = String(config.clinicId ?? '').trim();
+
+  if (!routingPhoneNumber || UNRESOLVED_CLINIC_IDS.has(clinicId.toLowerCase())) {
+    throw new Error(
+      `Blocked unresolved voice route: route ${routingPhoneNumber || '<missing>'} resolved to clinic ${clinicId || '<missing>'}`
+    );
+  }
+
+  const normalizedRoute = normalizeSlovakPhoneAddress(routingPhoneNumber);
+  const protectedRoutes = new Map<string, string>([
+    [PEKARCIK_ROUTING_PHONE_NUMBER, PEKARCIK_CLINIC_ID],
+    [DOBROVODSKA_ROUTING_PHONE_NUMBER, DOBROVODSKA_CLINIC_ID],
+    [CELKOVA_PHONE_NUMBER, CELKOVA_CLINIC_ID],
+    [BENOVA_BALOGHOVA_PHONE_NUMBER, BENOVA_BALOGHOVA_CLINIC_ID],
+    [novotnyVoiceBotPhoneNumber, NOVOTNY_CLINIC_ID],
+  ]);
+  const expectedClinicId = protectedRoutes.get(normalizedRoute);
+  const protectedClinicIds = new Set(protectedRoutes.values());
+
+  if (
+    (expectedClinicId && clinicId !== expectedClinicId)
+    || (!expectedClinicId && protectedClinicIds.has(clinicId))
+  ) {
+    throw new Error(
+      `Blocked cross-clinic voice event: route ${routingPhoneNumber || '<missing>'} resolved to clinic ${config.clinicId}`
+    );
+  }
+}
+
 export async function voiceRoutes(fastify: FastifyInstance) {
 
   fastify.post('/incoming', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -40,11 +94,21 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const carrierForwardedFrom = body.ForwardedFrom;
     let forwardedFrom = body.ForwardedFrom;
     const novotnyVoiceBotPhoneNumber = getNovotnyVoiceBotPhoneNumber();
+    const normalizedTo = normalizeSlovakPhoneAddress(body.To);
+    const normalizedCarrierForwardedFrom = normalizeSlovakPhoneAddress(carrierForwardedFrom);
+    const isPekarcikVipTelDestination = normalizedTo === PEKARCIK_VIPTEL_PHONE_NUMBER;
+    const isOtherDedicatedDestination = body.To === CELKOVA_PHONE_NUMBER
+      || body.To === BENOVA_BALOGHOVA_PHONE_NUMBER
+      || body.To === novotnyVoiceBotPhoneNumber;
 
     // Klostermann's carrier forwards an unanswered call from the clinic mobile
     // to this dedicated bot number after approximately 15 seconds.
-    const isKlostermannCall = body.ForwardedFrom === KLOSTERMANN_PHONE_NUMBER
-      || body.To === KLOSTERMANN_PHONE_NUMBER;
+    // An explicit dedicated destination always wins over a conflicting carrier
+    // ForwardedFrom header, so one clinic can never capture another clinic's DID.
+    const isKlostermannCall = body.To === KLOSTERMANN_PHONE_NUMBER
+      || (!isPekarcikVipTelDestination
+        && !isOtherDedicatedDestination
+        && body.ForwardedFrom === KLOSTERMANN_PHONE_NUMBER);
 
     if (isKlostermannCall) {
       fastify.log.info({ from: fromNumber, to: body.To, forwardedFrom: body.ForwardedFrom }, 'Handling unanswered Klostermann call');
@@ -89,6 +153,13 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     } else if (novotnyVoiceBotPhoneNumber && body.To === novotnyVoiceBotPhoneNumber) {
       forwardedFrom = novotnyVoiceBotPhoneNumber;
       fastify.log.info({ from: fromNumber, to: body.To, carrierForwardedFrom }, 'Applied dedicated Twilio number routing for MUDr. Novotny');
+    } else if (
+      isPekarcikVipTelDestination
+      || normalizedCarrierForwardedFrom === PEKARCIK_VIPTEL_PHONE_NUMBER
+      || normalizedCarrierForwardedFrom === PEKARCIK_ROUTING_PHONE_NUMBER
+    ) {
+      forwardedFrom = PEKARCIK_ROUTING_PHONE_NUMBER;
+      fastify.log.info({ from: fromNumber, to: body.To, carrierForwardedFrom }, 'Applied dedicated VipTel routing for Martin Pekarcik');
     } else if (!forwardedFrom) {
       if (body.To === '+421800232793' || body.To === '0322289055' || body.To === '+421322289055' || body.To === 'sip:0322289055@sip.twilio.com') {
         forwardedFrom = '+421911500609'; // Hardcoded fallback for MUDr. Dobrovodska
@@ -103,8 +174,22 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
     const twiml = new VoiceResponse();
 
+    if (!forwardedFrom) {
+      twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Toto číslo je momentálne nedostupné.');
+      twiml.reject();
+      return reply.type('text/xml').send(twiml.toString());
+    }
+
     try {
       const config = await prixiService.getConfig(forwardedFrom || fromNumber);
+      assertClinicRoutingIsolation(config, forwardedFrom, novotnyVoiceBotPhoneNumber);
+
+      if (
+        normalizeSlovakPhoneAddress(forwardedFrom) === PEKARCIK_ROUTING_PHONE_NUMBER
+        && !config.greetingMessage?.trim()
+      ) {
+        throw new Error('Blocked Pekarcik voice route because its configured greeting is missing');
+      }
 
       const isCelkovaNumber = forwardedFrom === CELKOVA_PHONE_NUMBER;
       const isBenovaBaloghovaNumber = forwardedFrom === BENOVA_BALOGHOVA_PHONE_NUMBER;
@@ -219,14 +304,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
     try {
       const config = await prixiService.getConfig(forwardedFrom || fromNumber);
-
-      if (forwardedFrom === CELKOVA_PHONE_NUMBER && config.clinicId !== CELKOVA_CLINIC_ID) {
-        throw new Error(`Blocked Celkova voice event: expected clinic ${CELKOVA_CLINIC_ID}, received ${config.clinicId}`);
-      }
-
-      if (forwardedFrom === getNovotnyVoiceBotPhoneNumber() && config.clinicId !== NOVOTNY_CLINIC_ID) {
-        throw new Error(`Blocked Novotny voice event: expected clinic ${NOVOTNY_CLINIC_ID}, received ${config.clinicId}`);
-      }
+      assertClinicRoutingIsolation(config, forwardedFrom);
 
       try {
         const transcribeSafe = async (url: string, prompt: string) => {
@@ -259,6 +337,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
           event: 'voicemail_recorded',
           clinicId: config.clinicId,
           phone: fromNumber,
+          routingPhoneNumber: forwardedFrom,
           durationSeconds,
           callStartedAt,
           callEndedAt,
@@ -279,6 +358,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
           event: 'voicemail_recorded',
           clinicId: config.clinicId,
           phone: fromNumber,
+          routingPhoneNumber: forwardedFrom,
           durationSeconds,
           callStartedAt,
           callEndedAt,

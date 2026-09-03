@@ -9,13 +9,16 @@ process.env.TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || 'test-auth-toke
 
 const appModule = require('../../src/app');
 const serviceModule = require('../../src/services/prixi.service');
+const sttModule = require('../../src/services/stt.service');
 
 const app = appModule.default;
 const prixiService = serviceModule.prixiService;
+const sttService = sttModule.sttService;
 const projectRoot = path.join(__dirname, '../..');
 
 const originalGetConfig = prixiService.getConfig.bind(prixiService);
 const originalSendEvent = prixiService.sendEvent.bind(prixiService);
+const originalTranscribeAudioUrl = sttService.transcribeAudioUrl.bind(sttService);
 
 function buildSignature(url, params) {
   return twilio.getExpectedTwilioSignature(process.env.TWILIO_AUTH_TOKEN, url, params);
@@ -47,6 +50,7 @@ test.before(() => {
 test.after(async () => {
   prixiService.getConfig = originalGetConfig;
   prixiService.sendEvent = originalSendEvent;
+  sttService.transcribeAudioUrl = originalTranscribeAudioUrl;
   await app.close();
 });
 
@@ -152,20 +156,317 @@ test('Klostermann fallback prehra dodanu nahravku a ukonci hovor', async () => {
 });
 
 test('Zdielane Twilio cislo bez Klostermann presmerovania ostava dostupne inym ambulanciam', async () => {
-  const response = await signedVoicePost('/voice/incoming', {
-    From: '+421900000006',
-    To: '+421800232793',
-    CallSid: 'CA99999999999999999999999999999989',
+  prixiService.getConfig = async () => ({
+    clinicId: '95',
+    voiceBotEnabled: false,
+    timezone: 'Europe/Bratislava',
   });
 
-  assert.equal(response.statusCode, 200);
-  assert.doesNotMatch(response.body, /Klostermann Orthodontics/);
-  assert.match(response.body, /Toto číslo je momentálne nedostupné\./);
+  try {
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000006',
+      To: '+421800232793',
+      CallSid: 'CA99999999999999999999999999999989',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.doesNotMatch(response.body, /Klostermann Orthodontics/);
+    assert.match(response.body, /Toto číslo je momentálne nedostupné\./);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+  }
+});
+
+test('Neznama orphan konfiguracia nikdy nespusti nahravanie', async () => {
+  prixiService.getConfig = async () => ({
+    clinicId: 'orphan',
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+    greetingMessage: null,
+  });
+
+  try {
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000017',
+      To: '+421999999999',
+      ForwardedFrom: '+421988888888',
+      CallSid: 'CA99999999999999999999999999999974',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body, /Momentálne máme technické problémy\./);
+    assert.doesNotMatch(response.body, /Pre zanechanie odkazu/);
+    assert.doesNotMatch(response.body, /<Record/);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+  }
+});
+
+test('Nove VipTel cislo Martina Pekarcika sa routuje vylucne na jeho ambulanciu', async () => {
+  let requestedPhoneNumber = null;
+  prixiService.getConfig = async (phoneNumber) => {
+    requestedPhoneNumber = phoneNumber;
+    return {
+      clinicId: 64,
+      voiceBotEnabled: true,
+      timezone: 'Europe/Bratislava',
+      greetingMessage: 'Pekarcik test greeting',
+    };
+  };
+
+  try {
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000010',
+      To: 'sip:0332289010@sip.twilio.com',
+      CallSid: 'CA99999999999999999999999999999981',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(requestedPhoneNumber, '+421940610160');
+    assert.match(response.body, /Pekarcik test greeting/);
+    assert.match(response.body, /forwardedFrom=%2B421940610160/);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+  }
+});
+
+test('Cudzie ForwardedFrom neprepise autoritativne VipTel cislo Martina Pekarcika', async () => {
+  let requestedPhoneNumber = null;
+  prixiService.getConfig = async (phoneNumber) => {
+    requestedPhoneNumber = phoneNumber;
+    return {
+      clinicId: '64',
+      voiceBotEnabled: true,
+      timezone: 'Europe/Bratislava',
+      greetingMessage: 'Pekarcik authoritative route',
+    };
+  };
+
+  try {
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000014',
+      To: '00421332289010',
+      ForwardedFrom: '+420910924239',
+      CallSid: 'CA99999999999999999999999999999977',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(requestedPhoneNumber, '+421940610160');
+    assert.match(response.body, /Pekarcik authoritative route/);
+    assert.doesNotMatch(response.body, /<Play/);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+  }
+});
+
+test('Cudzie dedikovane To cislo ma prednost pred Pekarcikovym ForwardedFrom', async () => {
+  let requestedPhoneNumber = null;
+  prixiService.getConfig = async (phoneNumber) => {
+    requestedPhoneNumber = phoneNumber;
+    return {
+      clinicId: '142',
+      voiceBotEnabled: true,
+      timezone: 'Europe/Bratislava',
+    };
+  };
+
+  try {
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000015',
+      To: '+420910927082',
+      ForwardedFrom: '+421940610160',
+      CallSid: 'CA99999999999999999999999999999976',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(requestedPhoneNumber, '+420910927082');
+    assert.match(response.body, /pediatrickej ambulancie doktorky Čelkovej/);
+    assert.match(response.body, /forwardedFrom=%2B420910927082/);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+  }
+});
+
+test('Pekarcikov routing zablokuje konfiguraciu cudzej ambulancie', async () => {
+  prixiService.getConfig = async () => ({
+    clinicId: '143',
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+    greetingMessage: 'Cudzia ambulancia',
+  });
+
+  try {
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000011',
+      To: '+421332289010',
+      CallSid: 'CA99999999999999999999999999999980',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body, /Momentálne máme technické problémy\./);
+    assert.doesNotMatch(response.body, /Cudzia ambulancia/);
+    assert.doesNotMatch(response.body, /<Record/);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+  }
+});
+
+test('Pekarcikov routing bez databazovej uvitacej hlasky nepouzije vseobecny fallback', async () => {
+  prixiService.getConfig = async () => ({
+    clinicId: '64',
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+    greetingMessage: null,
+  });
+
+  try {
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000018',
+      To: '+421332289010',
+      CallSid: 'CA99999999999999999999999999999973',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body, /Momentálne máme technické problémy\./);
+    assert.doesNotMatch(response.body, /Pre zanechanie odkazu/);
+    assert.doesNotMatch(response.body, /<Record/);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+  }
+});
+
+test('Ina telefonna linka nemoze vytvorit poziadavku v Pekarcikovej ambulancii', async () => {
+  prixiService.getConfig = async () => ({
+    clinicId: 64,
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+    greetingMessage: 'Pekarcik test greeting',
+  });
+
+  try {
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000012',
+      To: '+421800232793',
+      CallSid: 'CA99999999999999999999999999999979',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body, /Momentálne máme technické problémy\./);
+    assert.doesNotMatch(response.body, /Pekarcik test greeting/);
+    assert.doesNotMatch(response.body, /<Record/);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+  }
+});
+
+test('Rozpracovany Pekarcikov hovor sa pri zmene clinicId neodosle', async () => {
+  let sendEventCalls = 0;
+  prixiService.getConfig = async () => ({
+    clinicId: '143',
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+  });
+  prixiService.sendEvent = async () => {
+    sendEventCalls += 1;
+  };
+
+  try {
+    const endpoint = '/voice/recording-complete?forwardedFrom=%2B421940610160&pediatricMode=false&dentalMode=false';
+    const response = await signedVoicePost(endpoint, {
+      From: '+421900000013',
+      To: '+421332289010',
+      CallSid: 'CA99999999999999999999999999999978',
+      RecordingUrl: 'https://api.twilio.test/birth-year',
+      RecordingDuration: '2',
+    });
+
+    assert.equal(response.statusCode, 200);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(sendEventCalls, 0);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+    prixiService.sendEvent = originalSendEvent;
+  }
+});
+
+test('Platny Pekarcikov hovor vytvori udalost iba s clinicId 64', async () => {
+  const sentEvents = [];
+  prixiService.getConfig = async () => ({
+    clinicId: 64,
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+  });
+  prixiService.sendEvent = async (event) => {
+    sentEvents.push(event);
+  };
+  sttService.transcribeAudioUrl = async () => '1980';
+
+  try {
+    const endpoint = '/voice/recording-complete?forwardedFrom=%2B421940610160&pediatricMode=false&dentalMode=false';
+    const response = await signedVoicePost(endpoint, {
+      From: '+421900000016',
+      To: '+421332289010',
+      CallSid: 'CA99999999999999999999999999999975',
+      RecordingUrl: 'https://api.twilio.test/birth-year',
+      RecordingDuration: '2',
+    });
+
+    assert.equal(response.statusCode, 200);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(sentEvents.length, 1);
+    assert.equal(String(sentEvents[0].clinicId), '64');
+    assert.equal(sentEvents[0].phone, '+421900000016');
+    assert.equal(sentEvents[0].routingPhoneNumber, '+421940610160');
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+    prixiService.sendEvent = originalSendEvent;
+    sttService.transcribeAudioUrl = originalTranscribeAudioUrl;
+  }
 });
 
 test('Pediatricky rezim pyta udaje dietata v celom IVR toku', async () => {
   prixiService.getConfig = async () => ({
-    clinicId: 'mudr-celkova',
+    clinicId: 'pediatric-test-clinic',
     voiceBotEnabled: true,
     timezone: 'Europe/Bratislava',
     pediatricMode: true,
@@ -226,7 +527,7 @@ test('Twilio cislo MUDr. Celkovej automaticky aktivuje pediatricky voice bot', a
   prixiService.getConfig = async (phoneNumber) => {
     requestedPhoneNumber = phoneNumber;
     return {
-      clinicId: 'mudr-celkova',
+      clinicId: '142',
       voiceBotEnabled: false,
       timezone: 'Europe/Bratislava',
     };
@@ -328,7 +629,7 @@ test('Twilio cislo MUDr. Benovej Baloghovej aktivuje ortopedicky voice bot', asy
   prixiService.getConfig = async (phoneNumber) => {
     requestedPhoneNumber = phoneNumber;
     return {
-      clinicId: 'mudr-benova-baloghova',
+      clinicId: '143',
       voiceBotEnabled: false,
       timezone: 'Europe/Bratislava',
       pediatricMode: true,
@@ -384,7 +685,7 @@ test('Konfigurovane Twilio cislo MUDr. Novotneho aktivuje zubarsky voice bot', a
   prixiService.getConfig = async (phoneNumber) => {
     requestedPhoneNumber = phoneNumber;
     return {
-      clinicId: 'mudr-novotny',
+      clinicId: '112',
       voiceBotEnabled: false,
       timezone: 'Europe/Bratislava',
       pediatricMode: true,
@@ -446,7 +747,7 @@ test('Predvolene Twilio cislo MUDr. Novotneho je +420910928021', async () => {
   prixiService.getConfig = async (phoneNumber) => {
     requestedPhoneNumber = phoneNumber;
     return {
-      clinicId: 'mudr-novotny',
+      clinicId: '112',
       voiceBotEnabled: false,
       timezone: 'Europe/Bratislava',
     };
