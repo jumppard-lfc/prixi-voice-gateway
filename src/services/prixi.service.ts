@@ -95,6 +95,15 @@ export class PrixiService {
       };
     }
 
+    if (phoneNumber === '+420910928021') {
+      return {
+        clinicId: '112',
+        voiceBotEnabled: true,
+        timezone: 'Europe/Bratislava',
+        pediatricMode: false,
+      };
+    }
+
     if (this.mockMode) {
       return {
         clinicId: process.env.PRIXI_FALLBACK_CLINIC_ID || 'local-dev',
