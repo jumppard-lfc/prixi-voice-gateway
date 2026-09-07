@@ -8,6 +8,7 @@ import { CallForwardedEvent, VoicemailRecordedEvent } from '../types';
 import { claimVoiceEvent, completeVoiceEvent, failVoiceEvent, createVoiceEventKey } from '../utils/voice-event-ledger';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { voiceBotConfigStore } from '../services/voice-bot-config.store';
 import { bookingSessionService, BookingSession, BookingVerificationTarget } from '../services/booking-session.service';
 import { bookingAuditService } from '../services/booking-audit.service';
 import { bookioService } from '../services/bookio.service';
@@ -26,9 +27,19 @@ const KLOSTERMANN_GREETING_FILE = resolve(__dirname, '../assets/audio/klosterman
 const DEFAULT_GREETING = 'Dobrý deň, dovolali ste sa do ambulancie. Pre zanechanie odkazu popíšte po zaznení tónu najprv váš problém a po skončení stlačte hociktoré tlačidlo.';
 const PEDIATRIC_GREETING = 'Dobrý deň, dovolali ste sa do pediatrickej ambulancie doktorky Čelkovej. Ak ide o náhly život ohrozujúci stav, volajte tiesňovú linku 155 alebo 112. V opačnom prípade nám prosím po zaznení tónu stručne povedzte, s čím sa na ambulanciu obraciate. Môže ísť napríklad o zdravotné ťažkosti dieťaťa, predpis liekov, výsledky vyšetrenia alebo objednanie. Po skončení stlačte ľubovoľné tlačidlo.';
 const ORTHOPEDIC_GREETING = 'Dobrý deň, dovolali ste sa do ortopedickej ambulancie pani doktorky Miroslavy Beňovej Baloghovej. Po zaznení tónu nám, prosím, povedzte, s čím vám môžeme pomôcť. Po skončení stlačte ľubovoľné tlačidlo.';
+const PROTECTED_PRODUCTION_TWILIO_NUMBERS = new Set([
+  CELKOVA_PHONE_NUMBER,
+  BENOVA_BALOGHOVA_PHONE_NUMBER,
+  KLOSTERMANN_PHONE_NUMBER,
+  '+421800232793',
+]);
 
 export async function voiceRoutes(fastify: FastifyInstance) {
 
+  // Retained only for isolated local regression testing of the original BOV
+  // experiment. It is never reachable from /voice/incoming and is off by
+  // default in every environment, including production.
+  if (process.env.ENABLE_LEGACY_BOV_BOOKING_EXPERIMENT === 'true') {
   const sayOptions: any = { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' };
 
   function formatSlot(slot: { startAt: string }): string {
@@ -271,6 +282,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     if (!events) return reply.code(404).send({ message: 'Booking call was not found or has expired.' });
     return { callSid, events };
   });
+  }
 
   fastify.post('/incoming', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as Record<string, string>;
@@ -314,6 +326,19 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       twiml.hangup();
       return reply.type('text/xml').send(twiml.toString());
     }
+
+    // A demo bot can claim only its explicitly configured, dedicated Twilio
+    // number. Current production numbers are protected above and therefore
+    // always keep the legacy fine-tuning behaviour below.
+    if (body.To && !PROTECTED_PRODUCTION_TWILIO_NUMBERS.has(body.To)) {
+      const dedicatedDemoBot = await voiceBotConfigStore.findByInboundTwilioNumber(body.To);
+      if (dedicatedDemoBot?.provider.mode === 'demo_mock') {
+        fastify.log.info({ botId: dedicatedDemoBot.id, to: body.To }, 'Routing dedicated Twilio number to configured demo voice bot');
+        const twiml = new VoiceResponse();
+        twiml.redirect(`/voice/demo/${dedicatedDemoBot.id}/start`);
+        return reply.type('text/xml').send(twiml.toString());
+      }
+    }
     if (!forwardedFrom) {
       if (body.To === CELKOVA_PHONE_NUMBER) {
         forwardedFrom = CELKOVA_PHONE_NUMBER;
@@ -344,11 +369,6 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       if (!isDedicatedVoiceBotNumber && !ivrService.shouldAllowCall(config, forwardedFrom)) {
         twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Toto číslo je momentálne nedostupné.');
         twiml.reject();
-        return reply.type('text/xml').send(twiml.toString());
-      }
-
-      if (config.bookingEnabled || process.env.BOOKING_ENABLED === 'true') {
-        twiml.redirect('/voice/booking/start');
         return reply.type('text/xml').send(twiml.toString());
       }
 

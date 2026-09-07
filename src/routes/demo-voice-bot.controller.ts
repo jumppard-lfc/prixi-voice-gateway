@@ -164,7 +164,7 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
     const botId = (request.params as { botId: string }).botId;
     const config = await voiceBotConfigStore.get(botId);
     const twiml = new VoiceResponse();
-    if (!config) {
+    if (!config || config.provider.mode !== 'demo_mock') {
       twiml.say(sayOptions, 'Tento demo bot nie je dostupný.'); twiml.hangup();
     } else {
       twiml.redirect(`/voice/demo/${config.id}/start`);
@@ -175,7 +175,7 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
   fastify.post('/demo/:botId/start', async (request, reply) => {
     const botId = (request.params as { botId: string }).botId;
     const config = await voiceBotConfigStore.get(botId);
-    if (!config) {
+    if (!config || config.provider.mode !== 'demo_mock') {
       const twiml = new VoiceResponse(); twiml.say(sayOptions, 'Tento demo bot nie je dostupný.'); twiml.hangup();
       return reply.type('text/xml').send(twiml.toString());
     }

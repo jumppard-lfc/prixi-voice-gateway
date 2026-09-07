@@ -21,6 +21,14 @@ export interface ConversationPolicy {
   playPromptTone: boolean;
 }
 
+export interface VoiceBotRouting {
+  /**
+   * Dedicated Twilio numbers assigned to this bot. An empty list intentionally
+   * means that the bot is reachable only through its explicit dynamic webhook.
+   */
+  inboundTwilioNumbers: string[];
+}
+
 export interface VoiceBotConfig {
   version: 1;
   id: string;
@@ -37,6 +45,7 @@ export interface VoiceBotConfig {
     connectionId?: string;
   };
   services: VoiceBotServiceDefinition[];
+  routing?: VoiceBotRouting;
   conversation: ConversationPolicy;
   copy: {
     introduction?: string;
@@ -51,6 +60,10 @@ export interface VoiceBotConfigValidation {
 }
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{2,63}$/;
+
+export function normalizeTwilioNumber(value: string): string {
+  return value.replace(/[\s()-]/g, '');
+}
 
 export function slugify(value: string): string {
   return value
@@ -93,6 +106,16 @@ export function validateVoiceBotConfig(config: Partial<VoiceBotConfig>): VoiceBo
   if (config.clinic?.phoneNumber && !/^\+[1-9]\d{6,14}$/.test(config.clinic.phoneNumber.replace(/\s/g, ''))) {
     errors.push('Telefónne číslo zadajte v medzinárodnom formáte, napríklad +421900123456.');
   }
+  const inboundNumbers = config.routing?.inboundTwilioNumbers || [];
+  const normalizedInboundNumbers = inboundNumbers.map(normalizeTwilioNumber);
+  for (const number of normalizedInboundNumbers) {
+    if (!/^\+[1-9]\d{6,14}$/.test(number)) {
+      errors.push('Twilio číslo bota zadajte v medzinárodnom formáte, napríklad +420910123456.');
+    }
+  }
+  if (new Set(normalizedInboundNumbers).size !== normalizedInboundNumbers.length) {
+    errors.push('Rovnaké Twilio číslo nemôže byť pri jednom botovi uvedené viackrát.');
+  }
   if (!config.provider || !BOOKING_PROVIDERS.includes(config.provider.kind as BookingProviderKind)) {
     errors.push('Vyberte podporovaného booking providera.');
   }
@@ -131,6 +154,7 @@ export const bovClinicDemoConfig: VoiceBotConfig = {
     timezone: 'Europe/Bratislava',
   },
   provider: { kind: 'bookio', mode: 'demo_mock' },
+  routing: { inboundTwilioNumbers: [] },
   services: [
     { id: 'initial-exam', label: 'Vstupné očné vyšetrenie', durationMinutes: 20, voiceAliases: ['vstupné vyšetrenie', 'prvá návšteva'] },
     { id: 'follow-up', label: 'Kontrola', durationMinutes: 20, voiceAliases: ['kontrola'] },

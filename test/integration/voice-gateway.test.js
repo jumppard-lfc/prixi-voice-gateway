@@ -11,19 +11,16 @@ process.env.TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || 'test-auth-toke
 
 const appModule = require('../../src/app');
 const serviceModule = require('../../src/services/prixi.service');
-const auditModule = require('../../src/services/booking-audit.service');
 const bookingNluModule = require('../../src/services/booking-nlu.service');
 const frameworkModule = require('../../src/services/voice-bot-framework.service');
 
 const app = appModule.default;
 const prixiService = serviceModule.prixiService;
-const bookingAuditService = auditModule.bookingAuditService;
 const { parseDatePreference, parseSlotChoice, parseYesNo } = bookingNluModule;
 const { bovClinicDemoConfig, buildFlowSummary, validateVoiceBotConfig } = frameworkModule;
 const projectRoot = path.join(__dirname, '../..');
 
 const originalGetConfig = prixiService.getConfig.bind(prixiService);
-const originalBookingEnabled = process.env.BOOKING_ENABLED;
 
 function buildSignature(url, params) {
   return twilio.getExpectedTwilioSignature(process.env.TWILIO_AUTH_TOKEN, url, params);
@@ -45,9 +42,6 @@ async function signedVoicePost(endpoint, params) {
 }
 
 test.before(() => {
-  // Booking is enabled in the developer's local shell for manual Twilio testing.
-  // Keep the unrelated IVR scenarios independent from that external environment.
-  delete process.env.BOOKING_ENABLED;
   prixiService.getConfig = async () => ({
     clinicId: 'test-clinic',
     voiceBotEnabled: false,
@@ -56,8 +50,6 @@ test.before(() => {
 });
 
 test.after(async () => {
-  if (originalBookingEnabled === undefined) delete process.env.BOOKING_ENABLED;
-  else process.env.BOOKING_ENABLED = originalBookingEnabled;
   prixiService.getConfig = originalGetConfig;
   await app.close();
 });
@@ -155,6 +147,7 @@ test('ulozeny ICP demo bot prejde mock rezervaciou a potvrdi ju SMS', async () =
   config.clinic.displayName = 'DentCare Bratislava';
   config.clinic.specialty = 'zubná klinika';
   config.services = [{ id: 'hygiene', label: 'Dentálna hygiena', durationMinutes: 45, voiceAliases: ['hygiena'] }];
+  config.routing = { inboundTwilioNumbers: ['+420910921168'] };
 
   try {
     const saved = await app.inject({
@@ -163,6 +156,7 @@ test('ulozeny ICP demo bot prejde mock rezervaciou a potvrdi ju SMS', async () =
     });
     assert.equal(saved.statusCode, 200);
     assert.equal(saved.json().webhookPath, '/voice/demo/dentcare-bratislava-demo/incoming');
+    assert.deepEqual(saved.json().inboundTwilioNumbers, ['+420910921168']);
 
     const loaded = await app.inject({
       method: 'GET', url: '/admin/voice-bot-builder/config/dentcare-bratislava-demo',
@@ -170,6 +164,32 @@ test('ulozeny ICP demo bot prejde mock rezervaciou a potvrdi ju SMS', async () =
     });
     assert.equal(loaded.statusCode, 200);
     assert.equal(loaded.json().config.clinic.displayName, 'DentCare Bratislava');
+
+    const routedByDedicatedNumber = await signedVoicePost('/voice/incoming', {
+      From: '+421900000125',
+      To: '+420910921168',
+      CallSid: 'CA99999999999999999999999999999985',
+    });
+    assert.equal(routedByDedicatedNumber.statusCode, 200);
+    assert.match(routedByDedicatedNumber.body, /<Redirect>\/voice\/demo\/dentcare-bratislava-demo\/start<\/Redirect>/);
+
+    const protectedNumberConfig = structuredClone(config);
+    protectedNumberConfig.id = 'must-not-claim-production-number';
+    protectedNumberConfig.routing = { inboundTwilioNumbers: ['+420910927082'] };
+    const protectedNumberSaved = await app.inject({
+      method: 'POST', url: '/admin/voice-bot-builder/save',
+      headers: { authorization: 'Bearer demo-builder-token' }, payload: protectedNumberConfig,
+    });
+    assert.equal(protectedNumberSaved.statusCode, 200);
+
+    const protectedProductionCall = await signedVoicePost('/voice/incoming', {
+      From: '+421900000125',
+      To: '+420910927082',
+      CallSid: 'CA99999999999999999999999999999984',
+    });
+    assert.equal(protectedProductionCall.statusCode, 200);
+    assert.doesNotMatch(protectedProductionCall.body, /must-not-claim-production-number/);
+    assert.match(protectedProductionCall.body, /pediatrickej ambulancie doktorky Čelkovej/);
 
     const callSid = 'CA99999999999999999999999999999986';
     const base = { From: '+421900000125', CallSid: callSid };
@@ -280,73 +300,31 @@ test('POST /voice/incoming s validnym podpisom vrati TwiML', async () => {
   assert.match(response.body, /Toto číslo je momentálne nedostupné\./);
 });
 
-test('booking flow funguje kompletne cez tlacidla a odosle mock SMS', async () => {
-  const originalMockMode = process.env.BOOKIO_MOCK_MODE;
-  process.env.BOOKIO_MOCK_MODE = 'true';
-  const callSid = 'CA99999999999999999999999999999988';
-  const base = { From: '+421900000123', CallSid: callSid };
-
+test('globalny BOOKING_ENABLED nema vplyv na produkcny incoming flow', async () => {
+  const previous = process.env.BOOKING_ENABLED;
+  process.env.BOOKING_ENABLED = 'true';
   try {
-    const start = await signedVoicePost('/voice/booking/start', base);
-    assert.equal(start.statusCode, 200);
-    assert.match(start.body, /stlačte 1/);
-    assert.match(start.body, /<Play>https:\/\/127\.0\.0\.1:3000\/media\/booking-prompt-tone\.wav<\/Play>/);
-    assert.match(start.body, /<Gather[^>]+numDigits="1"/);
-
-    const service = await signedVoicePost('/voice/booking/answer', { ...base, Digits: '2' });
-    assert.match(service.body, /chcete objednať na kontrolu/);
-
-    const serviceConfirmed = await signedVoicePost('/voice/booking/answer', { ...base, Digits: '1' });
-    assert.match(serviceConfirmed.body, /najbližší termín/);
-
-    const preference = await signedVoicePost('/voice/booking/answer', { ...base, Digits: '1' });
-    assert.match(preference.body, /preferujete najbližší voľný termín/);
-
-    const preferenceConfirmed = await signedVoicePost('/voice/booking/answer', { ...base, Digits: '1' });
-    assert.match(preferenceConfirmed.body, /Mám tieto termíny/);
-
-    const slot = await signedVoicePost('/voice/booking/answer', { ...base, Digits: '2' });
-    assert.match(slot.body, /Rozumela som správne, že vám vyhovuje/);
-
-    const slotConfirmed = await signedVoicePost('/voice/booking/answer', { ...base, Digits: '1' });
-    assert.match(slotConfirmed.body, /meno a priezvisko/);
-
-    const name = await signedVoicePost('/voice/booking/answer', { ...base, SpeechResult: 'Ján Novák' });
-    assert.match(name.body, /Ďakujem/);
-    assert.match(name.body, /všeobecnými obchodnými podmienkami/);
-
-    const terms = await signedVoicePost('/voice/booking/answer', { ...base, Digits: '1' });
-    assert.match(terms.body, /Ďakujem. Ešte krátko zhrniem vybraný termín/);
-    assert.match(terms.body, /Môžem termín záväzne objednať/);
-
-    const confirmation = await signedVoicePost('/voice/booking/answer', { ...base, Digits: '1' });
-    assert.match(confirmation.body, /Potvrdenie vám posielame SMS správou/);
-    assert.match(confirmation.body, /<Hangup\/>/);
-
-    const events = bookingAuditService.get(callSid);
-    assert.deepEqual(events.map(({ event }) => event), [
-      'started', 'service_selected', 'slots_offered', 'slot_selected', 'identity_collected',
-      'terms_accepted', 'booking_created', 'sms_sent', 'completed',
-    ]);
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000001',
+      To: '+420910920000',
+      CallSid: 'CA88888888888888888888888888888889',
+    });
+    assert.equal(response.statusCode, 200);
+    assert.doesNotMatch(response.body, /\/voice\/booking\/start/);
+    assert.match(response.body, /Toto číslo je momentálne nedostupné\./);
   } finally {
-    if (originalMockMode === undefined) delete process.env.BOOKIO_MOCK_MODE;
-    else process.env.BOOKIO_MOCK_MODE = originalMockMode;
+    if (previous === undefined) delete process.env.BOOKING_ENABLED;
+    else process.env.BOOKING_ENABLED = previous;
   }
 });
 
-test('nepochopena hlasova volba prejde na presny vstup cez klavesnicu', async () => {
-  const callSid = 'CA99999999999999999999999999999987';
-  const base = { From: '+421900000124', CallSid: callSid };
-
-  const start = await signedVoicePost('/voice/booking/start', base);
-  assert.equal(start.statusCode, 200);
-
-  const retryWithDtmf = await signedVoicePost('/voice/booking/answer', {
-    ...base,
-    SpeechResult: 'niečo, čo nie je voľba vyšetrenia',
+test('legacy BOV endpoint nie je bez explicitneho experimentu dostupny', async () => {
+  const response = await signedVoicePost('/voice/booking/start', {
+    From: '+421900000123',
+    CallSid: 'CA99999999999999999999999999999988',
   });
-  assert.match(retryWithDtmf.body, /Prosím, pre istotu teraz použite klávesnicu/);
-  assert.match(retryWithDtmf.body, /<Gather[^>]+input="dtmf"/);
+
+  assert.equal(response.statusCode, 404);
 });
 
 test('Klostermann fallback prehra dodanu nahravku a ukonci hovor', async () => {
