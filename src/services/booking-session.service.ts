@@ -6,12 +6,15 @@ export type BookingStep =
   | 'slot'
   | 'name'
   | 'terms'
-  | 'marketing'
+  | 'verification'
   | 'confirmation';
+
+export type BookingVerificationTarget = 'service' | 'date_preference' | 'slot';
 
 export interface BookingSession {
   callSid: string;
   phone: string;
+  publicBaseUrl?: string;
   step: BookingStep;
   service?: BookingServiceCode;
   preference?: DatePreference;
@@ -20,7 +23,8 @@ export interface BookingSession {
   firstName?: string;
   lastName?: string;
   acceptedTerms?: boolean;
-  marketingConsent?: boolean;
+  verificationTarget?: BookingVerificationTarget;
+  forceDtmf?: boolean;
   attempts: number;
   expiresAt: number;
 }
@@ -30,8 +34,8 @@ const SESSION_TTL_MS = 20 * 60 * 1000;
 export class BookingSessionService {
   private sessions = new Map<string, BookingSession>();
 
-  create(callSid: string, phone: string): BookingSession {
-    const session: BookingSession = { callSid, phone, step: 'service', attempts: 0, expiresAt: Date.now() + SESSION_TTL_MS };
+  create(callSid: string, phone: string, publicBaseUrl?: string): BookingSession {
+    const session: BookingSession = { callSid, phone, publicBaseUrl, step: 'service', attempts: 0, expiresAt: Date.now() + SESSION_TTL_MS };
     this.sessions.set(callSid, session);
     return session;
   }

@@ -75,6 +75,9 @@ web_modules/
 .env.production
 .env.local
 
+# Locally created ICP demo bot configurations
+data/voice-bot-configs/
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache

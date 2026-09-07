@@ -8,7 +8,7 @@ import { CallForwardedEvent, VoicemailRecordedEvent } from '../types';
 import { claimVoiceEvent, completeVoiceEvent, failVoiceEvent, createVoiceEventKey } from '../utils/voice-event-ledger';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { bookingSessionService, BookingSession } from '../services/booking-session.service';
+import { bookingSessionService, BookingSession, BookingVerificationTarget } from '../services/booking-session.service';
 import { bookingAuditService } from '../services/booking-audit.service';
 import { bookioService } from '../services/bookio.service';
 import { parseDatePreference, parseName, parseService, parseSlotChoice, parseYesNo } from '../services/booking-nlu.service';
@@ -35,39 +35,91 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     return new Intl.DateTimeFormat('sk-SK', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Bratislava' }).format(new Date(slot.startAt));
   }
 
-  function ask(reply: FastifyReply, session: BookingSession, message: string, hints = ''): FastifyReply {
+  function serviceLabel(service: BookingSession['service']): string {
+    const labels = {
+      initial_exam: 'vstupné očné vyšetrenie',
+      follow_up: 'kontrolu',
+      acute_exam: 'akútne vyšetrenie',
+      certificate_exam: 'vyšetrenie na vodičský alebo zbrojný preukaz',
+      aesthetic_medicine: 'estetickú medicínu',
+    } as const;
+    return service ? labels[service] : 'vyšetrenie';
+  }
+
+  function preferenceLabel(session: BookingSession): string {
+    if (session.preference?.timeOfDay === 'morning') return 'najbližší voľný termín dopoludnia';
+    if (session.preference?.timeOfDay === 'afternoon') return 'najbližší voľný termín popoludní';
+    return 'najbližší voľný termín';
+  }
+
+  function publicBaseUrl(request: FastifyRequest): string {
+    const forwardedProto = String(request.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
+    const forwardedHost = String(request.headers['x-forwarded-host'] || request.headers.host || '').split(',')[0].trim();
+    return (process.env.PUBLIC_BASE_URL || `${forwardedProto}://${forwardedHost}`).replace(/\/$/, '');
+  }
+
+  function ask(reply: FastifyReply, session: BookingSession, message: string, hints = '', forceDtmf = false): FastifyReply {
     bookingSessionService.save(session);
     const twiml = new VoiceResponse();
-    const gather = twiml.gather({ input: ['speech', 'dtmf'], action: '/voice/booking/answer', method: 'POST', timeout: 5, speechTimeout: 'auto', language: 'sk-SK', hints } as any);
+    const expectsSingleDigit = session.step !== 'name';
+    const gather = twiml.gather({
+      input: forceDtmf ? ['dtmf'] : ['speech', 'dtmf'],
+      action: '/voice/booking/answer',
+      method: 'POST',
+      // Without this Twilio waits for the Gather timeout even after one key press.
+      ...(expectsSingleDigit ? { numDigits: 1 } : {}),
+      timeout: 5,
+      speechTimeout: 'auto',
+      language: 'sk-SK',
+      hints,
+    } as any);
     gather.say(sayOptions, message);
+    gather.play(`${session.publicBaseUrl || ''}/media/booking-prompt-tone.wav`);
     twiml.say(sayOptions, 'Odpoveď som nezachytila. Skúsme to, prosím, znova.');
     twiml.redirect('/voice/booking/retry');
     return reply.type('text/xml').send(twiml.toString());
   }
 
   function bookingPrompt(reply: FastifyReply, session: BookingSession, prefix = ''): FastifyReply {
+    const forceDtmf = session.forceDtmf === true;
+    session.forceDtmf = false;
     switch (session.step) {
       case 'service':
-        return ask(reply, session, `${prefix}Pre vstupné vyšetrenie stlačte 1 alebo povedzte vstupné vyšetrenie. Pre kontrolu stlačte 2. Pre akútne vyšetrenie stlačte 3. Pre vyšetrenie na vodičský preukaz stlačte 4. Pre estetickú medicínu stlačte 5.`, 'vstupné vyšetrenie, kontrola, akútne vyšetrenie, vodičský preukaz, estetická medicína');
+        return ask(reply, session, `${prefix}${forceDtmf ? 'Prosím, pre istotu teraz použite klávesnicu. ' : ''}Pre vstupné vyšetrenie stlačte 1${forceDtmf ? '.' : ' alebo povedzte vstupné vyšetrenie.'} Pre kontrolu stlačte 2. Pre akútne vyšetrenie stlačte 3. Pre vyšetrenie na vodičský preukaz stlačte 4. Pre estetickú medicínu stlačte 5.`, 'vstupné vyšetrenie, kontrola, akútne vyšetrenie, vodičský preukaz, estetická medicína', forceDtmf);
       case 'date_preference':
-        return ask(reply, session, `${prefix}Pre najbližší termín stlačte 1. Pre dopoludnie stlačte 2. Pre popoludnie stlačte 3. Môžete odpovedať aj hlasom.`, 'najbližší termín, dopoludnie, popoludnie');
+        return ask(reply, session, `${prefix}${forceDtmf ? 'Prosím, pre istotu teraz použite klávesnicu. ' : ''}Pre najbližší termín stlačte 1. Pre dopoludnie stlačte 2. Pre popoludnie stlačte 3.${forceDtmf ? '' : ' Môžete odpovedať aj hlasom.'}`, 'najbližší termín, dopoludnie, doobeda, popoludnie', forceDtmf);
       case 'slot': {
         const slots = session.offeredSlots || [];
         const choices = slots.map((slot, index) => `možnosť ${index + 1}: ${formatSlot(slot)}`).join('. ');
-        return ask(reply, session, `${prefix}Mám tieto termíny. ${choices}. Povedzte číslo možnosti, alebo deň.`, 'prvá možnosť, druhá možnosť, tretia možnosť');
+        const dayHints = slots.map((slot) => new Intl.DateTimeFormat('sk-SK', { weekday: 'long', timeZone: 'Europe/Bratislava' }).format(new Date(slot.startAt))).join(', ');
+        return ask(reply, session, `${prefix}${forceDtmf ? 'Prosím, pre istotu teraz použite klávesnicu. ' : ''}Mám tieto termíny. ${choices}. ${forceDtmf ? 'Stlačte číslo možnosti.' : 'Povedzte číslo možnosti alebo názov dňa.'}`, `prvá možnosť, druhá možnosť, tretia možnosť, ${dayHints}`, forceDtmf);
       }
       case 'name': return ask(reply, session, `${prefix}Prosím, povedzte vaše meno a priezvisko.`);
-      case 'terms': return ask(reply, session, `${prefix}Pred dokončením objednávky potrebujeme váš súhlas so všeobecnými obchodnými podmienkami BOV Clinic. Podmienky sú dostupné na webovej stránke ambulancie. Súhlasíte? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`, 'áno, nie');
-      case 'marketing': return ask(reply, session, 'Chcete dobrovoľne dostávať marketingové informácie od BOV Clinic? Nie je to podmienka objednania. Povedzte áno alebo nie.', 'áno, nie');
-      case 'confirmation': return ask(reply, session, `${prefix}Potvrdzujem: ${session.selectedSlot?.serviceName}, ${session.selectedSlot ? formatSlot(session.selectedSlot) : ''}, na meno ${session.firstName} ${session.lastName}. Môžem termín záväzne objednať?`, 'áno, nie');
+      case 'terms': return ask(reply, session, `${prefix}Súhlasíte so všeobecnými obchodnými podmienkami BOV Clinic? Podmienky sú dostupné na webovej stránke ambulancie. Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`, 'áno, nie', forceDtmf);
+      case 'verification': return ask(reply, session, verificationMessage(session), 'áno, nie', forceDtmf);
+      case 'confirmation': return ask(reply, session, `${prefix}Potvrdzujem: ${session.selectedSlot?.serviceName}, ${session.selectedSlot ? formatSlot(session.selectedSlot) : ''}. Môžem termín záväzne objednať? Povedzte áno alebo stlačte 1. Pre zmenu termínu stlačte 2.`, 'áno, nie', forceDtmf);
     }
+  }
+
+  function verificationMessage(session: BookingSession): string {
+    switch (session.verificationTarget) {
+      case 'service': return `Ďakujem. Rozumela som správne, že sa chcete objednať na ${serviceLabel(session.service)}? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`;
+      case 'date_preference': return `Ďakujem. Rozumela som správne, že preferujete ${preferenceLabel(session)}? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`;
+      case 'slot': return `Ďakujem. Rozumela som správne, že vám vyhovuje ${session.selectedSlot ? formatSlot(session.selectedSlot) : 'tento termín'}? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`;
+      default: return 'Rozumela som vám správne? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.';
+    }
+  }
+
+  function beginVerification(session: BookingSession, target: BookingVerificationTarget): void {
+    session.verificationTarget = target;
+    session.step = 'verification';
   }
 
   fastify.post('/booking/start', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as Record<string, string>;
-    const session = bookingSessionService.create(body.CallSid, body.From);
+    const session = bookingSessionService.create(body.CallSid, body.From, publicBaseUrl(request));
     bookingAuditService.record(session.callSid, 'started', { phone: session.phone });
-    return bookingPrompt(reply, session, 'Dobrý deň, som automatická asistentka BOV Clinic. Pomôžem vám s objednaním. ');
+    return bookingPrompt(reply, session, 'Dobrý deň, som virtuálna sestrička BOV Clinic. Rada vám pomôžem s objednaním. Spoločne vyberieme typ vyšetrenia, termín a potom vaše meno. Kedykoľvek môžete odpovedať hlasom alebo použiť tlačidlá na telefóne. ');
   });
 
   fastify.post('/booking/retry', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -87,55 +139,85 @@ export async function voiceRoutes(fastify: FastifyInstance) {
   fastify.post('/booking/answer', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as Record<string, string>;
     const session = bookingSessionService.get(body.CallSid);
-    if (!session) return bookingPrompt(reply, bookingSessionService.create(body.CallSid, body.From), 'Začnime, prosím, od začiatku. ');
+    if (!session) return bookingPrompt(reply, bookingSessionService.create(body.CallSid, body.From, publicBaseUrl(request)), 'Začnime, prosím, od začiatku. ');
     const answer = body.SpeechResult || body.Digits || '';
     let understood = false;
 
-    if (session.step === 'service') {
+    if (session.step === 'verification') {
+      const yes = parseYesNo(answer);
+      const target = session.verificationTarget;
+      if (yes === true && target) {
+        session.verificationTarget = undefined;
+        if (target === 'service') {
+          session.step = 'date_preference';
+        } else if (target === 'date_preference' && session.service && session.preference) {
+          session.offeredSlots = await bookioService.getAvailableSlots(session.service, session.preference);
+          session.step = 'slot';
+          bookingAuditService.record(session.callSid, 'slots_offered', { service: session.service, count: session.offeredSlots.length });
+        } else if (target === 'slot') {
+          session.step = 'name';
+        }
+        session.attempts = 0;
+        const transition = target === 'service'
+          ? 'Ďakujem. Poďme teraz spoločne vybrať termín, ktorý by vám vyhovoval. '
+          : target === 'date_preference'
+            ? 'Ďakujem. Pozrime sa spolu na voľné termíny. '
+            : 'Ďakujem. Teraz dokončíme údaje k objednávke. ';
+        return bookingPrompt(reply, session, transition);
+      } else if (yes === false && target) {
+        session.verificationTarget = undefined;
+        session.step = target;
+        session.forceDtmf = true;
+        if (target === 'service') session.service = undefined;
+        if (target === 'date_preference') session.preference = undefined;
+        if (target === 'slot') session.selectedSlot = undefined;
+        return bookingPrompt(reply, session, 'Ospravedlňujem sa. Pre istotu teraz, prosím, použite tlačidlo na klávesnici. ');
+      }
+    } else if (session.step === 'service') {
       const service = parseService(answer);
       if (service) {
-        session.service = service; session.step = 'date_preference'; understood = true;
+        session.service = service; beginVerification(session, 'service'); understood = true;
         bookingAuditService.record(session.callSid, 'service_selected', { service });
       }
     } else if (session.step === 'date_preference') {
       const preference = parseDatePreference(answer);
       if (preference && session.service) {
         session.preference = preference;
-        session.offeredSlots = await bookioService.getAvailableSlots(session.service, preference);
-        session.step = 'slot'; understood = true;
-        bookingAuditService.record(session.callSid, 'slots_offered', { service: session.service, count: session.offeredSlots.length });
+        beginVerification(session, 'date_preference'); understood = true;
       }
     } else if (session.step === 'slot') {
-      const choice = parseSlotChoice(answer, session.offeredSlots?.length || 0);
+      const choice = parseSlotChoice(answer, session.offeredSlots || []);
       if (choice !== undefined && session.offeredSlots?.[choice]) {
-        session.selectedSlot = session.offeredSlots[choice]; session.step = 'name'; understood = true;
+        session.selectedSlot = session.offeredSlots[choice]; beginVerification(session, 'slot'); understood = true;
         bookingAuditService.record(session.callSid, 'slot_selected', { slotId: session.selectedSlot.id, startAt: session.selectedSlot.startAt });
       }
     } else if (session.step === 'name') {
       const name = parseName(answer);
       if (name) {
-        Object.assign(session, name); session.step = 'terms'; understood = true;
+        Object.assign(session, name); session.step = 'terms';
         bookingAuditService.record(session.callSid, 'identity_collected', { firstName: name.firstName, lastName: name.lastName });
+        session.attempts = 0;
+        return bookingPrompt(reply, session, 'Ďakujem. Pred dokončením objednávky si spolu potvrdíme všeobecné podmienky. ');
       }
     } else if (session.step === 'terms') {
       const yes = parseYesNo(answer);
       if (yes === true) {
-        session.acceptedTerms = true; session.step = 'marketing'; understood = true;
+        session.acceptedTerms = true; session.step = 'confirmation';
         bookingAuditService.record(session.callSid, 'terms_accepted');
+        session.attempts = 0;
+        return bookingPrompt(reply, session, 'Ďakujem. Ešte krátko zhrniem vybraný termín. ');
       }
       if (yes === false) { const twiml = new VoiceResponse(); twiml.say(sayOptions, 'Bez súhlasu s podmienkami objednávku nevieme vytvoriť. Ďakujeme a dovidenia.'); twiml.hangup(); bookingSessionService.delete(session.callSid); return reply.type('text/xml').send(twiml.toString()); }
-    } else if (session.step === 'marketing') {
-      const yes = parseYesNo(answer);
-      if (yes !== undefined) {
-        session.marketingConsent = yes; session.step = 'confirmation'; understood = true;
-        bookingAuditService.record(session.callSid, 'marketing_recorded', { consent: yes });
-      }
     } else if (session.step === 'confirmation') {
       const yes = parseYesNo(answer);
-      if (yes === false) return bookingPrompt(reply, session, 'Rozumiem, objednávku nevytvorím. ');
+      if (yes === false) {
+        session.step = 'slot';
+        session.forceDtmf = true;
+        return bookingPrompt(reply, session, 'Rozumiem, termín zatiaľ nevytvorím. Vyberme iný termín. ');
+      }
       if (yes === true && session.service && session.selectedSlot && session.firstName && session.lastName && session.acceptedTerms) {
         try {
-          const booking = await bookioService.createBooking({ service: session.service, slotId: session.selectedSlot.id, firstName: session.firstName, lastName: session.lastName, phone: session.phone, note: 'Rezervácia vytvorená telefonickou asistentkou.', acceptedTerms: true, marketingConsent: Boolean(session.marketingConsent) });
+          const booking = await bookioService.createBooking({ service: session.service, slotId: session.selectedSlot.id, firstName: session.firstName, lastName: session.lastName, phone: session.phone, note: 'Rezervácia vytvorená telefonickou asistentkou.', acceptedTerms: true, marketingConsent: false });
           bookingAuditService.record(session.callSid, 'booking_created', { bookingId: booking.bookingId, provider: 'bookio' });
           let smsDelivered = false;
           try {
@@ -154,7 +236,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
           }
           bookingAuditService.record(session.callSid, 'completed', { smsDelivered });
           const twiml = new VoiceResponse();
-          twiml.say(sayOptions, smsDelivered ? `Termín ${formatSlot(session.selectedSlot)} je objednaný. Potvrdenie vám posielame SMS správou. Ďakujeme a dovidenia.` : `Termín ${formatSlot(session.selectedSlot)} je objednaný. Potvrdenie SMS správou sa nepodarilo odoslať. Ďakujeme a dovidenia.`);
+          twiml.say(sayOptions, smsDelivered ? `Ďakujem. Termín ${formatSlot(session.selectedSlot)} je objednaný. Potvrdenie vám posielame SMS správou. Ďakujeme a dovidenia.` : `Ďakujem. Termín ${formatSlot(session.selectedSlot)} je objednaný. Potvrdenie SMS správou sa nepodarilo odoslať. Ďakujeme a dovidenia.`);
           twiml.hangup(); bookingSessionService.delete(session.callSid);
           return reply.type('text/xml').send(twiml.toString());
         } catch (error) {
@@ -166,7 +248,14 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       }
     }
 
-    if (!understood) return bookingPrompt(reply, session, 'Prepáčte, nerozumela som. ');
+    if (!understood) {
+      // Do not make callers repeat an unsuccessfully recognised answer by voice.
+      // For every numeric choice, immediately offer the precise DTMF fallback.
+      session.forceDtmf = session.step !== 'name';
+      return bookingPrompt(reply, session, session.step === 'name'
+        ? 'Prepáčte, meno som nezachytila. '
+        : 'Prepáčte, nerozumela som. ');
+    }
     session.attempts = 0;
     return bookingPrompt(reply, session);
   });

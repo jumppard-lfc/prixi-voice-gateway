@@ -5,7 +5,6 @@ export type BookingAuditEventName =
   | 'slot_selected'
   | 'identity_collected'
   | 'terms_accepted'
-  | 'marketing_recorded'
   | 'booking_created'
   | 'sms_sent'
   | 'sms_failed'
