@@ -25,7 +25,7 @@ After Render deploys the commit, configure the new Twilio number with the dedica
 
 `VOICE_BOT_CONFIG_REPOSITORY_DIR` can override the committed directory for local development or tests. `VOICE_BOT_CONFIG_DIR` is only an explicit, temporary writable override; do not set it on Render.
 
-The saved demo bot has the same guided phone flow as BOV Clinic, but it always uses generated mock availability and never writes to Bookio, PriXi or another calendar. It can send a real confirmation SMS only when both the normal BulkGate credentials and this explicit opt-in are present:
+The saved demo bot has the same guided phone flow as BOV Clinic, but it always uses generated mock availability and never writes to Bookio, PriXi or another calendar. In a conversation tree, add a **Voľné termíny** node after the service (and optional time-preference) question. It offers three concrete mock dates/times, stores the selected one in its configured variable (for example `{{termin}}`), and can require an explicit yes/no confirmation before the end node. It can send a real confirmation SMS only when both the normal BulkGate credentials and this explicit opt-in are present:
 
 ```bash
 DEMO_BOOKING_SMS_ENABLED=true \

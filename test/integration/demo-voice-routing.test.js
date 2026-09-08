@@ -186,6 +186,37 @@ test('vlastný rozhodovací strom vedie hlasovú voľbu cez potvrdenie do správ
   assert.match(completed.body, /Vaša požiadavka na vstupné vyšetrenie je potvrdená/);
 });
 
+test('stromový uzol voľných termínov nechá pacienta vybrať a potvrdiť konkrétny slot', async () => {
+  const config = configFor('tree-availability-demo', []);
+  config.conversationTree = {
+    entryNodeId: 'navsteva',
+    nodes: [
+      {
+        id: 'navsteva', type: 'question', prompt: 'Akú návštevu si prajete?', storeAs: 'navsteva', confirmSelection: false,
+        choices: [{ id: 'hygiena', label: 'dentálnu hygienu', voiceAliases: ['dentálna hygiena', 'hygiena'], dtmf: '1', nextNodeId: 'terminy' }],
+      },
+      {
+        id: 'terminy', type: 'availability', bridge: 'Ďakujem. Pozrime sa na voľné termíny.', prompt: '', serviceVariable: 'navsteva', storeAs: 'termin',
+        confirmSelection: true, nextNodeId: 'potvrdene',
+      },
+      { id: 'potvrdene', type: 'end', text: 'Termín {{termin}} je potvrdený.', outcome: 'mock_booking' },
+    ],
+  };
+  await save(config);
+
+  const callSid = 'CA90000000000000000000000000000007';
+  await signedPost('/voice/demo/tree-availability-demo/start', { From: '+421900000125', CallSid: callSid });
+  const slots = await signedPost('/voice/demo/tree-availability-demo/tree/answer', { CallSid: callSid, SpeechResult: 'hygiena' });
+  assert.match(slots.body, /voľné termíny/);
+  assert.match(slots.body, /možnosť 1/);
+
+  const confirmation = await signedPost('/voice/demo/tree-availability-demo/tree/answer', { CallSid: callSid, Digits: '1' });
+  assert.match(confirmation.body, /Rozumela som správne, že si prajete/);
+
+  const completed = await signedPost('/voice/demo/tree-availability-demo/tree/answer', { CallSid: callSid, SpeechResult: 'áno' });
+  assert.match(completed.body, /Termín .* je potvrdený/);
+});
+
 test('konfigurácia nikdy neprevezme chránené produkčné Twilio číslo', async () => {
   await save(configFor('blocked-demo-bot', ['+420910927082']));
   prixiService.getConfig = async () => ({

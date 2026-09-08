@@ -74,6 +74,29 @@ export interface VoiceBotTreeMessageNode {
   nextNodeId: string;
 }
 
+/**
+ * Looks up availability after prior choices (for example visit type and time
+ * preference) and turns the returned slots into a deterministic choice menu.
+ * `demo_mock` is the only source implemented today; provider connectors can
+ * later implement the same contract without changing the conversation tree.
+ */
+export interface VoiceBotTreeAvailabilityNode {
+  id: string;
+  type: 'availability';
+  bridge?: string;
+  prompt?: string;
+  audioUrl?: string;
+  /** Key of a prior answer describing the requested visit. */
+  serviceVariable: string;
+  /** Optional prior answer such as "dopoludnia" or "popoludní". */
+  preferenceVariable?: string;
+  /** Key under which the selected formatted date/time is retained. */
+  storeAs: string;
+  confirmSelection: boolean;
+  confirmationPrompt?: string;
+  nextNodeId: string;
+}
+
 export interface VoiceBotTreeEndNode {
   id: string;
   type: 'end';
@@ -85,7 +108,7 @@ export interface VoiceBotTreeEndNode {
   smsText?: string;
 }
 
-export type VoiceBotTreeNode = VoiceBotTreeQuestionNode | VoiceBotTreeMessageNode | VoiceBotTreeEndNode;
+export type VoiceBotTreeNode = VoiceBotTreeQuestionNode | VoiceBotTreeMessageNode | VoiceBotTreeAvailabilityNode | VoiceBotTreeEndNode;
 
 export interface VoiceBotConversationTree {
   entryNodeId: string;
@@ -274,6 +297,10 @@ function validateConversationTree(tree: VoiceBotConversationTree, errors: string
         if (!choice.voiceAliases?.length) warnings.push(`Odpoveď „${choice.label || choice.id}“ v uzle „${node.id}“ nemá hlasové synonymá.`);
         if (!nodeIds.has(choice.nextNodeId)) errors.push(`Odpoveď „${choice.label || choice.id}“ odkazuje na neznámy uzol „${choice.nextNodeId}“.`);
       }
+    } else if (node.type === 'availability') {
+      if (!node.serviceVariable?.trim()) errors.push(`Uzol voľných termínov „${node.id}“ potrebuje premennú služby.`);
+      if (!node.storeAs?.trim()) errors.push(`Uzol voľných termínov „${node.id}“ potrebuje názov premennej termínu.`);
+      if (!nodeIds.has(node.nextNodeId)) errors.push(`Uzol voľných termínov „${node.id}“ odkazuje na neznámy uzol „${node.nextNodeId}“.`);
     } else if (node.type === 'message') {
       if (!node.text.trim() && !node.audioUrl) errors.push(`Správa „${node.id}“ potrebuje text alebo nahrávku.`);
       if (!nodeIds.has(node.nextNodeId)) errors.push(`Správa „${node.id}“ odkazuje na neznámy uzol „${node.nextNodeId}“.`);
