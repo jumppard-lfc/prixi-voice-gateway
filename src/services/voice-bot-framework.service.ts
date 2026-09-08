@@ -10,11 +10,22 @@ export interface VoiceBotServiceDefinition {
   voiceAliases: string[];
 }
 
+/** A clinician or team member that can be selected after the service. */
+export interface VoiceBotPractitionerDefinition {
+  id: string;
+  label: string;
+  voiceAliases: string[];
+  /** Empty means that this person can provide every configured service. */
+  serviceIds?: string[];
+}
+
 export interface ConversationPolicy {
   confirmService: boolean;
   confirmDatePreference: boolean;
   confirmSlot: boolean;
   confirmName: boolean;
+  /** Omitted configurations keep the original flow and do not ask for a practitioner. */
+  confirmPractitioner?: boolean;
   requireTerms: boolean;
   sendConfirmationSms: boolean;
   useDtmfFallback: boolean;
@@ -45,6 +56,7 @@ export interface VoiceBotConfig {
     connectionId?: string;
   };
   services: VoiceBotServiceDefinition[];
+  practitioners?: VoiceBotPractitionerDefinition[];
   routing?: VoiceBotRouting;
   conversation: ConversationPolicy;
   copy: {
@@ -130,6 +142,22 @@ export function validateVoiceBotConfig(config: Partial<VoiceBotConfig>): VoiceBo
       ids.add(service.id);
       if (!service.voiceAliases?.length) warnings.push(`Služba „${service.label}“ nemá doplnené hlasové synonymá.`);
     }
+  }
+  if (config.practitioners?.length) {
+    const ids = new Set<string>();
+    for (const practitioner of config.practitioners) {
+      if (!practitioner.id || !ID_PATTERN.test(practitioner.id)) errors.push(`Člen tímu „${practitioner.label || 'bez názvu'}“ nemá platné ID.`);
+      if (!practitioner.label?.trim()) errors.push('Každý člen tímu potrebuje meno, ktoré volajúci počuje.');
+      if (ids.has(practitioner.id)) errors.push(`ID člena tímu „${practitioner.id}“ je použité viackrát.`);
+      ids.add(practitioner.id);
+      for (const serviceId of practitioner.serviceIds || []) {
+        if (!config.services?.some((service) => service.id === serviceId)) {
+          errors.push(`Člen tímu „${practitioner.label}“ odkazuje na neznámu službu „${serviceId}“.`);
+        }
+      }
+      if (!practitioner.voiceAliases?.length) warnings.push(`Člen tímu „${practitioner.label}“ nemá doplnené hlasové synonymá.`);
+    }
+    if (config.practitioners.length > 7) warnings.push('Výber člena tímu bude rozdelený do viacerých stránok klávesnicového menu.');
   }
   if (config.provider?.mode === 'live' && !config.provider.connectionId?.trim()) {
     warnings.push('Live provider zatiaľ nemá vyplnené connection ID; konfigurácia je vhodná len na prípravu.');

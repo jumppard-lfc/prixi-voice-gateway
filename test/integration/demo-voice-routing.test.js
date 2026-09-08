@@ -103,6 +103,50 @@ test('dynamická URL zostáva nezávisle dostupná pre ten istý demo bot', asyn
   assert.match(response.body, /<Redirect>\/voice\/demo\/dentcare-bratislava-demo\/start<\/Redirect>/);
 });
 
+test('dlhý zoznam služieb uprednostní hlas a po chybe ponúkne dvojcifernú klávesnicu', async () => {
+  const config = configFor('paginated-team-demo', []);
+  config.services = Array.from({ length: 10 }, (_, index) => ({
+    id: `sluzba-${index + 1}`,
+    label: `Služba ${index + 1}`,
+    durationMinutes: 30,
+    voiceAliases: [`služba ${index + 1}`],
+  }));
+  config.practitioners = [
+    { id: 'doktor-prvy', label: 'doktora Prvého', serviceIds: ['sluzba-8'], voiceAliases: ['prvý'] },
+    { id: 'doktorka-druha', label: 'doktorky Druhej', serviceIds: ['sluzba-8'], voiceAliases: ['druhá'] },
+  ];
+  await save(config);
+
+  const callSid = 'CA90000000000000000000000000000004';
+  const start = await signedPost('/voice/demo/paginated-team-demo/start', { From: '+421900000125', CallSid: callSid });
+  assert.match(start.body, /Povedzte mi, prosím, na akú návštevu sa chcete objednať/);
+  assert.doesNotMatch(start.body, /Pre ďalšie možnosti stlačte 9/);
+
+  const fallback = await signedPost('/voice/demo/paginated-team-demo/answer', { CallSid: callSid, SpeechResult: 'niečomu nerozumiem' });
+  assert.match(fallback.body, /Zadajte číslo služby a potvrďte ho tlačidlom mriežka/);
+
+  const serviceSelected = await signedPost('/voice/demo/paginated-team-demo/answer', { CallSid: callSid, Digits: '10' });
+  assert.match(serviceSelected.body, /Rozumela som správne, že sa chcete objednať na Služba 10/);
+
+  const practitionerChoice = await signedPost('/voice/demo/paginated-team-demo/answer', { CallSid: callSid, Digits: '1' });
+  assert.match(practitionerChoice.body, /Poďme teraz spoločne vybrať termín/);
+});
+
+test('po potvrdení služby ponúkne zubára, ak ich má služba viac', async () => {
+  const config = configFor('team-choice-demo', []);
+  config.practitioners = [
+    { id: 'doktor-prvy', label: 'doktora Prvého', serviceIds: ['hygiene'], voiceAliases: ['prvý'] },
+    { id: 'doktorka-druha', label: 'doktorky Druhej', serviceIds: ['hygiene'], voiceAliases: ['druhá'] },
+  ];
+  await save(config);
+
+  const callSid = 'CA90000000000000000000000000000005';
+  await signedPost('/voice/demo/team-choice-demo/start', { From: '+421900000125', CallSid: callSid });
+  await signedPost('/voice/demo/team-choice-demo/answer', { CallSid: callSid, SpeechResult: 'hygiena' });
+  const practitionerChoice = await signedPost('/voice/demo/team-choice-demo/answer', { CallSid: callSid, Digits: '1' });
+  assert.match(practitionerChoice.body, /Vyberte si, prosím, zubára/);
+});
+
 test('konfigurácia nikdy neprevezme chránené produkčné Twilio číslo', async () => {
   await save(configFor('blocked-demo-bot', ['+420910927082']));
   prixiService.getConfig = async () => ({

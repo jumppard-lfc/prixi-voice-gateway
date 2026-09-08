@@ -4,15 +4,16 @@ import { bulkGateSmsService } from '../services/bulkgate-sms.service';
 import { bookingAuditService } from '../services/booking-audit.service';
 import { parseDatePreference, parseName, parseSlotChoice, parseYesNo } from '../services/booking-nlu.service';
 import { voiceBotConfigStore } from '../services/voice-bot-config.store';
-import { buildIntroduction, VoiceBotConfig, VoiceBotServiceDefinition } from '../services/voice-bot-framework.service';
+import { buildIntroduction, VoiceBotConfig, VoiceBotPractitionerDefinition, VoiceBotServiceDefinition } from '../services/voice-bot-framework.service';
 import { DatePreference, OfferedSlot } from '../types';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 const SESSION_TTL_MS = 20 * 60 * 1000;
 const sayOptions: any = { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' };
 
-type DemoStep = 'service' | 'date_preference' | 'slot' | 'name' | 'terms' | 'verification' | 'confirmation';
-type VerificationTarget = 'service' | 'date_preference' | 'slot' | 'name';
+type DemoStep = 'service' | 'practitioner' | 'date_preference' | 'slot' | 'name' | 'terms' | 'verification' | 'confirmation';
+type VerificationTarget = 'service' | 'practitioner' | 'date_preference' | 'slot' | 'name';
+const MENU_PAGE_SIZE = 7;
 
 interface DemoSession {
   callSid: string;
@@ -22,12 +23,14 @@ interface DemoSession {
   step: DemoStep;
   verificationTarget?: VerificationTarget;
   service?: VoiceBotServiceDefinition;
+  practitioner?: VoiceBotPractitionerDefinition;
   preference?: DatePreference;
   offeredSlots?: OfferedSlot[];
   selectedSlot?: OfferedSlot;
   firstName?: string;
   lastName?: string;
   acceptedTerms?: boolean;
+  practitionerPage: number;
   forceDtmf?: boolean;
   expiresAt: number;
 }
@@ -65,7 +68,7 @@ function get(callSid: string): DemoSession | undefined {
 }
 
 function createSession(callSid: string, phone: string, config: VoiceBotConfig, baseUrl: string): DemoSession {
-  const session: DemoSession = { callSid, phone, config, publicBaseUrl: baseUrl, step: 'service', expiresAt: Date.now() + SESSION_TTL_MS };
+  const session: DemoSession = { callSid, phone, config, publicBaseUrl: baseUrl, step: 'service', practitionerPage: 0, expiresAt: Date.now() + SESSION_TTL_MS };
   sessions.set(callSid, session);
   return session;
 }
@@ -96,9 +99,49 @@ function parseService(value: string, services: VoiceBotServiceDefinition[]): Voi
     .some((alias) => text.includes(alias)));
 }
 
+function parsePractitioner(value: string, practitioners: VoiceBotPractitionerDefinition[]): VoiceBotPractitionerDefinition | undefined {
+  const text = normalize(value);
+  const digit = Number(text);
+  if (Number.isInteger(digit) && digit >= 1 && digit <= practitioners.length) return practitioners[digit - 1];
+  return practitioners.find((practitioner) => [practitioner.label, ...practitioner.voiceAliases]
+    .map(normalize)
+    .some((alias) => text.includes(alias)));
+}
+
+function pageItems<T>(items: T[], page: number): T[] {
+  return items.slice(page * MENU_PAGE_SIZE, (page + 1) * MENU_PAGE_SIZE);
+}
+
+function canGoToPreviousPage(page: number): boolean {
+  return page > 0;
+}
+
+function canGoToNextPage(items: unknown[], page: number): boolean {
+  return (page + 1) * MENU_PAGE_SIZE < items.length;
+}
+
+function navigationPrompt(items: unknown[], page: number): string {
+  return `${canGoToPreviousPage(page) ? ' Pre predchádzajúce možnosti stlačte 8.' : ''}${canGoToNextPage(items, page) ? ' Pre ďalšie možnosti stlačte 9.' : ''}`;
+}
+
+function practitionersForService(session: DemoSession): VoiceBotPractitionerDefinition[] {
+  if (!session.service) return [];
+  return (session.config.practitioners || []).filter((practitioner) => !practitioner.serviceIds?.length
+    || practitioner.serviceIds.includes(session.service!.id));
+}
+
+function continueAfterService(session: DemoSession): DemoStep {
+  const practitioners = practitionersForService(session);
+  if (practitioners.length === 1) session.practitioner = practitioners[0];
+  session.practitionerPage = 0;
+  session.step = practitioners.length > 1 ? 'practitioner' : 'date_preference';
+  return session.step;
+}
+
 function verificationText(session: DemoSession): string {
   switch (session.verificationTarget) {
     case 'service': return `Ďakujem. Rozumela som správne, že sa chcete objednať na ${session.service?.label}? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`;
+    case 'practitioner': return `Ďakujem. Rozumela som správne, že preferujete termín u ${session.practitioner?.label}? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`;
     case 'date_preference': return `Ďakujem. Rozumela som správne, že preferujete ${session.preference?.timeOfDay === 'morning' ? 'termín dopoludnia' : session.preference?.timeOfDay === 'afternoon' ? 'termín popoludní' : 'najbližší voľný termín'}? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`;
     case 'slot': return `Ďakujem. Rozumela som správne, že vám vyhovuje ${session.selectedSlot ? formatSlot(session.selectedSlot) : 'tento termín'}? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`;
     case 'name': return `Rozumela som správne, že sa voláte ${session.firstName} ${session.lastName}? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`;
@@ -109,11 +152,13 @@ function verificationText(session: DemoSession): string {
 function ask(reply: FastifyReply, session: DemoSession, message: string, hints = '', forceDtmf = false): FastifyReply {
   save(session);
   const twiml = new VoiceResponse();
-  const expectsSingleDigit = session.step !== 'name';
+  const serviceDtmfFallback = forceDtmf && session.step === 'service';
+  const serviceSpeechFirst = !forceDtmf && session.step === 'service';
+  const expectsSingleDigit = session.step !== 'name' && !serviceDtmfFallback;
   const gather = twiml.gather({
-    input: forceDtmf ? ['dtmf'] : ['speech', 'dtmf'],
+    input: forceDtmf ? ['dtmf'] : serviceSpeechFirst ? ['speech'] : ['speech', 'dtmf'],
     action: `/voice/demo/${session.config.id}/answer`, method: 'POST', timeout: 5, speechTimeout: 'auto', language: 'sk-SK', hints,
-    ...(expectsSingleDigit ? { numDigits: 1 } : {}),
+    ...(expectsSingleDigit ? { numDigits: 1 } : serviceDtmfFallback ? { numDigits: 2, finishOnKey: '#' } : {}),
   } as any);
   gather.say(sayOptions, message);
   if (session.config.conversation.playPromptTone) gather.play(`${session.publicBaseUrl}/media/booking-prompt-tone.wav`);
@@ -129,8 +174,18 @@ function prompt(reply: FastifyReply, session: DemoSession, prefix = ''): Fastify
 
   switch (session.step) {
     case 'service': {
-      const options = session.config.services.map((service, index) => `Pre ${service.label} stlačte ${index + 1}${forceDtmf ? '.' : ` alebo povedzte ${service.voiceAliases[0] || service.label}.`}`).join(' ');
-      return ask(reply, session, `${prefix}${keyboard}${options}`, session.config.services.flatMap((service) => [service.label, ...service.voiceAliases]).join(', '), forceDtmf);
+      if (!forceDtmf) {
+        const examples = session.config.services.slice(0, 5).map((service) => service.voiceAliases[0] || service.label).join(', ');
+        return ask(reply, session, `${prefix}Povedzte mi, prosím, na akú návštevu sa chcete objednať. Môžete povedať napríklad ${examples}.`, session.config.services.flatMap((service) => [service.label, ...service.voiceAliases]).join(', '));
+      }
+      const options = session.config.services.map((service, index) => `Pre ${service.label} stlačte ${index + 1}.`).join(' ');
+      return ask(reply, session, `${prefix}${keyboard}${options} Zadajte číslo služby a potvrďte ho tlačidlom mriežka.`, '', true);
+    }
+    case 'practitioner': {
+      const practitioners = practitionersForService(session);
+      const visiblePractitioners = pageItems(practitioners, session.practitionerPage);
+      const options = visiblePractitioners.map((practitioner, index) => `Pre termín u ${practitioner.label} stlačte ${index + 1}${forceDtmf ? '.' : ` alebo povedzte ${practitioner.voiceAliases[0] || practitioner.label}.`}`).join(' ');
+      return ask(reply, session, `${prefix}${keyboard}Vyberte si, prosím, zubára. ${options}${navigationPrompt(practitioners, session.practitionerPage)}`, visiblePractitioners.flatMap((practitioner) => [practitioner.label, ...practitioner.voiceAliases]).join(', '), forceDtmf);
     }
     case 'date_preference':
       return ask(reply, session, `${prefix}${keyboard}Pre najbližší termín stlačte 1. Pre dopoludnie stlačte 2. Pre popoludnie stlačte 3.${forceDtmf ? '' : ' Môžete odpovedať aj hlasom.'}`, 'najbližší termín, dopoludnie, doobeda, popoludnie', forceDtmf);
@@ -192,6 +247,7 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
       const twiml = new VoiceResponse(); twiml.say(sayOptions, 'Platnosť objednávky vypršala. Zavolajte, prosím, znovu.'); twiml.hangup();
       return reply.type('text/xml').send(twiml.toString());
     }
+    session.forceDtmf = session.step !== 'name' && session.config.conversation.useDtmfFallback;
     return prompt(reply, session, 'Prepáčte, nerozumela som. ');
   });
 
@@ -210,6 +266,12 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
       if (yes === true && target) {
         session.verificationTarget = undefined;
         if (target === 'service') {
+          const nextStep = continueAfterService(session);
+          return prompt(reply, session, nextStep === 'practitioner'
+            ? 'Ďakujem. Najprv si spolu vyberieme zubára. '
+            : 'Ďakujem. Poďme teraz spoločne vybrať termín, ktorý by vám vyhovoval. ');
+        }
+        if (target === 'practitioner') {
           session.step = 'date_preference';
           return prompt(reply, session, 'Ďakujem. Poďme teraz spoločne vybrať termín, ktorý by vám vyhovoval. ');
         }
@@ -235,6 +297,7 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
         session.step = target;
         session.forceDtmf = target !== 'name';
         if (target === 'service') session.service = undefined;
+        if (target === 'practitioner') session.practitioner = undefined;
         if (target === 'date_preference') session.preference = undefined;
         if (target === 'slot') session.selectedSlot = undefined;
         if (target === 'name') { session.firstName = undefined; session.lastName = undefined; }
@@ -245,9 +308,31 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
       if (service) {
         session.service = service;
         bookingAuditService.record(session.callSid, 'service_selected', { service: service.id });
+        const nextStep = session.config.conversation.confirmService ? undefined : continueAfterService(session);
         if (session.config.conversation.confirmService) beginVerification(session, 'service');
+        return prompt(reply, session, session.config.conversation.confirmService ? '' : nextStep === 'practitioner'
+          ? 'Ďakujem. Najprv si spolu vyberieme zubára. '
+          : 'Ďakujem. Poďme teraz spoločne vybrať termín, ktorý by vám vyhovoval. ');
+      }
+    } else if (session.step === 'practitioner') {
+      const practitioners = practitionersForService(session);
+      const visiblePractitioners = pageItems(practitioners, session.practitionerPage);
+      const digit = Number(normalize(answer));
+      if (digit === 8 && canGoToPreviousPage(session.practitionerPage)) {
+        session.practitionerPage -= 1;
+        return prompt(reply, session, 'Tu sú predchádzajúci členovia tímu. ');
+      }
+      if (digit === 9 && canGoToNextPage(practitioners, session.practitionerPage)) {
+        session.practitionerPage += 1;
+        return prompt(reply, session, 'Tu sú ďalší členovia tímu. ');
+      }
+      const practitioner = parsePractitioner(answer, visiblePractitioners);
+      if (practitioner) {
+        session.practitioner = practitioner;
+        bookingAuditService.record(session.callSid, 'practitioner_selected', { practitioner: practitioner.id });
+        if (session.config.conversation.confirmPractitioner !== false) beginVerification(session, 'practitioner');
         else session.step = 'date_preference';
-        return prompt(reply, session, session.config.conversation.confirmService ? '' : 'Ďakujem. Poďme teraz spoločne vybrať termín, ktorý by vám vyhovoval. ');
+        return prompt(reply, session, session.config.conversation.confirmPractitioner !== false ? '' : 'Ďakujem. Poďme teraz spoločne vybrať termín, ktorý by vám vyhovoval. ');
       }
     } else if (session.step === 'date_preference') {
       const preference = parseDatePreference(answer);

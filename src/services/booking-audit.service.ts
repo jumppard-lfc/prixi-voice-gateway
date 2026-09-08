@@ -1,6 +1,7 @@
 export type BookingAuditEventName =
   | 'started'
   | 'service_selected'
+  | 'practitioner_selected'
   | 'slots_offered'
   | 'slot_selected'
   | 'identity_collected'
