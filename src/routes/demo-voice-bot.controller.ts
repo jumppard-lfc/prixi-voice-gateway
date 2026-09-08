@@ -410,7 +410,9 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
     if (config.conversationTree) {
       const session = createTreeSession(body.CallSid, body.From, config, publicBaseUrl(request));
       bookingAuditService.record(session.callSid, 'started', { botId: config.id, phone: session.phone, mode: 'conversation_tree' });
-      return renderTree(reply, session, buildIntroduction(config));
+      // A tree owns its complete opening, including the greeting and kickoff
+      // question. This keeps its script fully visible in the Builder.
+      return renderTree(reply, session);
     }
     const session = createSession(body.CallSid, body.From, config, publicBaseUrl(request));
     bookingAuditService.record(session.callSid, 'started', { botId: config.id, phone: session.phone });
