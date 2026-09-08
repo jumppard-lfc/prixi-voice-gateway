@@ -1,0 +1,204 @@
+{
+  "version": 1,
+  "id": "dental-centrum-nivy-bratislava",
+  "clinic": {
+    "displayName": "Dental Centrum NIVY",
+    "specialty": "zubná klinika",
+    "phoneNumber": "+421948605747",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": {
+    "kind": "custom",
+    "mode": "demo_mock"
+  },
+  "services": [
+    {
+      "id": "vstupne-stomatologicke-vysetrenie",
+      "label": "Vstupné stomatologické vyšetrenie",
+      "durationMinutes": 30,
+      "voiceAliases": [
+        "vstupné vyšetrenie",
+        "prvá návšteva",
+        "nový pacient",
+        "vyšetrenie"
+      ]
+    },
+    {
+      "id": "zubna-pohotovost-este-dnes",
+      "label": "Zubná pohotovosť ešte dnes",
+      "durationMinutes": 30,
+      "voiceAliases": [
+        "pohotovosť",
+        "akútne ošetrenie",
+        "bolesť zuba",
+        "urgentne"
+      ]
+    },
+    {
+      "id": "bezbolestna-dentalna-hygiena",
+      "label": "Bezbolestná dentálna hygiena",
+      "durationMinutes": 60,
+      "voiceAliases": [
+        "dentálna hygiena",
+        "hygiena",
+        "čistenie zubov"
+      ]
+    },
+    {
+      "id": "dentalna-hygiena-a-bielenie-zubov",
+      "label": "Dentálna hygiena a bielenie zubov",
+      "durationMinutes": 60,
+      "voiceAliases": [
+        "hygiena a bielenie",
+        "bielenie s hygienou"
+      ]
+    },
+    {
+      "id": "profesionalne-bielenie-zubov",
+      "label": "Profesionálne bielenie zubov",
+      "durationMinutes": 30,
+      "voiceAliases": [
+        "bielenie zubov",
+        "bielenie",
+        "profesionálne bielenie"
+      ]
+    },
+    {
+      "id": "preventivna-prehliadka-pre-staleho-pacienta",
+      "label": "Preventívna prehliadka pre stáleho pacienta",
+      "durationMinutes": 30,
+      "voiceAliases": [
+        "preventívna prehliadka",
+        "preventívka",
+        "kontrola",
+        "stály pacient"
+      ]
+    },
+    {
+      "id": "zubna-konzultacia-zadarmo",
+      "label": "Zubná konzultácia zadarmo",
+      "durationMinutes": 15,
+      "voiceAliases": [
+        "zubná konzultácia",
+        "konzultácia",
+        "poradenstvo"
+      ]
+    },
+    {
+      "id": "konzultacia-zavedenia-implantatu",
+      "label": "Konzultácia zavedenia implantátu",
+      "durationMinutes": 30,
+      "voiceAliases": [
+        "implantát",
+        "implantáty",
+        "konzultácia implantátu"
+      ]
+    },
+    {
+      "id": "vytrhnutie-alebo-extrakcia-zuba",
+      "label": "Vytrhnutie alebo extrakcia zuba",
+      "durationMinutes": 30,
+      "voiceAliases": [
+        "vytrhnutie zuba",
+        "extrakcia zuba",
+        "trhanie zuba"
+      ]
+    },
+    {
+      "id": "chirurgicka-extrakcia-zuba-mudrosti",
+      "label": "Chirurgická extrakcia zuba múdrosti",
+      "durationMinutes": 30,
+      "voiceAliases": [
+        "zub múdrosti",
+        "osmička",
+        "chirurgická extrakcia"
+      ]
+    }
+  ],
+  "practitioners": [
+    {
+      "id": "michaela-zanova",
+      "label": "Michaela Záňová",
+      "serviceIds": [
+        "vstupne-stomatologicke-vysetrenie",
+        "zubna-pohotovost-este-dnes",
+        "preventivna-prehliadka-pre-staleho-pacienta",
+        "zubna-konzultacia-zadarmo",
+        "vytrhnutie-alebo-extrakcia-zuba"
+      ],
+      "voiceAliases": [
+        "doktorka záňová",
+        "záňová",
+        "michaela záňová"
+      ]
+    },
+    {
+      "id": "viktor-bodi",
+      "label": "Viktor Bódi",
+      "serviceIds": [
+        "vstupne-stomatologicke-vysetrenie",
+        "zubna-pohotovost-este-dnes",
+        "profesionalne-bielenie-zubov",
+        "preventivna-prehliadka-pre-staleho-pacienta",
+        "zubna-konzultacia-zadarmo",
+        "vytrhnutie-alebo-extrakcia-zuba"
+      ],
+      "voiceAliases": [
+        "doktor bódi",
+        "bódi",
+        "viktor bódi"
+      ]
+    },
+    {
+      "id": "michal-polivka",
+      "label": "Michal Polivka",
+      "serviceIds": [
+        "vstupne-stomatologicke-vysetrenie",
+        "zubna-pohotovost-este-dnes",
+        "preventivna-prehliadka-pre-staleho-pacienta",
+        "zubna-konzultacia-zadarmo",
+        "konzultacia-zavedenia-implantatu",
+        "vytrhnutie-alebo-extrakcia-zuba",
+        "chirurgicka-extrakcia-zuba-mudrosti"
+      ],
+      "voiceAliases": [
+        "doktor polivka",
+        "polivka",
+        "michal polivka"
+      ]
+    },
+    {
+      "id": "fabian-bohon",
+      "label": "Fabián Bohoň",
+      "serviceIds": [
+        "bezbolestna-dentalna-hygiena",
+        "dentalna-hygiena-a-bielenie-zubov",
+        "profesionalne-bielenie-zubov"
+      ],
+      "voiceAliases": [
+        "fabián bohoň",
+        "bohoň",
+        "fabián"
+      ]
+    }
+  ],
+  "routing": {
+    "inboundTwilioNumbers": [
+      "+420910928324"
+    ]
+  },
+  "conversation": {
+    "confirmService": true,
+    "confirmDatePreference": true,
+    "confirmSlot": true,
+    "confirmName": false,
+    "requireTerms": false,
+    "sendConfirmationSms": true,
+    "useDtmfFallback": true,
+    "playPromptTone": true
+  },
+  "copy": {
+    "introduction": "Dobrý deň, vítam vás v Dental Centrum NIVY. Som virtuálna asistentka a rada vám pomôžem s objednaním. Spoločne vyberieme typ návštevy, pri vstupnom vyšetrení aj zubára, potom vhodný termín a vaše meno. Kedykoľvek môžete odpovedať hlasom alebo použiť tlačidlá na telefóne."
+  }
+}

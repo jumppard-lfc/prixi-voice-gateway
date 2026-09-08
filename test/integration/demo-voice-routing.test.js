@@ -144,7 +144,7 @@ test('po potvrdení služby ponúkne zubára, ak ich má služba viac', async ()
   await signedPost('/voice/demo/team-choice-demo/start', { From: '+421900000125', CallSid: callSid });
   await signedPost('/voice/demo/team-choice-demo/answer', { CallSid: callSid, SpeechResult: 'hygiena' });
   const practitionerChoice = await signedPost('/voice/demo/team-choice-demo/answer', { CallSid: callSid, Digits: '1' });
-  assert.match(practitionerChoice.body, /Vyberte si, prosím, zubára/);
+  assert.match(practitionerChoice.body, /Vyberte si, prosím, člena tímu/);
 });
 
 test('konfigurácia nikdy neprevezme chránené produkčné Twilio číslo', async () => {

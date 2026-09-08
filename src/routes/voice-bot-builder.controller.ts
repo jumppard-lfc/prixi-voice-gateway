@@ -52,7 +52,7 @@ function builderPage(): string {
     <textarea id="services" spellcheck="false" placeholder="Preventívna prehliadka | 20 | preventive | preventívka,prehliadka\nDentálna hygiena | 45 | hygiene | hygiena\nAkútne ošetrenie | 30 | acute | bolesť zuba,akútne"></textarea>
     <p class="hint">Jeden riadok = <strong>názov služby | minúty | ID služby u providera | hlasové synonymá oddelené čiarkou</strong>. Provider ID môže zatiaľ zostať prázdne.</p>
     <label>Členovia tímu (nepovinné)<textarea id="practitioners" spellcheck="false" placeholder="MDDr. Michaela Záňová | vstupne-stomatologicke-vysetrenie | doktorka záňová,záňová\nMDDr. Viktor Bódi | vstupne-stomatologicke-vysetrenie | doktor bódi,bódi"></textarea></label>
-    <p class="hint">Jeden riadok = <strong>meno | ID služieb oddelené čiarkou | hlasové synonymá oddelené čiarkou</strong>. Pri viacerých vhodných členoch tímu bot po výbere služby ponúkne výber zubára. Prázdny zoznam služieb znamená, že člen tímu je dostupný pre všetky služby.</p>
+    <p class="hint">Jeden riadok = <strong>meno | ID služieb oddelené čiarkou | hlasové synonymá oddelené čiarkou</strong>. Pri viacerých vhodných členoch tímu bot po výbere služby ponúkne ich výber. Prázdny zoznam služieb znamená, že člen tímu je dostupný pre všetky služby.</p>
     <label>Vlastný úvod (nepovinné)<textarea id="introduction" placeholder="Nechaj prázdne pre odporúčaný transparentný úvod."></textarea></label>
   </section>
   <section class="card wide"><h2>4. Skontroluj a pridaj do Gitu</h2>

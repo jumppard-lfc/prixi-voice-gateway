@@ -185,7 +185,7 @@ function prompt(reply: FastifyReply, session: DemoSession, prefix = ''): Fastify
       const practitioners = practitionersForService(session);
       const visiblePractitioners = pageItems(practitioners, session.practitionerPage);
       const options = visiblePractitioners.map((practitioner, index) => `Pre termín u ${practitioner.label} stlačte ${index + 1}${forceDtmf ? '.' : ` alebo povedzte ${practitioner.voiceAliases[0] || practitioner.label}.`}`).join(' ');
-      return ask(reply, session, `${prefix}${keyboard}Vyberte si, prosím, zubára. ${options}${navigationPrompt(practitioners, session.practitionerPage)}`, visiblePractitioners.flatMap((practitioner) => [practitioner.label, ...practitioner.voiceAliases]).join(', '), forceDtmf);
+      return ask(reply, session, `${prefix}${keyboard}Vyberte si, prosím, člena tímu. ${options}${navigationPrompt(practitioners, session.practitionerPage)}`, visiblePractitioners.flatMap((practitioner) => [practitioner.label, ...practitioner.voiceAliases]).join(', '), forceDtmf);
     }
     case 'date_preference':
       return ask(reply, session, `${prefix}${keyboard}Pre najbližší termín stlačte 1. Pre dopoludnie stlačte 2. Pre popoludnie stlačte 3.${forceDtmf ? '' : ' Môžete odpovedať aj hlasom.'}`, 'najbližší termín, dopoludnie, doobeda, popoludnie', forceDtmf);
@@ -268,7 +268,7 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
         if (target === 'service') {
           const nextStep = continueAfterService(session);
           return prompt(reply, session, nextStep === 'practitioner'
-            ? 'Ďakujem. Najprv si spolu vyberieme zubára. '
+            ? 'Ďakujem. Najprv si spolu vyberieme člena tímu. '
             : 'Ďakujem. Poďme teraz spoločne vybrať termín, ktorý by vám vyhovoval. ');
         }
         if (target === 'practitioner') {
@@ -311,7 +311,7 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
         const nextStep = session.config.conversation.confirmService ? undefined : continueAfterService(session);
         if (session.config.conversation.confirmService) beginVerification(session, 'service');
         return prompt(reply, session, session.config.conversation.confirmService ? '' : nextStep === 'practitioner'
-          ? 'Ďakujem. Najprv si spolu vyberieme zubára. '
+          ? 'Ďakujem. Najprv si spolu vyberieme člena tímu. '
           : 'Ďakujem. Poďme teraz spoločne vybrať termín, ktorý by vám vyhovoval. ');
       }
     } else if (session.step === 'practitioner') {
