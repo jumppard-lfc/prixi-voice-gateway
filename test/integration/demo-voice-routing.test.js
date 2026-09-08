@@ -3,17 +3,19 @@ const assert = require('node:assert/strict');
 const twilio = require('twilio');
 const path = require('node:path');
 const os = require('node:os');
-const { rmSync } = require('node:fs');
+const { mkdirSync, rmSync, writeFileSync } = require('node:fs');
 
 process.env.NODE_ENV = 'test';
 process.env.TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || 'test-auth-token';
 process.env.VOICE_BOT_BUILDER_TOKEN = 'demo-routing-builder-token';
 process.env.VOICE_BOT_CONFIG_DIR = path.join(os.tmpdir(), `prixi-demo-routing-${process.pid}`);
+process.env.VOICE_BOT_CONFIG_REPOSITORY_DIR = path.join(os.tmpdir(), `prixi-demo-routing-repository-${process.pid}`);
 
 const app = require('../../src/app').default;
 const { prixiService } = require('../../src/services/prixi.service');
 
 const configDirectory = process.env.VOICE_BOT_CONFIG_DIR;
+const repositoryConfigDirectory = process.env.VOICE_BOT_CONFIG_REPOSITORY_DIR;
 const originalGetConfig = prixiService.getConfig.bind(prixiService);
 
 function configFor(id, inboundTwilioNumbers) {
@@ -68,7 +70,20 @@ test.before(async () => {
 test.after(async () => {
   prixiService.getConfig = originalGetConfig;
   rmSync(configDirectory, { recursive: true, force: true });
+  rmSync(repositoryConfigDirectory, { recursive: true, force: true });
   await app.close();
+});
+
+test('verzovaná konfigurácia z repozitára zostane dostupná bez runtime úložiska', async () => {
+  const config = configFor('versioned-dentcare-demo', []);
+  mkdirSync(repositoryConfigDirectory, { recursive: true });
+  writeFileSync(path.join(repositoryConfigDirectory, `${config.id}.json`), `${JSON.stringify(config)}\n`);
+
+  const params = { From: '+421900000125', CallSid: 'CA90000000000000000000000000000000' };
+  const response = await signedPost(`/voice/demo/${config.id}/incoming`, params);
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, new RegExp(`/voice/demo/${config.id}/start`));
 });
 
 test('dedikované Twilio číslo spustí iba jemu priradený demo bot', async () => {
