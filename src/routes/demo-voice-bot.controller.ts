@@ -4,7 +4,17 @@ import { bulkGateSmsService } from '../services/bulkgate-sms.service';
 import { bookingAuditService } from '../services/booking-audit.service';
 import { parseDatePreference, parseName, parseSlotChoice, parseYesNo } from '../services/booking-nlu.service';
 import { voiceBotConfigStore } from '../services/voice-bot-config.store';
-import { buildIntroduction, VoiceBotConfig, VoiceBotPractitionerDefinition, VoiceBotServiceDefinition } from '../services/voice-bot-framework.service';
+import {
+  buildIntroduction,
+  VoiceBotConfig,
+  VoiceBotPractitionerDefinition,
+  VoiceBotServiceDefinition,
+  VoiceBotTreeChoice,
+  VoiceBotTreeEndNode,
+  VoiceBotTreeMessageNode,
+  VoiceBotTreeNode,
+  VoiceBotTreeQuestionNode,
+} from '../services/voice-bot-framework.service';
 import { DatePreference, OfferedSlot } from '../types';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -36,6 +46,20 @@ interface DemoSession {
 }
 
 const sessions = new Map<string, DemoSession>();
+
+interface TreeSession {
+  callSid: string;
+  phone: string;
+  config: VoiceBotConfig;
+  publicBaseUrl: string;
+  nodeId: string;
+  answers: Record<string, { label: string; value?: string }>;
+  pendingConfirmation?: { nodeId: string; choiceId: string };
+  forceDtmf?: boolean;
+  expiresAt: number;
+}
+
+const treeSessions = new Map<string, TreeSession>();
 
 function normalize(value: string): string {
   return value.toLocaleLowerCase('sk-SK').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -214,6 +238,154 @@ async function sendDemoConfirmationSms(session: DemoSession): Promise<boolean> {
   return true;
 }
 
+function createTreeSession(callSid: string, phone: string, config: VoiceBotConfig, baseUrl: string): TreeSession {
+  const session: TreeSession = {
+    callSid,
+    phone,
+    config,
+    publicBaseUrl: baseUrl,
+    nodeId: config.conversationTree!.entryNodeId,
+    answers: {},
+    expiresAt: Date.now() + SESSION_TTL_MS,
+  };
+  treeSessions.set(callSid, session);
+  return session;
+}
+
+function getTreeSession(callSid: string): TreeSession | undefined {
+  const session = treeSessions.get(callSid);
+  if (!session || session.expiresAt <= Date.now()) {
+    treeSessions.delete(callSid);
+    return undefined;
+  }
+  return session;
+}
+
+function saveTreeSession(session: TreeSession): void {
+  session.expiresAt = Date.now() + SESSION_TTL_MS;
+  treeSessions.set(session.callSid, session);
+}
+
+function treeNode(session: TreeSession, nodeId = session.nodeId): VoiceBotTreeNode | undefined {
+  return session.config.conversationTree?.nodes.find((node) => node.id === nodeId);
+}
+
+function interpolateTreeText(value: string | undefined, session: TreeSession, selected = ''): string {
+  return (value || '').replace(/{{\s*([a-zA-Z0-9_-]+)\s*}}/g, (_match, key: string) => {
+    if (key === 'selected') return selected;
+    return session.answers[key]?.label || '';
+  });
+}
+
+function parseTreeChoice(value: string, node: VoiceBotTreeQuestionNode): VoiceBotTreeChoice | undefined {
+  const text = normalize(value);
+  return node.choices.find((choice) => text === choice.dtmf
+    || [choice.label, ...choice.voiceAliases].map(normalize).some((alias) => text === alias || text.includes(alias)));
+}
+
+function commitTreeChoice(session: TreeSession, node: VoiceBotTreeQuestionNode, choice: VoiceBotTreeChoice): void {
+  if (node.storeAs) session.answers[node.storeAs] = { label: choice.label, value: choice.value };
+  bookingAuditService.record(session.callSid, 'tree_choice_selected', { nodeId: node.id, choiceId: choice.id, value: choice.value });
+  session.nodeId = choice.nextNodeId;
+  session.pendingConfirmation = undefined;
+}
+
+function addTreeAudioOrSpeech(target: any, text: string, audioUrl?: string): void {
+  if (audioUrl) target.play(audioUrl);
+  else if (text.trim()) target.say(sayOptions, text);
+}
+
+async function sendTreeDemoSms(session: TreeSession, node: VoiceBotTreeEndNode): Promise<boolean> {
+  if (node.outcome !== 'mock_booking' || !session.config.conversation.sendConfirmationSms || process.env.DEMO_BOOKING_SMS_ENABLED !== 'true') return false;
+  if (process.env.NODE_ENV === 'test') return true;
+  const fallback = `${session.config.clinic.displayName}: vaša demo požiadavka je potvrdená.`;
+  await bulkGateSmsService.sendTransactionalSms(session.phone, interpolateTreeText(node.smsText, session) || fallback, 'demo-booking-confirmation');
+  return true;
+}
+
+function expiredTreeResponse(reply: FastifyReply): FastifyReply {
+  const twiml = new VoiceResponse();
+  twiml.say(sayOptions, 'Platnosť hovoru vypršala. Zavolajte, prosím, znovu.');
+  twiml.hangup();
+  return reply.type('text/xml').send(twiml.toString());
+}
+
+async function renderTree(reply: FastifyReply, session: TreeSession, prefix = ''): Promise<FastifyReply> {
+  const twiml = new VoiceResponse();
+  const preambles: Array<{ text: string; audioUrl?: string }> = prefix ? [{ text: prefix }] : [];
+  let node = treeNode(session);
+  let hops = 0;
+
+  while (node?.type === 'message' && hops < 12) {
+    const message = node as VoiceBotTreeMessageNode;
+    preambles.push({ text: interpolateTreeText(message.text, session), audioUrl: message.audioUrl });
+    session.nodeId = message.nextNodeId;
+    node = treeNode(session);
+    hops += 1;
+  }
+
+  if (!node || hops >= 12) {
+    twiml.say(sayOptions, 'Konfigurácia rozhovoru nie je úplná. Ďakujeme a dovidenia.');
+    twiml.hangup();
+    treeSessions.delete(session.callSid);
+    return reply.type('text/xml').send(twiml.toString());
+  }
+
+  if (node.type === 'end') {
+    const end = node as VoiceBotTreeEndNode;
+    for (const preamble of preambles) addTreeAudioOrSpeech(twiml, preamble.text, preamble.audioUrl);
+    let smsDelivered = false;
+    if (end.outcome === 'mock_booking') {
+      bookingAuditService.record(session.callSid, 'booking_created', { bookingId: `tree-demo-${Date.now()}`, provider: 'demo_mock', mode: 'conversation_tree' });
+      try {
+        smsDelivered = await sendTreeDemoSms(session, end);
+        bookingAuditService.record(session.callSid, smsDelivered ? 'sms_sent' : 'sms_skipped', { mode: smsDelivered ? 'bulkgate' : 'disabled', to: session.phone });
+      } catch (error) {
+        bookingAuditService.record(session.callSid, 'sms_failed', { message: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    addTreeAudioOrSpeech(twiml, interpolateTreeText(end.text, session), end.audioUrl);
+    twiml.hangup();
+    bookingAuditService.record(session.callSid, 'completed', { outcome: end.outcome, smsDelivered, mode: 'conversation_tree' });
+    treeSessions.delete(session.callSid);
+    return reply.type('text/xml').send(twiml.toString());
+  }
+
+  const question = node as VoiceBotTreeQuestionNode;
+  saveTreeSession(session);
+  const forceDtmf = session.forceDtmf === true;
+  session.forceDtmf = false;
+  const gather = twiml.gather({
+    input: forceDtmf ? ['dtmf'] : ['speech', 'dtmf'],
+    action: `/voice/demo/${session.config.id}/tree/answer`,
+    method: 'POST',
+    timeout: 5,
+    speechTimeout: 'auto',
+    language: 'sk-SK',
+    hints: question.choices.flatMap((choice) => [choice.label, ...choice.voiceAliases]).join(', '),
+    numDigits: 1,
+  } as any);
+  for (const preamble of preambles) addTreeAudioOrSpeech(gather, preamble.text, preamble.audioUrl);
+  const fallback = forceDtmf ? 'Prosím, pre istotu teraz použite klávesnicu. ' : '';
+  addTreeAudioOrSpeech(gather, `${fallback}${interpolateTreeText(question.bridge, session)} ${interpolateTreeText(question.prompt, session)}`.trim(), question.audioUrl);
+  if (session.config.conversation.playPromptTone) gather.play(`${session.publicBaseUrl}/media/booking-prompt-tone.wav`);
+  twiml.say(sayOptions, 'Odpoveď som nezachytila. Skúsme to, prosím, znova.');
+  twiml.redirect(`/voice/demo/${session.config.id}/tree/retry`);
+  return reply.type('text/xml').send(twiml.toString());
+}
+
+async function renderTreeConfirmation(reply: FastifyReply, session: TreeSession, node: VoiceBotTreeQuestionNode, choice: VoiceBotTreeChoice): Promise<FastifyReply> {
+  saveTreeSession(session);
+  const twiml = new VoiceResponse();
+  const gather = twiml.gather({ input: ['speech', 'dtmf'], action: `/voice/demo/${session.config.id}/tree/answer`, method: 'POST', timeout: 5, speechTimeout: 'auto', language: 'sk-SK', hints: 'áno, nie', numDigits: 1 } as any);
+  const fallback = `Ďakujem. Rozumela som správne, že si prajete ${choice.label}? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`;
+  gather.say(sayOptions, interpolateTreeText(node.confirmationPrompt, session, choice.label) || fallback);
+  if (session.config.conversation.playPromptTone) gather.play(`${session.publicBaseUrl}/media/booking-prompt-tone.wav`);
+  twiml.say(sayOptions, 'Odpoveď som nezachytila. Skúsme to, prosím, znova.');
+  twiml.redirect(`/voice/demo/${session.config.id}/tree/retry`);
+  return reply.type('text/xml').send(twiml.toString());
+}
+
 export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post('/demo/:botId/incoming', async (request, reply) => {
     const botId = (request.params as { botId: string }).botId;
@@ -235,6 +407,11 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
       return reply.type('text/xml').send(twiml.toString());
     }
     const body = request.body as Record<string, string>;
+    if (config.conversationTree) {
+      const session = createTreeSession(body.CallSid, body.From, config, publicBaseUrl(request));
+      bookingAuditService.record(session.callSid, 'started', { botId: config.id, phone: session.phone, mode: 'conversation_tree' });
+      return renderTree(reply, session, buildIntroduction(config));
+    }
     const session = createSession(body.CallSid, body.From, config, publicBaseUrl(request));
     bookingAuditService.record(session.callSid, 'started', { botId: config.id, phone: session.phone });
     return prompt(reply, session, buildIntroduction(config));
@@ -409,5 +586,51 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
 
     session.forceDtmf = session.step !== 'name' && session.config.conversation.useDtmfFallback;
     return prompt(reply, session, session.step === 'name' ? 'Prepáčte, meno som nezachytila. ' : 'Prepáčte, nerozumela som. ');
+  });
+
+  fastify.post('/demo/:botId/tree/retry', async (request, reply) => {
+    const body = request.body as Record<string, string>;
+    const session = getTreeSession(body.CallSid);
+    if (!session) return expiredTreeResponse(reply);
+    session.forceDtmf = session.config.conversation.useDtmfFallback;
+    return renderTree(reply, session, 'Prepáčte, nerozumela som. ');
+  });
+
+  fastify.post('/demo/:botId/tree/answer', async (request, reply) => {
+    const body = request.body as Record<string, string>;
+    const session = getTreeSession(body.CallSid);
+    if (!session) return expiredTreeResponse(reply);
+    const answer = body.SpeechResult || body.Digits || '';
+
+    if (session.pendingConfirmation) {
+      const pending = session.pendingConfirmation;
+      const node = treeNode(session, pending.nodeId);
+      const choice = node?.type === 'question' ? node.choices.find((item) => item.id === pending.choiceId) : undefined;
+      const yes = parseYesNo(answer);
+      if (node?.type === 'question' && choice && yes === true) {
+        commitTreeChoice(session, node, choice);
+        return renderTree(reply, session, 'Ďakujem. ');
+      }
+      if (node?.type === 'question' && choice && yes === false) {
+        session.pendingConfirmation = undefined;
+        session.forceDtmf = session.config.conversation.useDtmfFallback;
+        return renderTree(reply, session, 'Ospravedlňujem sa. Vyberme to, prosím, ešte raz. ');
+      }
+      return renderTreeConfirmation(reply, session, node as VoiceBotTreeQuestionNode, choice as VoiceBotTreeChoice);
+    }
+
+    const node = treeNode(session);
+    if (node?.type !== 'question') return renderTree(reply, session);
+    const choice = parseTreeChoice(answer, node);
+    if (!choice) {
+      session.forceDtmf = session.config.conversation.useDtmfFallback;
+      return renderTree(reply, session, 'Prepáčte, nerozumela som. ');
+    }
+    if (node.confirmSelection) {
+      session.pendingConfirmation = { nodeId: node.id, choiceId: choice.id };
+      return renderTreeConfirmation(reply, session, node, choice);
+    }
+    commitTreeChoice(session, node, choice);
+    return renderTree(reply, session, 'Ďakujem. ');
   });
 }

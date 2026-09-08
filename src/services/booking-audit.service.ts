@@ -1,5 +1,6 @@
 export type BookingAuditEventName =
   | 'started'
+  | 'tree_choice_selected'
   | 'service_selected'
   | 'practitioner_selected'
   | 'slots_offered'
@@ -8,6 +9,7 @@ export type BookingAuditEventName =
   | 'terms_accepted'
   | 'booking_created'
   | 'sms_sent'
+  | 'sms_skipped'
   | 'sms_failed'
   | 'completed'
   | 'failed';

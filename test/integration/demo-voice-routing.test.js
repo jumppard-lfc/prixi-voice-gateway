@@ -147,6 +147,45 @@ test('po potvrdení služby ponúkne zubára, ak ich má služba viac', async ()
   assert.match(practitionerChoice.body, /Vyberte si, prosím, člena tímu/);
 });
 
+test('vlastný rozhodovací strom vedie hlasovú voľbu cez potvrdenie do správnej vetvy', async () => {
+  const config = configFor('tree-conversation-demo', []);
+  config.conversationTree = {
+    entryNodeId: 'pomoc',
+    nodes: [
+      {
+        id: 'pomoc', type: 'question', prompt: 'S čím vám môžem pomôcť?', storeAs: 'dovod', confirmSelection: true,
+        choices: [
+          { id: 'objednat', label: 'objednať sa', voiceAliases: ['objednať sa', 'chcem termín'], dtmf: '1', nextNodeId: 'navsteva' },
+          { id: 'info', label: 'položiť otázku', voiceAliases: ['mám otázku'], dtmf: '2', nextNodeId: 'prepojenie' },
+        ],
+      },
+      {
+        id: 'navsteva', type: 'question', bridge: 'Ďakujem. Vyberieme si návštevu.', prompt: 'Aký typ návštevy si prajete?', storeAs: 'navsteva', confirmSelection: true,
+        choices: [{ id: 'vstupne', label: 'vstupné vyšetrenie', voiceAliases: ['vstupné vyšetrenie'], dtmf: '1', nextNodeId: 'potvrdene' }],
+      },
+      { id: 'potvrdene', type: 'end', text: 'Vaša požiadavka na {{navsteva}} je potvrdená.', outcome: 'mock_booking' },
+      { id: 'prepojenie', type: 'end', text: 'Spojím vás s kolegyňou.', outcome: 'handoff' },
+    ],
+  };
+  await save(config);
+
+  const callSid = 'CA90000000000000000000000000000006';
+  const start = await signedPost('/voice/demo/tree-conversation-demo/start', { From: '+421900000125', CallSid: callSid });
+  assert.match(start.body, /S čím vám môžem pomôcť/);
+
+  const firstConfirmation = await signedPost('/voice/demo/tree-conversation-demo/tree/answer', { CallSid: callSid, SpeechResult: 'chcem termín' });
+  assert.match(firstConfirmation.body, /Rozumela som správne, že si prajete objednať sa/);
+
+  const visit = await signedPost('/voice/demo/tree-conversation-demo/tree/answer', { CallSid: callSid, SpeechResult: 'áno' });
+  assert.match(visit.body, /Vyberieme si návštevu/);
+
+  const secondConfirmation = await signedPost('/voice/demo/tree-conversation-demo/tree/answer', { CallSid: callSid, SpeechResult: 'vstupné vyšetrenie' });
+  assert.match(secondConfirmation.body, /Rozumela som správne, že si prajete vstupné vyšetrenie/);
+
+  const completed = await signedPost('/voice/demo/tree-conversation-demo/tree/answer', { CallSid: callSid, SpeechResult: 'áno' });
+  assert.match(completed.body, /Vaša požiadavka na vstupné vyšetrenie je potvrdená/);
+});
+
 test('konfigurácia nikdy neprevezme chránené produkčné Twilio číslo', async () => {
   await save(configFor('blocked-demo-bot', ['+420910927082']));
   prixiService.getConfig = async () => ({

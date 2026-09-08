@@ -38,6 +38,18 @@ npm run dev
 
 Without `DEMO_BOOKING_SMS_ENABLED=true`, the demo records a mock booking but intentionally does not send an SMS. In Twilio use your current public tunnel URL plus the webhook path shown by the Builder, for example `https://your-tunnel.trycloudflare.com/voice/demo/dentcare-bratislava-demo/incoming`.
 
+### Deterministic conversation trees
+
+The Builder also has a **Vlastný rozhodovací strom** mode. It is intended for lead-specific demos where the clinic needs a different intake flow than the standard booking template.
+
+- A question has an exact set of spoken aliases, one DTMF digit per answer, and an explicit next node.
+- A selected answer can be confirmed with yes/no; a misunderstood response moves the caller to the keypad fallback.
+- A node can carry a natural bridge sentence before its question and store its selected label for later `{{variable}}` text or SMS templates.
+- End nodes either finish the call, mark a demo handoff branch, or create a mock booking and optionally send the already opt-in-gated demo SMS.
+- A public HTTPS audio URL can replace TTS for a static node. The recording must contain the complete wording for that node; dynamic values still use TTS.
+
+Existing configurations without `conversationTree` continue to use the original guided booking flow unchanged.
+
 ### Safe routing
 
 An existing production caller is never routed to a demo based on a global environment flag or a PriXi `bookingEnabled` value. A demo bot begins only in one of two explicit ways:
