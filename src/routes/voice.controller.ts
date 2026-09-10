@@ -10,6 +10,8 @@ import { claimVoiceEvent, completeVoiceEvent, failVoiceEvent, createVoiceEventKe
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { voiceBotConfigStore } from '../services/voice-bot-config.store';
+import { normalizeBirthYearTranscript } from '../utils/transcript-normalization';
+import { getVoicemailDraft, updateVoicemailDraft, VoicemailDraft } from '../utils/voicemail-draft-store';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
@@ -98,6 +100,78 @@ function assertClinicRoutingIsolation(
 }
 
 export async function voiceRoutes(fastify: FastifyInstance) {
+
+  function parseRecordingDuration(value?: string): number {
+    const duration = Number.parseInt(value || '0', 10);
+    return Number.isFinite(duration) && duration > 0 ? duration : 0;
+  }
+
+  function dispatchVoicemail(params: {
+    fromNumber: string;
+    forwardedFrom: string;
+    nameUrl?: string;
+    birthYearUrl?: string;
+    problemUrl?: string;
+    nameDuration?: string;
+    birthYearDuration?: string;
+    problemDuration?: string;
+    providerCallId: string;
+    pediatricMode: boolean;
+    dentalMode: boolean;
+    requireProblem?: boolean;
+    callStartedAt?: string;
+    callEndedAt?: string;
+  }): void {
+    const nameUrl = params.nameUrl || '';
+    const birthYearUrl = params.birthYearUrl || '';
+    const problemUrl = params.problemUrl || '';
+
+    // A request becomes useful only after the problem step has produced a
+    // recording. Name and birth year may legitimately remain empty.
+    if ((params.requireProblem && !problemUrl) || (!problemUrl && !nameUrl && !birthYearUrl)) return;
+
+    const durationSeconds = parseRecordingDuration(params.nameDuration)
+      + parseRecordingDuration(params.birthYearDuration)
+      + parseRecordingDuration(params.problemDuration);
+    const callEndedAt = params.callEndedAt || new Date().toISOString();
+    const callStartedAt = params.callStartedAt
+      || new Date(Date.now() - durationSeconds * 1000).toISOString();
+    const eventKey = createVoiceEventKey('voicemail_recorded', params.providerCallId);
+
+    handleVoicemailBackground(
+      params.fromNumber,
+      params.forwardedFrom,
+      nameUrl,
+      birthYearUrl,
+      problemUrl,
+      durationSeconds,
+      callStartedAt,
+      callEndedAt,
+      params.providerCallId,
+      eventKey,
+      params.pediatricMode,
+      params.dentalMode
+    ).catch(err => fastify.log.error(err, 'Background voicemail task failed'));
+  }
+
+  function dispatchDraft(draft: VoicemailDraft): void {
+    dispatchVoicemail({
+      fromNumber: draft.fromNumber,
+      forwardedFrom: draft.forwardedFrom,
+      nameUrl: draft.nameUrl,
+      birthYearUrl: draft.birthYearUrl,
+      problemUrl: draft.problemUrl,
+      nameDuration: draft.nameDuration,
+      birthYearDuration: draft.birthYearDuration,
+      problemDuration: draft.problemDuration,
+      providerCallId: draft.callSid,
+      pediatricMode: draft.pediatricMode,
+      dentalMode: draft.dentalMode,
+      requireProblem: true,
+      callStartedAt: draft.callStartedAt,
+      callEndedAt: draft.callEndedAt,
+    });
+  }
 
   fastify.post('/incoming', async (request: FastifyRequest, reply: FastifyReply) => {
     const body = request.body as Record<string, string>;
@@ -240,6 +314,12 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
         greeting
       );
+      updateVoicemailDraft(body.CallSid, {
+        fromNumber,
+        forwardedFrom,
+        pediatricMode,
+        dentalMode,
+      });
       twiml.record({
         action: `/voice/record-problem?forwardedFrom=${encodeURIComponent(forwardedFrom)}&pediatricMode=${pediatricMode}&dentalMode=${dentalMode}`,
         playBeep: true,
@@ -264,8 +344,28 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const forwardedFrom = query.forwardedFrom || '';
     const pediatricMode = query.pediatricMode === 'true';
     const dentalMode = query.dentalMode === 'true';
+    const draft = updateVoicemailDraft(body.CallSid, {
+      fromNumber: body.From,
+      forwardedFrom,
+      pediatricMode,
+      dentalMode,
+      problemUrl: problemUrl || '',
+      problemDuration,
+    });
 
     const twiml = new VoiceResponse();
+    if (body.Digits === 'hangup') {
+      reply.type('text/xml').send(twiml.toString());
+      const completedDraft = updateVoicemailDraft(body.CallSid, {
+        callCompleted: true,
+        callEndedAt: new Date().toISOString(),
+      }) || draft;
+      if (completedDraft) dispatchDraft(completedDraft);
+      return;
+    }
+
+    if (draft?.callCompleted) dispatchDraft(draft);
+
     if (pediatricMode) {
       twiml.say(
         { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
@@ -296,8 +396,30 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const forwardedFrom = query.forwardedFrom || '';
     const pediatricMode = query.pediatricMode === 'true';
     const dentalMode = query.dentalMode === 'true';
+    const draft = updateVoicemailDraft(body.CallSid, {
+      fromNumber: body.From,
+      forwardedFrom,
+      pediatricMode,
+      dentalMode,
+      problemUrl,
+      problemDuration,
+      nameUrl: nameUrl || '',
+      nameDuration,
+    });
 
     const twiml = new VoiceResponse();
+    if (body.Digits === 'hangup') {
+      reply.type('text/xml').send(twiml.toString());
+      const completedDraft = updateVoicemailDraft(body.CallSid, {
+        callCompleted: true,
+        callEndedAt: new Date().toISOString(),
+      }) || draft;
+      if (completedDraft) dispatchDraft(completedDraft);
+      return;
+    }
+
+    if (draft?.callCompleted) dispatchDraft(draft);
+
     const birthYearPrompt = pediatricMode
       ? 'Na záver, prosím, uveďte rok narodenia dieťaťa a stlačte ľubovoľné tlačidlo.'
       : 'Rozumiem. Na záver prosím uveďte váš rok narodenia a stlačte hociktoré tlačidlo.';
@@ -348,19 +470,20 @@ export async function voiceRoutes(fastify: FastifyInstance) {
           }
         };
 
-        const [nameTranscript, birthYearTranscript, problemTranscript] = await Promise.all([
+        const [nameTranscript, rawBirthYearTranscript, problemTranscript] = await Promise.all([
           transcribeSafe(nameUrl, pediatricMode
-            ? 'Meno a priezvisko dieťaťa, ktoré rodič uvádza ako pacienta pediatrickej ambulancie. Napríklad Adam Kováč, Ema Nováková.'
-            : 'Meno a priezvisko pacienta, napríklad Ján Kováč, Mária Nováková.'),
+            ? 'Krátka telefonická nahrávka v slovenčine. Volajúci uvádza meno a priezvisko dieťaťa.'
+            : 'Krátka telefonická nahrávka v slovenčine. Volajúci uvádza meno a priezvisko pacienta.'),
           transcribeSafe(birthYearUrl, pediatricMode
-            ? 'Rok narodenia dieťaťa vo formáte 4-miestneho čísla, napríklad 2018, 2021, 2024. Nevymýšľaj si webové stránky ani vety, uveď len číslo.'
-            : 'Rok narodenia pacienta vo formáte 4-miestneho čísla, napríklad 1985, 1990, 2003, 1952. Nevymýšľaj si webové stránky ani vety, uveď len číslo.'),
+            ? 'Krátka telefonická nahrávka v slovenčine. Volajúci uvádza rok narodenia dieťaťa.'
+            : 'Krátka telefonická nahrávka v slovenčine. Volajúci uvádza rok narodenia pacienta.'),
           transcribeSafe(problemUrl, pediatricMode
-            ? 'Požiadavka rodiča pre pediatrickú ambulanciu týkajúca sa dieťaťa. Môže ísť o zdravotné ťažkosti, kašeľ, teplotu, predpis liekov, výsledky vyšetrenia alebo objednanie.'
+            ? 'Telefonická požiadavka rodiča pre pediatrickú ambulanciu v slovenčine.'
             : dentalMode
-              ? 'Požiadavka pacienta pre zubnú ambulanciu. Môže ísť o bolesť zuba, opuch, vypadnutú plombu, preventívnu prehliadku, objednanie alebo zmenu termínu.'
-              : 'Popis zdravotného problému pacienta pre lekára. Napríklad bolesť chrbta, recept na lieky, kašeľ, teplota. Alebo sa len jednoducho chce objednať na termín, alebo sa zaujíma o výsledky z vyšetrenia, a pod.')
+              ? 'Telefonická požiadavka pacienta pre zubnú ambulanciu v slovenčine.'
+              : 'Telefonická požiadavka pacienta pre lekársku ambulanciu v slovenčine.')
         ]);
+        const birthYearTranscript = normalizeBirthYearTranscript(rawBirthYearTranscript);
 
         const event: VoicemailRecordedEvent = {
           event: 'voicemail_recorded',
@@ -429,16 +552,25 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const fromNumber = body.From;
     const providerCallId = body.CallSid;
 
-    const nameDuration = parseInt(query.nameDuration || '0', 10);
-    const problemDuration = parseInt(query.problemDuration || '0', 10);
-    const birthYearDuration = parseInt(body.RecordingDuration || '0', 10);
-    const durationSeconds = nameDuration + birthYearDuration + problemDuration;
+    const nameDuration = query.nameDuration || '0';
+    const problemDuration = query.problemDuration || '0';
+    const birthYearDuration = body.RecordingDuration || '0';
+    const draft = updateVoicemailDraft(providerCallId, {
+      fromNumber,
+      forwardedFrom,
+      pediatricMode,
+      dentalMode,
+      problemUrl,
+      problemDuration,
+      nameUrl,
+      nameDuration,
+      birthYearUrl: birthYearUrl || '',
+      birthYearDuration,
+      callCompleted: true,
+      callEndedAt: new Date().toISOString(),
+    });
 
-    // Rough estimation if exact start/end differ
-    const callStartedAt = new Date(Date.now() - durationSeconds * 1000).toISOString();
-    const callEndedAt = new Date().toISOString();
-
-    fastify.log.info({ from: fromNumber, durationSeconds, problemUrl }, 'Voicemail recording complete');
+    fastify.log.info({ from: fromNumber, problemUrl }, 'Voicemail recording complete');
 
     const twiml = new VoiceResponse();
     const completionMessage = pediatricMode
@@ -452,11 +584,25 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     // Return XML to Twilio immediately to prevent timeouts
     reply.type('text/xml').send(twiml.toString());
 
-    if (problemUrl || nameUrl || birthYearUrl) {
-      const eventKey = createVoiceEventKey('voicemail_recorded', providerCallId);
-      // Run heavy processing asynchronously in background
-      handleVoicemailBackground(fromNumber, forwardedFrom, nameUrl, birthYearUrl, problemUrl, durationSeconds, callStartedAt, callEndedAt, providerCallId, eventKey, pediatricMode, dentalMode)
-        .catch(err => fastify.log.error(err, 'Background voicemail task failed'));
+    if (draft) dispatchDraft(draft);
+  });
+
+  fastify.post('/call-status', async (request: FastifyRequest, reply: FastifyReply) => {
+    const body = request.body as Record<string, string>;
+    const terminalStatuses = new Set(['completed', 'canceled', 'failed', 'busy', 'no-answer']);
+
+    reply.code(204).send();
+
+    if (!terminalStatuses.has(body.CallStatus) || !body.CallSid) return;
+
+    const draft = updateVoicemailDraft(body.CallSid, {
+      fromNumber: body.From || getVoicemailDraft(body.CallSid)?.fromNumber || '',
+      callCompleted: true,
+      callEndedAt: new Date().toISOString(),
+    });
+
+    if (draft?.problemUrl) {
+      dispatchDraft(draft);
     }
   });
 }

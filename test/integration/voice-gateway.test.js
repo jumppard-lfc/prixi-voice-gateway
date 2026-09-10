@@ -403,7 +403,7 @@ test('Rozpracovany Pekarcikov hovor sa pri zmene clinicId neodosle', async () =>
   };
 
   try {
-    const endpoint = '/voice/recording-complete?forwardedFrom=%2B421940610160&pediatricMode=false&dentalMode=false';
+    const endpoint = '/voice/recording-complete?problemUrl=https%3A%2F%2Fapi.twilio.test%2Fproblem&problemDuration=5&forwardedFrom=%2B421940610160&pediatricMode=false&dentalMode=false';
     const response = await signedVoicePost(endpoint, {
       From: '+421900000013',
       To: '+421332289010',
@@ -438,7 +438,7 @@ test('Platny Pekarcikov hovor vytvori udalost iba s clinicId 64', async () => {
   sttService.transcribeAudioUrl = async () => '1980';
 
   try {
-    const endpoint = '/voice/recording-complete?forwardedFrom=%2B421940610160&pediatricMode=false&dentalMode=false';
+    const endpoint = '/voice/recording-complete?problemUrl=https%3A%2F%2Fapi.twilio.test%2Fproblem&problemDuration=5&forwardedFrom=%2B421940610160&pediatricMode=false&dentalMode=false';
     const response = await signedVoicePost(endpoint, {
       From: '+421900000016',
       To: '+421332289010',
@@ -453,6 +453,141 @@ test('Platny Pekarcikov hovor vytvori udalost iba s clinicId 64', async () => {
     assert.equal(String(sentEvents[0].clinicId), '64');
     assert.equal(sentEvents[0].phone, '+421900000016');
     assert.equal(sentEvents[0].routingPhoneNumber, '+421940610160');
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+    prixiService.sendEvent = originalSendEvent;
+    sttService.transcribeAudioUrl = originalTranscribeAudioUrl;
+  }
+});
+
+test('Zlozenie pocas nahravania problemu odosle ciastocnu poziadavku do PriXi', async () => {
+  const sentEvents = [];
+  prixiService.getConfig = async () => ({
+    clinicId: '95',
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+  });
+  prixiService.sendEvent = async (event) => {
+    sentEvents.push(event);
+  };
+  sttService.transcribeAudioUrl = async () => 'Potrebujem predpísať lieky.';
+
+  try {
+    const endpoint = '/voice/record-problem?forwardedFrom=%2B421911500609&pediatricMode=false&dentalMode=false';
+    const response = await signedVoicePost(endpoint, {
+      From: '+421900000019',
+      CallSid: 'CA99999999999999999999999999999974',
+      RecordingUrl: 'https://api.twilio.test/problem-hangup',
+      RecordingDuration: '7',
+      Digits: 'hangup',
+    });
+
+    assert.equal(response.statusCode, 200);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(sentEvents.length, 1);
+    assert.equal(sentEvents[0].problemTranscript, 'Potrebujem predpísať lieky.');
+    assert.equal(sentEvents[0].nameTranscript, '');
+    assert.equal(sentEvents[0].birthYearTranscript, '');
+    assert.equal(sentEvents[0].durationSeconds, 7);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+    prixiService.sendEvent = originalSendEvent;
+    sttService.transcribeAudioUrl = originalTranscribeAudioUrl;
+  }
+});
+
+test('Zlozenie pocas nahravania mena zachova problem aj meno a prazdny rok', async () => {
+  const sentEvents = [];
+  prixiService.getConfig = async () => ({
+    clinicId: '95',
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+  });
+  prixiService.sendEvent = async (event) => {
+    sentEvents.push(event);
+  };
+  sttService.transcribeAudioUrl = async (url) => url.includes('name-hangup')
+    ? 'Eva Krupová'
+    : 'Potrebujem predpísať lieky.';
+
+  try {
+    const endpoint = '/voice/record-name?problemUrl=https%3A%2F%2Fapi.twilio.test%2Fproblem-hangup-2&problemDuration=9&forwardedFrom=%2B421911500609&pediatricMode=false&dentalMode=false';
+    const response = await signedVoicePost(endpoint, {
+      From: '+421900000020',
+      CallSid: 'CA99999999999999999999999999999973',
+      RecordingUrl: 'https://api.twilio.test/name-hangup',
+      RecordingDuration: '2',
+      Digits: 'hangup',
+    });
+
+    assert.equal(response.statusCode, 200);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(sentEvents.length, 1);
+    assert.equal(sentEvents[0].problemTranscript, 'Potrebujem predpísať lieky.');
+    assert.equal(sentEvents[0].nameTranscript, 'Eva Krupová');
+    assert.equal(sentEvents[0].birthYearTranscript, '');
+    assert.equal(sentEvents[0].durationSeconds, 11);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+    prixiService.sendEvent = originalSendEvent;
+    sttService.transcribeAudioUrl = originalTranscribeAudioUrl;
+  }
+});
+
+test('Call status callback odosle problem pri zlozeni pocas hlasovej otazky iba raz', async () => {
+  const sentEvents = [];
+  prixiService.getConfig = async () => ({
+    clinicId: '95',
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+  });
+  prixiService.sendEvent = async (event) => {
+    sentEvents.push(event);
+  };
+  sttService.transcribeAudioUrl = async () => 'Potrebujem výsledky vyšetrenia.';
+
+  try {
+    const callSid = 'CA99999999999999999999999999999972';
+    const problemEndpoint = '/voice/record-problem?forwardedFrom=%2B421911500609&pediatricMode=false&dentalMode=false';
+    const problemResponse = await signedVoicePost(problemEndpoint, {
+      From: '+421900000021',
+      CallSid: callSid,
+      RecordingUrl: 'https://api.twilio.test/problem-before-prompt-hangup',
+      RecordingDuration: '6',
+    });
+
+    assert.equal(problemResponse.statusCode, 200);
+    assert.match(problemResponse.body, /vaše meno a priezvisko/);
+    assert.equal(sentEvents.length, 0);
+
+    const statusParams = {
+      From: '+421900000021',
+      CallSid: callSid,
+      CallStatus: 'completed',
+      CallDuration: '14',
+    };
+    const firstStatus = await signedVoicePost('/voice/call-status', statusParams);
+    const duplicateStatus = await signedVoicePost('/voice/call-status', statusParams);
+
+    assert.equal(firstStatus.statusCode, 204);
+    assert.equal(duplicateStatus.statusCode, 204);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(sentEvents.length, 1);
+    assert.equal(sentEvents[0].problemTranscript, 'Potrebujem výsledky vyšetrenia.');
+    assert.equal(sentEvents[0].nameTranscript, '');
+    assert.equal(sentEvents[0].birthYearTranscript, '');
   } finally {
     prixiService.getConfig = async () => ({
       clinicId: 'test-clinic',
@@ -568,7 +703,7 @@ test('Poziadavka MUDr. Celkovej sa pri nespravnom clinicId neodosle inej ambulan
   };
 
   try {
-    const endpoint = '/voice/recording-complete?forwardedFrom=%2B420910927082&pediatricMode=true';
+    const endpoint = '/voice/recording-complete?problemUrl=https%3A%2F%2Fapi.twilio.test%2Fproblem&problemDuration=5&forwardedFrom=%2B420910927082&pediatricMode=true';
     const response = await signedVoicePost(endpoint, {
       From: '+421900000003',
       To: '+420910927082',
@@ -602,7 +737,7 @@ test('Poziadavka MUDr. Novotneho sa pri nespravnom clinicId neodosle inej ambula
   };
 
   try {
-    const endpoint = '/voice/recording-complete?forwardedFrom=%2B420910928021&pediatricMode=false&dentalMode=true';
+    const endpoint = '/voice/recording-complete?problemUrl=https%3A%2F%2Fapi.twilio.test%2Fproblem&problemDuration=5&forwardedFrom=%2B420910928021&pediatricMode=false&dentalMode=true';
     const response = await signedVoicePost(endpoint, {
       From: '+421900000009',
       To: '+420910928021',

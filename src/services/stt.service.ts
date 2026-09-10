@@ -15,7 +15,7 @@ export class SttService {
   }
 
   /**
-   * Downloads an audio file from a given URL and transcribes it using OpenAI Whisper.
+   * Downloads an audio file from a given URL and transcribes it using OpenAI.
    * Cleans up the temporary file after processing.
    */
   async transcribeAudioUrl(audioUrl: string, prompt?: string): Promise<string> {
@@ -44,12 +44,12 @@ export class SttService {
         writer.on('error', reject);
       });
 
-      // 3. Send to Whisper API
+      // 3. Send to the transcription API. The env override provides a quick
+      // rollback path without requiring another deployment.
       const transcription = await this.openai.audio.transcriptions.create({
         file: fs.createReadStream(tempFilePath),
-        model: 'whisper-1',
-        language: 'sk',
-        prompt: prompt || 'Hlasová správa pre lekára v ambulancii PriXi. Pacient uvádza svoje meno, priezvisko a dôvod volania, napríklad recept na lieky ako Ibalgin, Paralen, kontrola alebo choroba.',
+        model: process.env.OPENAI_TRANSCRIPTION_MODEL?.trim() || 'gpt-transcribe',
+        prompt: prompt || 'Telefonická hlasová správa pacienta pre ambulanciu PriXi v slovenčine.',
       });
 
       return transcription.text;

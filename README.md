@@ -60,3 +60,18 @@ An existing production caller is never routed to a demo based on a global enviro
 The builder exposes this as **Dedikované Twilio číslo bota**. Existing production Twilio numbers are protected in the gateway and retain their original `fine-tuning` behaviour. Unconfigured numbers also remain on that existing flow. `provider.mode: live` is deliberately rejected by the demo endpoints until a real provider connector has been implemented and reviewed.
 
 Run verification with `npm test`.
+
+### Production call status callback
+
+The production voicemail flow keeps a short-lived in-memory draft keyed by the
+Twilio `CallSid`. Configure Twilio to send the terminal call status as an HTTP
+POST to:
+
+```text
+https://<voice-gateway-host>/voice/call-status
+```
+
+This callback finalizes a request when a caller hangs up while the bot is
+speaking between two recording steps. Drafts expire after 24 hours. Because the
+store is intentionally in memory, an application restart or a request routed to
+a different instance can lose an unfinished draft.
