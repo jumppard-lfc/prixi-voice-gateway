@@ -5,6 +5,21 @@ import path from 'path';
 import os from 'os';
 import { v4 as uuidv4 } from 'uuid';
 
+const SUPPORTED_AUDIO_EXTENSIONS = new Set([
+  '.flac', '.mp3', '.mp4', '.mpeg', '.mpga', '.m4a', '.ogg', '.wav', '.webm'
+]);
+
+export function getAudioFileExtension(audioUrl: string): string {
+  try {
+    const extension = path.extname(new URL(audioUrl).pathname).toLowerCase();
+    if (SUPPORTED_AUDIO_EXTENSIONS.has(extension)) return extension;
+  } catch {
+    // Fall through to the Twilio format requested by the voicemail flow.
+  }
+
+  return '.mp3';
+}
+
 export class SttService {
   private openai: OpenAI;
 
@@ -17,9 +32,12 @@ export class SttService {
   /**
    * Downloads an audio file from a given URL and transcribes it using OpenAI.
    * Cleans up the temporary file after processing.
-   */
+  */
   async transcribeAudioUrl(audioUrl: string, prompt?: string): Promise<string> {
-    const tempFilePath = path.join(os.tmpdir(), `${uuidv4()}.wav`);
+    // Preserve the real media extension. Twilio serves MP3 bytes when `.mp3`
+    // is appended to RecordingUrl; labelling those bytes as WAV makes stricter
+    // transcription models reject an otherwise supported file.
+    const tempFilePath = path.join(os.tmpdir(), `${uuidv4()}${getAudioFileExtension(audioUrl)}`);
     const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
     const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
 
