@@ -178,6 +178,7 @@ test('vlastný rozhodovací strom vedie hlasovú voľbu cez potvrdenie do správ
 
   const visit = await signedPost('/voice/demo/tree-conversation-demo/tree/answer', { CallSid: callSid, SpeechResult: 'áno' });
   assert.match(visit.body, /Vyberieme si návštevu/);
+  assert.equal((visit.body.match(/Ďakujem\./g) || []).length, 1);
 
   const secondConfirmation = await signedPost('/voice/demo/tree-conversation-demo/tree/answer', { CallSid: callSid, SpeechResult: 'vstupné vyšetrenie' });
   assert.match(secondConfirmation.body, /Rozumela som správne, že si prajete vstupné vyšetrenie/);
@@ -216,6 +217,26 @@ test('strom rozpozná prirodzenú zmenu slovosledu a po chybe neopakuje úvod', 
   assert.match(retry.body, /Prepáčte, nerozumela som/);
   assert.match(retry.body, /Zopakujem možnosti. Pre objednanie stlačte 1/);
   assert.doesNotMatch(retry.body, /Dobrý deň, vítajte v ambulancii/);
+});
+
+test('strom rozpozná slovenský skloňovaný tvar služby', async () => {
+  const config = configFor('tree-inflection-demo', []);
+  config.conversationTree = {
+    entryNodeId: 'sluzba',
+    nodes: [
+      {
+        id: 'sluzba', type: 'question', prompt: 'Akú službu si prajete?', storeAs: 'sluzba', confirmSelection: false,
+        choices: [{ id: 'hygiena', label: 'dentálna hygiena', voiceAliases: ['hygiena'], dtmf: '1', nextNodeId: 'koniec' }],
+      },
+      { id: 'koniec', type: 'end', text: 'Vybrali ste {{sluzba}}.', outcome: 'complete' },
+    ],
+  };
+  await save(config);
+
+  const callSid = 'CA90000000000000000000000000000010';
+  await signedPost('/voice/demo/tree-inflection-demo/start', { From: '+421900000125', CallSid: callSid });
+  const selected = await signedPost('/voice/demo/tree-inflection-demo/tree/answer', { CallSid: callSid, SpeechResult: 'mám záujem o dentálnu hygienu' });
+  assert.match(selected.body, /Vybrali ste dentálna hygiena/);
 });
 
 test('stromový uzol voľných termínov nechá pacienta vybrať a potvrdiť konkrétny slot', async () => {

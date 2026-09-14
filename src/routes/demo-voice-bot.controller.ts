@@ -293,9 +293,17 @@ function parseTreeChoice(value: string, node: VoiceBotTreeQuestionNode): VoiceBo
     // aliases accept that deterministic variation, while keeping one-word
     // aliases strict so they do not accidentally match unrelated sentences.
     const phraseTokens = normalizedPhrase.split(/[^a-z0-9]+/).filter(Boolean);
-    if (phraseTokens.length < 2) return false;
-    const answerTokens = new Set(text.split(/[^a-z0-9]+/).filter(Boolean));
-    return phraseTokens.every((token) => answerTokens.has(token));
+    const answerTokens = text.split(/[^a-z0-9]+/).filter(Boolean);
+    const sameWordOrInflection = (expected: string, spoken: string): boolean => {
+      if (expected === spoken) return true;
+      // Slovak speech commonly differs from the configured nominative only by
+      // declension: "hygiena" → "hygienu", "bielenie" → "bielenia".
+      // Six shared initial characters keep this deterministic and narrow.
+      const shared = Math.min(expected.length, spoken.length);
+      return shared >= 6 && expected.slice(0, 6) === spoken.slice(0, 6);
+    };
+    if (phraseTokens.length === 1) return answerTokens.some((token) => sameWordOrInflection(phraseTokens[0], token));
+    return phraseTokens.every((token) => answerTokens.some((answerToken) => sameWordOrInflection(token, answerToken)));
   };
   return node.choices.find((choice) => text === choice.dtmf
     || [choice.label, ...choice.voiceAliases].some(matchesPhrase));
@@ -389,6 +397,14 @@ async function renderTree(reply: FastifyReply, session: TreeSession, prefix = ''
     treeSessions.delete(session.callSid);
     return reply.type('text/xml').send(twiml.toString());
   }
+
+  const startsWithThanks = (value: string): boolean => /^dakujem(?:\s|\.|,|!|$)/.test(normalize(value));
+  const nextBridge = node.type === 'question' || node.type === 'availability'
+    ? interpolateTreeText(node.bridge, session)
+    : node.type === 'end' ? interpolateTreeText(node.text, session) : '';
+  const firstPreambleIsThanks = preambles[0] && startsWithThanks(preambles[0].text);
+  const nextPartAlreadyThanks = preambles.slice(1).some((preamble) => startsWithThanks(preamble.text)) || startsWithThanks(nextBridge);
+  if (firstPreambleIsThanks && nextPartAlreadyThanks) preambles.shift();
 
   if (node.type === 'end') {
     const end = node as VoiceBotTreeEndNode;
