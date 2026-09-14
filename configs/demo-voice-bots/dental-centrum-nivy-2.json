@@ -2,7 +2,7 @@
   "version": 1,
   "id": "dental-centrum-nivy-2",
   "clinic": {
-    "displayName": "Dental Centrum NIVY - 2",
+    "displayName": "Dental Centrum NIVY",
     "specialty": "zubná klinika",
     "phoneNumber": "+421948605747",
     "locale": "sk-SK",
@@ -12,17 +12,242 @@
     "kind": "custom",
     "mode": "demo_mock"
   },
-  "services": [],
-  "practitioners": [],
+  "services": [
+    {
+      "id": "vstupne-stomatologicke-vysetrenie",
+      "label": "Vstupné stomatologické vyšetrenie",
+      "durationMinutes": 30,
+      "providerServiceId": "2",
+      "voiceAliases": [
+        "vstupné vyšetrenie",
+        "prvá návšteva",
+        "nový pacient"
+      ]
+    },
+    {
+      "id": "vstupne-pedostomatologicke-vysetrenie",
+      "label": "Vstupné pedostomatologické vyšetrenie",
+      "durationMinutes": 45,
+      "providerServiceId": "26",
+      "voiceAliases": [
+        "detské vstupné vyšetrenie",
+        "pedostomatologické vyšetrenie",
+        "vyšetrenie dieťaťa"
+      ]
+    },
+    {
+      "id": "zubna-pohotovost",
+      "label": "Zubná pohotovosť ešte dnes",
+      "durationMinutes": 30,
+      "providerServiceId": "5",
+      "voiceAliases": [
+        "pohotovosť",
+        "bolesť zuba",
+        "akútne ošetrenie"
+      ]
+    },
+    {
+      "id": "bezbolestna-dentalna-hygiena",
+      "label": "Bezbolestná dentálna hygiena",
+      "durationMinutes": 60,
+      "providerServiceId": "23",
+      "voiceAliases": [
+        "dentálna hygiena",
+        "hygiena",
+        "čistenie zubov"
+      ]
+    },
+    {
+      "id": "hygiena-a-bielenie",
+      "label": "Dentálna hygiena a bielenie zubov",
+      "durationMinutes": 60,
+      "providerServiceId": "25",
+      "voiceAliases": [
+        "hygiena a bielenie",
+        "bielenie s hygienou"
+      ]
+    },
+    {
+      "id": "prva-navsteva-babatka",
+      "label": "Prvá návšteva bábätka do 12 mesiacov",
+      "durationMinutes": 30,
+      "providerServiceId": "27",
+      "voiceAliases": [
+        "bábätko",
+        "prvá návšteva bábätka",
+        "vyšetrenie bábätka"
+      ]
+    },
+    {
+      "id": "zubna-konzultacia",
+      "label": "Zubná konzultácia zadarmo",
+      "durationMinutes": 15,
+      "providerServiceId": "20",
+      "voiceAliases": [
+        "zubná konzultácia",
+        "konzultácia",
+        "poradenstvo"
+      ]
+    },
+    {
+      "id": "profesionalne-bielenie",
+      "label": "Profesionálne bielenie zubov",
+      "durationMinutes": 30,
+      "providerServiceId": "24",
+      "voiceAliases": [
+        "profesionálne bielenie",
+        "bielenie zubov",
+        "bielenie"
+      ]
+    },
+    {
+      "id": "preventivna-prehliadka",
+      "label": "Preventívna prehliadka pre stáleho pacienta",
+      "durationMinutes": 30,
+      "providerServiceId": "22",
+      "voiceAliases": [
+        "preventívna prehliadka",
+        "preventívka",
+        "kontrola"
+      ]
+    },
+    {
+      "id": "konzultacia-implantatu",
+      "label": "Konzultácia zavedenia implantátu",
+      "durationMinutes": 30,
+      "providerServiceId": "21",
+      "voiceAliases": [
+        "implantát",
+        "implantáty",
+        "konzultácia implantátu"
+      ]
+    },
+    {
+      "id": "extrakcia-zuba",
+      "label": "Vytrhnutie alebo extrakcia zuba",
+      "durationMinutes": 30,
+      "providerServiceId": "18",
+      "voiceAliases": [
+        "vytrhnutie zuba",
+        "extrakcia",
+        "trhanie zuba"
+      ]
+    },
+    {
+      "id": "chirurgicka-extrakcia",
+      "label": "Chirurgická extrakcia zuba múdrosti",
+      "durationMinutes": 30,
+      "providerServiceId": "19",
+      "voiceAliases": [
+        "zub múdrosti",
+        "osmička",
+        "chirurgická extrakcia"
+      ]
+    },
+    {
+      "id": "osetrenie-kazu",
+      "label": "Ošetrenie kazu pre stáleho pacienta",
+      "durationMinutes": 45,
+      "providerServiceId": "28",
+      "voiceAliases": [
+        "kaz",
+        "oprava kazu",
+        "ošetrenie kazu"
+      ]
+    }
+  ],
+  "practitioners": [
+    {
+      "id": "michaela-zanova",
+      "label": "MDDr. Michaela Záňová",
+      "voiceAliases": [
+        "doktorka záňová",
+        "záňová",
+        "michaela záňová"
+      ],
+      "serviceIds": [
+        "vstupne-stomatologicke-vysetrenie",
+        "zubna-pohotovost",
+        "zubna-konzultacia",
+        "preventivna-prehliadka",
+        "extrakcia-zuba",
+        "osetrenie-kazu"
+      ]
+    },
+    {
+      "id": "viktor-bodi",
+      "label": "MDDr. Viktor Bódi",
+      "voiceAliases": [
+        "doktor bódi",
+        "bódi",
+        "viktor bódi"
+      ],
+      "serviceIds": [
+        "vstupne-stomatologicke-vysetrenie",
+        "zubna-pohotovost",
+        "zubna-konzultacia",
+        "profesionalne-bielenie",
+        "preventivna-prehliadka",
+        "extrakcia-zuba",
+        "osetrenie-kazu"
+      ]
+    },
+    {
+      "id": "michal-polivka",
+      "label": "MDDr. Michal Polivka",
+      "voiceAliases": [
+        "doktor polivka",
+        "polivka",
+        "michal polivka"
+      ],
+      "serviceIds": [
+        "vstupne-stomatologicke-vysetrenie",
+        "zubna-pohotovost",
+        "zubna-konzultacia",
+        "preventivna-prehliadka",
+        "konzultacia-implantatu",
+        "extrakcia-zuba",
+        "chirurgicka-extrakcia",
+        "osetrenie-kazu"
+      ]
+    },
+    {
+      "id": "fabian-bohon",
+      "label": "Bc. Fabián Bohoň",
+      "voiceAliases": [
+        "fabián bohoň",
+        "bohoň",
+        "fabián"
+      ],
+      "serviceIds": [
+        "bezbolestna-dentalna-hygiena",
+        "hygiena-a-bielenie",
+        "profesionalne-bielenie"
+      ]
+    },
+    {
+      "id": "ivana-sulja",
+      "label": "MDDr. Ivana Šulja",
+      "voiceAliases": [
+        "doktorka šulja",
+        "šulja",
+        "ivana šulja"
+      ],
+      "serviceIds": [
+        "vstupne-pedostomatologicke-vysetrenie",
+        "prva-navsteva-babatka"
+      ]
+    }
+  ],
   "routing": {
     "inboundTwilioNumbers": []
   },
   "conversation": {
     "confirmService": true,
-    "confirmDatePreference": true,
+    "confirmDatePreference": false,
     "confirmSlot": true,
     "confirmName": false,
-    "requireTerms": true,
+    "requireTerms": false,
     "sendConfirmationSms": true,
     "useDtmfFallback": true,
     "playPromptTone": true
@@ -35,9 +260,9 @@
         "id": "ako-pomoct",
         "type": "question",
         "bridge": "",
-        "prompt": "Dobrý deň, vítam vás v Dental Centrum NIVY. Som virtuálna asistentka PriXi v demo režime. Pomôžem vám vybrať typ návštevy a vhodný termín. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici.",
+        "prompt": "Dobrý deň, vítam vás v Dental Centrum NIVY. Som virtuálna asistentka PriXi v ukážkovom režime. Pomôžem vám vybrať návštevu, ošetrujúceho a vhodný termín. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Chcete sa objednať na návštevu, alebo máte otázku?",
         "storeAs": "dovod",
-        "confirmSelection": true,
+        "confirmSelection": false,
         "choices": [
           {
             "id": "objednanie",
@@ -48,7 +273,7 @@
               "chcem termín"
             ],
             "dtmf": "1",
-            "nextNodeId": "typ-navstevy"
+            "nextNodeId": "oblast-navstevy"
           },
           {
             "id": "otazka",
@@ -64,72 +289,342 @@
         ]
       },
       {
-        "id": "typ-navstevy",
+        "id": "oblast-navstevy",
         "type": "question",
-        "bridge": "Ďakujem. Poďme spolu vybrať návštevu, ktorá vám bude najviac vyhovovať.",
-        "prompt": "Vyberte si, prosím, typ návštevy.",
+        "bridge": "Ďakujem. Aby sme vás zbytočne nezdržovali, najprv vyberieme oblasť návštevy.",
+        "prompt": "Ide o vstupné vyšetrenie alebo konzultáciu, akútne ošetrenie, alebo dentálnu hygienu či bielenie?",
+        "storeAs": "oblast",
+        "confirmSelection": false,
+        "choices": [
+          {
+            "id": "vstupy",
+            "label": "vstupné vyšetrenie alebo konzultáciu",
+            "voiceAliases": [
+              "vstupné vyšetrenie",
+              "prvá návšteva",
+              "konzultácia",
+              "implantát",
+              "bábätko",
+              "dieťa"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "sluzby-vstupy"
+          },
+          {
+            "id": "osetrenie",
+            "label": "akútne ošetrenie alebo liečbu",
+            "voiceAliases": [
+              "akútne",
+              "bolesť",
+              "pohotovosť",
+              "kaz",
+              "extrakcia",
+              "kontrola"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "sluzby-liecba"
+          },
+          {
+            "id": "hygiena",
+            "label": "dentálnu hygienu alebo bielenie",
+            "voiceAliases": [
+              "hygiena",
+              "čistenie",
+              "bielenie"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "sluzby-hygiena"
+          }
+        ]
+      },
+      {
+        "id": "sluzby-vstupy",
+        "type": "question",
+        "bridge": "Výborne. Vyberme teraz presný typ návštevy.",
+        "prompt": "Môžete si vybrať vstupné stomatologické vyšetrenie, vstupné vyšetrenie dieťaťa, prvú návštevu bábätka, zubnú konzultáciu alebo konzultáciu zavedenia implantátu.",
         "storeAs": "navsteva",
         "confirmSelection": true,
         "choices": [
           {
             "id": "vstupne",
-            "label": "Vstupné vyšetrenie",
+            "label": "Vstupné stomatologické vyšetrenie",
+            "value": "2",
             "voiceAliases": [
+              "vstupné vyšetrenie",
               "prvá návšteva",
-              "nový pacient",
-              "vstupné"
+              "nový pacient"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "lekar-vseobecny"
+          },
+          {
+            "id": "pedo",
+            "label": "Vstupné pedostomatologické vyšetrenie",
+            "value": "26",
+            "voiceAliases": [
+              "detské vyšetrenie",
+              "vyšetrenie dieťaťa",
+              "pedostomatologické"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "lekar-ivana"
+          },
+          {
+            "id": "babatko",
+            "label": "Prvá návšteva bábätka do 12 mesiacov",
+            "value": "27",
+            "voiceAliases": [
+              "bábätko",
+              "prvá návšteva bábätka",
+              "vyšetrenie bábätka"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "lekar-ivana"
+          },
+          {
+            "id": "konzultacia",
+            "label": "Zubná konzultácia zadarmo",
+            "value": "20",
+            "voiceAliases": [
+              "zubná konzultácia",
+              "konzultácia",
+              "poradenstvo"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "lekar-vseobecny"
+          },
+          {
+            "id": "implantat",
+            "label": "Konzultácia zavedenia implantátu",
+            "value": "21",
+            "voiceAliases": [
+              "implantát",
+              "implantáty",
+              "konzultácia implantátu"
+            ],
+            "dtmf": "5",
+            "nextNodeId": "lekar-polivka"
+          }
+        ]
+      },
+      {
+        "id": "sluzby-liecba",
+        "type": "question",
+        "bridge": "Rozumiem. Vyberme presne, s čím vám môžeme pomôcť.",
+        "prompt": "Môžete si vybrať zubnú pohotovosť, preventívnu prehliadku, vytrhnutie zuba, chirurgickú extrakciu zuba múdrosti alebo ošetrenie kazu.",
+        "storeAs": "navsteva",
+        "confirmSelection": true,
+        "choices": [
+          {
+            "id": "pohotovost",
+            "label": "Zubná pohotovosť ešte dnes",
+            "value": "5",
+            "voiceAliases": [
+              "pohotovosť",
+              "bolesť zuba",
+              "akútne ošetrenie"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "lekar-vseobecny"
+          },
+          {
+            "id": "preventivka",
+            "label": "Preventívna prehliadka pre stáleho pacienta",
+            "value": "22",
+            "voiceAliases": [
+              "preventívna prehliadka",
+              "preventívka",
+              "kontrola"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "lekar-vseobecny"
+          },
+          {
+            "id": "extrakcia",
+            "label": "Vytrhnutie alebo extrakcia zuba",
+            "value": "18",
+            "voiceAliases": [
+              "vytrhnutie zuba",
+              "extrakcia",
+              "trhanie zuba"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "lekar-vseobecny"
+          },
+          {
+            "id": "osmica",
+            "label": "Chirurgická extrakcia zuba múdrosti",
+            "value": "19",
+            "voiceAliases": [
+              "zub múdrosti",
+              "osmička",
+              "chirurgická extrakcia"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "lekar-polivka"
+          },
+          {
+            "id": "kaz",
+            "label": "Ošetrenie kazu pre stáleho pacienta",
+            "value": "28",
+            "voiceAliases": [
+              "kaz",
+              "oprava kazu",
+              "ošetrenie kazu"
+            ],
+            "dtmf": "5",
+            "nextNodeId": "lekar-vseobecny"
+          }
+        ]
+      },
+      {
+        "id": "sluzby-hygiena",
+        "type": "question",
+        "bridge": "Ďakujem. Ešte vyberieme presnú službu.",
+        "prompt": "Chcete bezbolestnú dentálnu hygienu, dentálnu hygienu s bielením, alebo profesionálne bielenie zubov?",
+        "storeAs": "navsteva",
+        "confirmSelection": true,
+        "choices": [
+          {
+            "id": "hygiena",
+            "label": "Bezbolestná dentálna hygiena",
+            "value": "23",
+            "voiceAliases": [
+              "dentálna hygiena",
+              "hygiena",
+              "čistenie zubov"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "lekar-fabian"
+          },
+          {
+            "id": "hygiena-bielenie",
+            "label": "Dentálna hygiena a bielenie zubov",
+            "value": "25",
+            "voiceAliases": [
+              "hygiena a bielenie",
+              "bielenie s hygienou"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "lekar-fabian"
+          },
+          {
+            "id": "bielenie",
+            "label": "Profesionálne bielenie zubov",
+            "value": "24",
+            "voiceAliases": [
+              "profesionálne bielenie",
+              "bielenie zubov",
+              "bielenie"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "lekar-bielenie"
+          }
+        ]
+      },
+      {
+        "id": "lekar-vseobecny",
+        "type": "question",
+        "bridge": "Ďakujem za výber. Pri tejto službe si ešte môžete vybrať ošetrujúceho.",
+        "prompt": "Vyhovuje vám doktorka Michaela Záňová, doktor Viktor Bódi alebo doktor Michal Polivka?",
+        "storeAs": "lekar",
+        "confirmSelection": true,
+        "choices": [
+          {
+            "id": "zanova",
+            "label": "MDDr. Michaela Záňová",
+            "value": "7",
+            "voiceAliases": [
+              "doktorka záňová",
+              "záňová",
+              "michaela záňová"
             ],
             "dtmf": "1",
             "nextNodeId": "kedy-vyhovuje"
           },
           {
-            "id": "kontrola",
-            "label": "Zubná pohotovosť",
+            "id": "bodi",
+            "label": "MDDr. Viktor Bódi",
+            "value": "3",
             "voiceAliases": [
-              "bolesť zuba",
-              "akútne",
-              "pohotovosť"
+              "doktor bódi",
+              "bódi",
+              "viktor bódi"
             ],
             "dtmf": "2",
             "nextNodeId": "kedy-vyhovuje"
           },
           {
-            "id": "moznost-3",
-            "label": "Dentálna hygiena",
+            "id": "polivka",
+            "label": "MDDr. Michal Polivka",
+            "value": "5",
             "voiceAliases": [
-              "hygiena",
-              "čistenie zubov"
+              "doktor polivka",
+              "polivka",
+              "michal polivka"
             ],
             "dtmf": "3",
-            "nextNodeId": "kedy-vyhovuje"
-          },
-          {
-            "id": "moznost-4",
-            "label": "Profesionálne bielenie",
-            "voiceAliases": [
-              "bielenie",
-              "bielenie zubov"
-            ],
-            "dtmf": "4",
-            "nextNodeId": "kedy-vyhovuje"
-          },
-          {
-            "id": "moznost-5",
-            "label": "Zubná konzultácia",
-            "voiceAliases": [
-              "konzultácia",
-              "poradenstvo"
-            ],
-            "dtmf": "5",
             "nextNodeId": "kedy-vyhovuje"
           }
         ]
       },
       {
+        "id": "lekar-bielenie",
+        "type": "question",
+        "bridge": "Ďakujem za výber. Pri profesionálnom bielení si ešte môžete vybrať ošetrujúceho.",
+        "prompt": "Vyhovuje vám doktor Viktor Bódi alebo dentálny hygienik Fabián Bohoň?",
+        "storeAs": "lekar",
+        "confirmSelection": true,
+        "choices": [
+          {
+            "id": "bodi",
+            "label": "MDDr. Viktor Bódi",
+            "value": "3",
+            "voiceAliases": [
+              "doktor bódi",
+              "bódi",
+              "viktor bódi"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "kedy-vyhovuje"
+          },
+          {
+            "id": "bohon",
+            "label": "Bc. Fabián Bohoň",
+            "value": "6",
+            "voiceAliases": [
+              "fabián bohoň",
+              "bohoň",
+              "fabián"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "kedy-vyhovuje"
+          }
+        ]
+      },
+      {
+        "id": "lekar-ivana",
+        "type": "message",
+        "text": "Pre túto službu je v online rezervácii dostupná doktorka Ivana Šulja. Teraz spoločne nájdeme vhodný termín.",
+        "nextNodeId": "kedy-vyhovuje"
+      },
+      {
+        "id": "lekar-polivka",
+        "type": "message",
+        "text": "Pre túto službu je v online rezervácii dostupný doktor Michal Polivka. Teraz spoločne nájdeme vhodný termín.",
+        "nextNodeId": "kedy-vyhovuje"
+      },
+      {
+        "id": "lekar-fabian",
+        "type": "message",
+        "text": "Pre túto službu je v online rezervácii dostupný dentálny hygienik Fabián Bohoň. Teraz spoločne nájdeme vhodný termín.",
+        "nextNodeId": "kedy-vyhovuje"
+      },
+      {
         "id": "kedy-vyhovuje",
         "type": "question",
-        "bridge": "Výborne, typ návštevy už máme. Ešte spolu nájdeme vhodný čas.",
-        "prompt": "Vyhovuje vám najbližší voľný termín, dopoludnie alebo popoludnie?",
+        "bridge": "Výborne. Už nám chýba len vhodný čas.",
+        "prompt": "Vyhovuje vám najbližší voľný termín, termín dopoludnia alebo termín popoludní?",
         "storeAs": "cas",
         "confirmSelection": false,
         "choices": [
