@@ -370,7 +370,13 @@ async function renderTreeAvailability(reply: FastifyReply, session: TreeSession,
   const availabilityPrompt = retry
     ? `Zopakujem možnosti. ${choices}. Stlačte číslo možnosti.`
     : `${interpolateTreeText(node.bridge, session)} ${interpolateTreeText(node.prompt, session) || defaultPrompt} ${choices}. ${forceDtmf ? 'Stlačte číslo možnosti.' : 'Povedzte číslo možnosti alebo názov dňa.'}`;
-  gather.say(sayOptions, `${keyboard}${availabilityPrompt}`.trim());
+  if (retry) gather.say(sayOptions, `${keyboard}${availabilityPrompt}`.trim());
+  else if (node.audioUrl) {
+    // A human recording can cover the fixed bridge, while slot dates and times
+    // remain dynamic and therefore must still be spoken after it.
+    gather.play(node.audioUrl);
+    gather.say(sayOptions, `${choices}. Povedzte číslo možnosti alebo názov dňa.`);
+  } else gather.say(sayOptions, `${keyboard}${availabilityPrompt}`.trim());
   if (session.config.conversation.playPromptTone) gather.play(`${session.publicBaseUrl}/media/booking-prompt-tone.wav`);
   twiml.say(sayOptions, 'Odpoveď som nezachytila. Skúsme to, prosím, znova.');
   twiml.redirect(`/voice/demo/${session.config.id}/tree/retry`);
@@ -694,6 +700,7 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
     const session = getTreeSession(body.CallSid);
     if (!session) return expiredTreeResponse(reply);
     const answer = body.SpeechResult || body.Digits || '';
+    const selectedByKeypad = Boolean(body.Digits);
 
     if (session.pendingConfirmation) {
       const pending = session.pendingConfirmation;
@@ -724,7 +731,7 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
         return renderTree(reply, session, 'Prepáčte, nerozumela som. ', true);
       }
       const label = formatSlot(slot);
-      if (node.confirmSelection) {
+      if (node.confirmSelection && !selectedByKeypad) {
         session.pendingConfirmation = { nodeId: node.id, label, value: slot.id, nextNodeId: node.nextNodeId, kind: 'slot' };
         return renderTreeConfirmation(reply, session, node.confirmationPrompt, label);
       }
@@ -737,7 +744,7 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
       session.forceDtmf = session.config.conversation.useDtmfFallback;
       return renderTree(reply, session, 'Prepáčte, nerozumela som. ', true);
     }
-    if (node.confirmSelection) {
+    if (node.confirmSelection && !selectedByKeypad) {
       session.pendingConfirmation = { nodeId: node.id, label: choice.label, value: choice.value, nextNodeId: choice.nextNodeId, kind: 'choice' };
       return renderTreeConfirmation(reply, session, node.confirmationPrompt, choice.label);
     }

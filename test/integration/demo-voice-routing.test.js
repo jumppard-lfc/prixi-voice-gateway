@@ -239,6 +239,27 @@ test('strom rozpozná slovenský skloňovaný tvar služby', async () => {
   assert.match(selected.body, /Vybrali ste dentálna hygiena/);
 });
 
+test('výber tlačidlom okamžite pokračuje bez hlasového potvrdenia', async () => {
+  const config = configFor('tree-dtmf-demo', []);
+  config.conversationTree = {
+    entryNodeId: 'sluzba',
+    nodes: [
+      {
+        id: 'sluzba', type: 'question', prompt: 'Akú službu si prajete?', storeAs: 'sluzba', confirmSelection: true,
+        choices: [{ id: 'hygiena', label: 'dentálnu hygienu', voiceAliases: ['hygiena'], dtmf: '1', nextNodeId: 'koniec' }],
+      },
+      { id: 'koniec', type: 'end', text: 'Rezerváciu dokončíme.', outcome: 'complete' },
+    ],
+  };
+  await save(config);
+
+  const callSid = 'CA90000000000000000000000000000011';
+  await signedPost('/voice/demo/tree-dtmf-demo/start', { From: '+421900000125', CallSid: callSid });
+  const selected = await signedPost('/voice/demo/tree-dtmf-demo/tree/answer', { CallSid: callSid, Digits: '1' });
+  assert.match(selected.body, /Rezerváciu dokončíme/);
+  assert.doesNotMatch(selected.body, /Rozumela som správne/);
+});
+
 test('stromový uzol voľných termínov nechá pacienta vybrať a potvrdiť konkrétny slot', async () => {
   const config = configFor('tree-availability-demo', []);
   config.conversationTree = {
@@ -263,11 +284,9 @@ test('stromový uzol voľných termínov nechá pacienta vybrať a potvrdiť kon
   assert.match(slots.body, /voľné termíny/);
   assert.match(slots.body, /možnosť 1/);
 
-  const confirmation = await signedPost('/voice/demo/tree-availability-demo/tree/answer', { CallSid: callSid, Digits: '1' });
-  assert.match(confirmation.body, /Rozumela som správne, že si prajete/);
-
-  const completed = await signedPost('/voice/demo/tree-availability-demo/tree/answer', { CallSid: callSid, SpeechResult: 'áno' });
+  const completed = await signedPost('/voice/demo/tree-availability-demo/tree/answer', { CallSid: callSid, Digits: '1' });
   assert.match(completed.body, /Termín .* je potvrdený/);
+  assert.doesNotMatch(completed.body, /Rozumela som správne/);
 });
 
 test('konfigurácia nikdy neprevezme chránené produkčné Twilio číslo', async () => {
