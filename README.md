@@ -21,6 +21,8 @@ git commit -m "feat: add DentCare Bratislava demo bot"
 git push
 ```
 
+For a repeatable end-to-end ICP exercise — research, a safe new demo number, Builder tree, Git/Render/Twilio setup, test calls and a personalised cold email — follow [the personalised demo runbook](docs/personalized-demo-runbook.md).
+
 After Render deploys the commit, configure the new Twilio number with the dedicated webhook path `/voice/demo/<bot-id>/incoming`.
 
 `VOICE_BOT_CONFIG_REPOSITORY_DIR` can override the committed directory for local development or tests. `VOICE_BOT_CONFIG_DIR` is only an explicit, temporary writable override; do not set it on Render.

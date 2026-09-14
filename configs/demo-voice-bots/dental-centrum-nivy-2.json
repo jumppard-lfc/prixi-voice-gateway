@@ -1,0 +1,198 @@
+{
+  "version": 1,
+  "id": "dental-centrum-nivy-2",
+  "clinic": {
+    "displayName": "Dental Centrum NIVY - 2",
+    "specialty": "zubná klinika",
+    "phoneNumber": "+421948605747",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": {
+    "kind": "custom",
+    "mode": "demo_mock"
+  },
+  "services": [],
+  "practitioners": [],
+  "routing": {
+    "inboundTwilioNumbers": []
+  },
+  "conversation": {
+    "confirmService": true,
+    "confirmDatePreference": true,
+    "confirmSlot": true,
+    "confirmName": false,
+    "requireTerms": true,
+    "sendConfirmationSms": true,
+    "useDtmfFallback": true,
+    "playPromptTone": true
+  },
+  "copy": {},
+  "conversationTree": {
+    "entryNodeId": "ako-pomoct",
+    "nodes": [
+      {
+        "id": "ako-pomoct",
+        "type": "question",
+        "bridge": "",
+        "prompt": "Dobrý deň, vítam vás v Dental Centrum NIVY. Som virtuálna asistentka PriXi v demo režime. Pomôžem vám vybrať typ návštevy a vhodný termín. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici.",
+        "storeAs": "dovod",
+        "confirmSelection": true,
+        "choices": [
+          {
+            "id": "objednanie",
+            "label": "objednať sa na návštevu",
+            "voiceAliases": [
+              "objednať sa",
+              "objednanie",
+              "chcem termín"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "typ-navstevy"
+          },
+          {
+            "id": "otazka",
+            "label": "položiť otázku",
+            "voiceAliases": [
+              "mám otázku",
+              "otázka",
+              "informácia"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "prepojenie"
+          }
+        ]
+      },
+      {
+        "id": "typ-navstevy",
+        "type": "question",
+        "bridge": "Ďakujem. Poďme spolu vybrať návštevu, ktorá vám bude najviac vyhovovať.",
+        "prompt": "Vyberte si, prosím, typ návštevy.",
+        "storeAs": "navsteva",
+        "confirmSelection": true,
+        "choices": [
+          {
+            "id": "vstupne",
+            "label": "Vstupné vyšetrenie",
+            "voiceAliases": [
+              "prvá návšteva",
+              "nový pacient",
+              "vstupné"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "kedy-vyhovuje"
+          },
+          {
+            "id": "kontrola",
+            "label": "Zubná pohotovosť",
+            "voiceAliases": [
+              "bolesť zuba",
+              "akútne",
+              "pohotovosť"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "kedy-vyhovuje"
+          },
+          {
+            "id": "moznost-3",
+            "label": "Dentálna hygiena",
+            "voiceAliases": [
+              "hygiena",
+              "čistenie zubov"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "kedy-vyhovuje"
+          },
+          {
+            "id": "moznost-4",
+            "label": "Profesionálne bielenie",
+            "voiceAliases": [
+              "bielenie",
+              "bielenie zubov"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "kedy-vyhovuje"
+          },
+          {
+            "id": "moznost-5",
+            "label": "Zubná konzultácia",
+            "voiceAliases": [
+              "konzultácia",
+              "poradenstvo"
+            ],
+            "dtmf": "5",
+            "nextNodeId": "kedy-vyhovuje"
+          }
+        ]
+      },
+      {
+        "id": "kedy-vyhovuje",
+        "type": "question",
+        "bridge": "Výborne, typ návštevy už máme. Ešte spolu nájdeme vhodný čas.",
+        "prompt": "Vyhovuje vám najbližší voľný termín, dopoludnie alebo popoludnie?",
+        "storeAs": "cas",
+        "confirmSelection": false,
+        "choices": [
+          {
+            "id": "najblizsi",
+            "label": "najbližší voľný termín",
+            "voiceAliases": [
+              "najbližší termín",
+              "čo najskôr",
+              "najbližší"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "dopoludnie",
+            "label": "termín dopoludnia",
+            "voiceAliases": [
+              "dopoludnia",
+              "doobeda",
+              "ráno"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "popoludnie",
+            "label": "termín popoludní",
+            "voiceAliases": [
+              "popoludní",
+              "poobede",
+              "odpoludnia"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "volne-terminy"
+          }
+        ]
+      },
+      {
+        "id": "volne-terminy",
+        "type": "availability",
+        "bridge": "Ďakujem. Pozrime sa spolu na voľné termíny.",
+        "prompt": "Mám pre vás tieto možnosti.",
+        "serviceVariable": "navsteva",
+        "preferenceVariable": "cas",
+        "storeAs": "termin",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že vám vyhovuje {{selected}}?",
+        "nextNodeId": "rezervovane"
+      },
+      {
+        "id": "rezervovane",
+        "type": "end",
+        "text": "Ďakujem. Vaša demo rezervácia na {{navsteva}}, {{termin}}, je potvrdená. Potvrdzujúcu SMS vám posielame hneď po hovore. Ďakujeme a dovidenia.",
+        "outcome": "mock_booking",
+        "smsText": "Dental Centrum NIVY: demo rezervácia na {{navsteva}}, {{termin}}, je potvrdená."
+      },
+      {
+        "id": "prepojenie",
+        "type": "end",
+        "text": "Ďakujem za vašu otázku. V tomto deme je táto vetva pripravená pre kolegyňu z ambulancie. Ďakujeme a dovidenia.",
+        "outcome": "handoff"
+      }
+    ]
+  }
+}
