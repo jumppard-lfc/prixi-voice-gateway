@@ -58,6 +58,11 @@ export interface VoiceBotTreeQuestionNode {
   prompt: string;
   /** Public HTTPS recording containing the complete bridge and question. */
   audioUrl?: string;
+  /**
+   * Optional concise wording used after an answer was not understood. It must
+   * repeat only the choices, never the greeting or full introductory prompt.
+   */
+  retryPrompt?: string;
   /** Retains the selected label for {{variable}} placeholders later in the call. */
   storeAs?: string;
   confirmSelection: boolean;

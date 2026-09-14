@@ -186,6 +186,38 @@ test('vlastný rozhodovací strom vedie hlasovú voľbu cez potvrdenie do správ
   assert.match(completed.body, /Vaša požiadavka na vstupné vyšetrenie je potvrdená/);
 });
 
+test('strom rozpozná prirodzenú zmenu slovosledu a po chybe neopakuje úvod', async () => {
+  const config = configFor('tree-retry-demo', []);
+  config.conversationTree = {
+    entryNodeId: 'uvod',
+    nodes: [
+      {
+        id: 'uvod', type: 'question', prompt: 'Dobrý deň, vítajte v ambulancii. Chcete sa objednať na návštevu alebo máte otázku?',
+        retryPrompt: 'Zopakujem možnosti. Pre objednanie stlačte 1. Pre otázku stlačte 2.', storeAs: 'dovod', confirmSelection: false,
+        choices: [
+          { id: 'objednanie', label: 'objednať sa na návštevu', voiceAliases: ['objednať sa', 'chcem termín'], dtmf: '1', nextNodeId: 'objednane' },
+          { id: 'otazka', label: 'máte otázku', voiceAliases: ['otázka'], dtmf: '2', nextNodeId: 'otazka' },
+        ],
+      },
+      { id: 'objednane', type: 'end', text: 'Pokračujeme v objednaní.', outcome: 'complete' },
+      { id: 'otazka', type: 'end', text: 'Vypočujem si vašu otázku.', outcome: 'handoff' },
+    ],
+  };
+  await save(config);
+
+  const acceptedCallSid = 'CA90000000000000000000000000000008';
+  await signedPost('/voice/demo/tree-retry-demo/start', { From: '+421900000125', CallSid: acceptedCallSid });
+  const accepted = await signedPost('/voice/demo/tree-retry-demo/tree/answer', { CallSid: acceptedCallSid, SpeechResult: 'chcem sa objednať na návštevu' });
+  assert.match(accepted.body, /Pokračujeme v objednaní/);
+
+  const retryCallSid = 'CA90000000000000000000000000000009';
+  await signedPost('/voice/demo/tree-retry-demo/start', { From: '+421900000125', CallSid: retryCallSid });
+  const retry = await signedPost('/voice/demo/tree-retry-demo/tree/answer', { CallSid: retryCallSid, SpeechResult: 'niečomu vôbec nerozumiem' });
+  assert.match(retry.body, /Prepáčte, nerozumela som/);
+  assert.match(retry.body, /Zopakujem možnosti. Pre objednanie stlačte 1/);
+  assert.doesNotMatch(retry.body, /Dobrý deň, vítajte v ambulancii/);
+});
+
 test('stromový uzol voľných termínov nechá pacienta vybrať a potvrdiť konkrétny slot', async () => {
   const config = configFor('tree-availability-demo', []);
   config.conversationTree = {

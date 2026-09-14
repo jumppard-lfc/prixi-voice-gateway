@@ -263,6 +263,7 @@
         "prompt": "Dobrý deň, vítam vás v Dental Centrum NIVY. Som virtuálna asistentka PriXi v ukážkovom režime. Pomôžem vám vybrať návštevu, ošetrujúceho a vhodný termín. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Chcete sa objednať na návštevu, alebo máte otázku?",
         "storeAs": "dovod",
         "confirmSelection": false,
+        "retryPrompt": "Zopakujem možnosti. Pre objednanie sa na návštevu stlačte 1. Pre otázku stlačte 2.",
         "choices": [
           {
             "id": "objednanie",
@@ -270,7 +271,10 @@
             "voiceAliases": [
               "objednať sa",
               "objednanie",
-              "chcem termín"
+              "chcem termín",
+              "chcem sa objednať",
+              "chcem sa objednať na návštevu",
+              "chcem objednať"
             ],
             "dtmf": "1",
             "nextNodeId": "oblast-navstevy"

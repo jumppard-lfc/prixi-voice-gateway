@@ -283,8 +283,22 @@ function interpolateTreeText(value: string | undefined, session: TreeSession, se
 
 function parseTreeChoice(value: string, node: VoiceBotTreeQuestionNode): VoiceBotTreeChoice | undefined {
   const text = normalize(value);
+  const matchesPhrase = (phrase: string): boolean => {
+    const normalizedPhrase = normalize(phrase);
+    if (!normalizedPhrase) return false;
+    if (text === normalizedPhrase || text.includes(normalizedPhrase)) return true;
+
+    // Speech-to-text commonly keeps the words but changes their order, for
+    // example "chcem sa objednať" instead of "objednať sa". For multi-word
+    // aliases accept that deterministic variation, while keeping one-word
+    // aliases strict so they do not accidentally match unrelated sentences.
+    const phraseTokens = normalizedPhrase.split(/[^a-z0-9]+/).filter(Boolean);
+    if (phraseTokens.length < 2) return false;
+    const answerTokens = new Set(text.split(/[^a-z0-9]+/).filter(Boolean));
+    return phraseTokens.every((token) => answerTokens.has(token));
+  };
   return node.choices.find((choice) => text === choice.dtmf
-    || [choice.label, ...choice.voiceAliases].map(normalize).some((alias) => text === alias || text.includes(alias)));
+    || [choice.label, ...choice.voiceAliases].some(matchesPhrase));
 }
 
 function commitTreeChoice(session: TreeSession, node: VoiceBotTreeQuestionNode, choice: VoiceBotTreeChoice): void {
@@ -328,7 +342,7 @@ function expiredTreeResponse(reply: FastifyReply): FastifyReply {
   return reply.type('text/xml').send(twiml.toString());
 }
 
-async function renderTreeAvailability(reply: FastifyReply, session: TreeSession, node: VoiceBotTreeAvailabilityNode, preambles: TreePreamble[]): Promise<FastifyReply> {
+async function renderTreeAvailability(reply: FastifyReply, session: TreeSession, node: VoiceBotTreeAvailabilityNode, preambles: TreePreamble[], retry = false): Promise<FastifyReply> {
   const slots = session.offeredSlots?.[node.id] || mockTreeSlots(session, node);
   session.offeredSlots = { ...(session.offeredSlots || {}), [node.id]: slots };
   saveTreeSession(session);
@@ -345,14 +359,17 @@ async function renderTreeAvailability(reply: FastifyReply, session: TreeSession,
   const choices = slots.map((slot, index) => `možnosť ${index + 1}: ${formatSlot(slot)}`).join('. ');
   const keyboard = forceDtmf ? 'Prosím, pre istotu teraz použite klávesnicu. ' : '';
   const defaultPrompt = 'Mám pre vás tieto voľné demo termíny.';
-  gather.say(sayOptions, `${keyboard}${interpolateTreeText(node.bridge, session)} ${interpolateTreeText(node.prompt, session) || defaultPrompt} ${choices}. ${forceDtmf ? 'Stlačte číslo možnosti.' : 'Povedzte číslo možnosti alebo názov dňa.'}`.trim());
+  const availabilityPrompt = retry
+    ? `Zopakujem možnosti. ${choices}. Stlačte číslo možnosti.`
+    : `${interpolateTreeText(node.bridge, session)} ${interpolateTreeText(node.prompt, session) || defaultPrompt} ${choices}. ${forceDtmf ? 'Stlačte číslo možnosti.' : 'Povedzte číslo možnosti alebo názov dňa.'}`;
+  gather.say(sayOptions, `${keyboard}${availabilityPrompt}`.trim());
   if (session.config.conversation.playPromptTone) gather.play(`${session.publicBaseUrl}/media/booking-prompt-tone.wav`);
   twiml.say(sayOptions, 'Odpoveď som nezachytila. Skúsme to, prosím, znova.');
   twiml.redirect(`/voice/demo/${session.config.id}/tree/retry`);
   return reply.type('text/xml').send(twiml.toString());
 }
 
-async function renderTree(reply: FastifyReply, session: TreeSession, prefix = ''): Promise<FastifyReply> {
+async function renderTree(reply: FastifyReply, session: TreeSession, prefix = '', retry = false): Promise<FastifyReply> {
   const twiml = new VoiceResponse();
   const preambles: TreePreamble[] = prefix ? [{ text: prefix }] : [];
   let node = treeNode(session);
@@ -394,7 +411,7 @@ async function renderTree(reply: FastifyReply, session: TreeSession, prefix = ''
   }
 
   if (node.type === 'availability') {
-    return renderTreeAvailability(reply, session, node as VoiceBotTreeAvailabilityNode, preambles);
+    return renderTreeAvailability(reply, session, node as VoiceBotTreeAvailabilityNode, preambles, retry);
   }
 
   const question = node as VoiceBotTreeQuestionNode;
@@ -413,7 +430,14 @@ async function renderTree(reply: FastifyReply, session: TreeSession, prefix = ''
   } as any);
   for (const preamble of preambles) addTreeAudioOrSpeech(gather, preamble.text, preamble.audioUrl);
   const fallback = forceDtmf ? 'Prosím, pre istotu teraz použite klávesnicu. ' : '';
-  addTreeAudioOrSpeech(gather, `${fallback}${interpolateTreeText(question.bridge, session)} ${interpolateTreeText(question.prompt, session)}`.trim(), question.audioUrl);
+  const defaultRetryPrompt = `Zopakujem možnosti. ${question.choices.map((choice) => `pre ${choice.label} stlačte ${choice.dtmf}`).join('. ')}.`;
+  const questionPrompt = retry
+    ? interpolateTreeText(question.retryPrompt, session) || defaultRetryPrompt
+    : `${interpolateTreeText(question.bridge, session)} ${interpolateTreeText(question.prompt, session)}`;
+  // A full question recording often includes a greeting. On retry we always
+  // use concise speech so that callers never hear the greeting again.
+  if (retry) gather.say(sayOptions, `${fallback}${questionPrompt}`.trim());
+  else addTreeAudioOrSpeech(gather, `${fallback}${questionPrompt}`.trim(), question.audioUrl);
   if (session.config.conversation.playPromptTone) gather.play(`${session.publicBaseUrl}/media/booking-prompt-tone.wav`);
   twiml.say(sayOptions, 'Odpoveď som nezachytila. Skúsme to, prosím, znova.');
   twiml.redirect(`/voice/demo/${session.config.id}/tree/retry`);
@@ -646,7 +670,7 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
       return renderTreeConfirmation(reply, session, confirmationPrompt, session.pendingConfirmation.label);
     }
     session.forceDtmf = session.config.conversation.useDtmfFallback;
-    return renderTree(reply, session, 'Prepáčte, nerozumela som. ');
+    return renderTree(reply, session, 'Prepáčte, nerozumela som. ', true);
   });
 
   fastify.post('/demo/:botId/tree/answer', async (request, reply) => {
@@ -667,7 +691,7 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
       if (node && yes === false) {
         session.pendingConfirmation = undefined;
         session.forceDtmf = session.config.conversation.useDtmfFallback;
-        return renderTree(reply, session, 'Ospravedlňujem sa. Vyberme to, prosím, ešte raz. ');
+        return renderTree(reply, session, 'Ospravedlňujem sa. Vyberme to, prosím, ešte raz. ', true);
       }
       const confirmationPrompt = node?.type === 'question' || node?.type === 'availability' ? node.confirmationPrompt : undefined;
       return renderTreeConfirmation(reply, session, confirmationPrompt, pending.label);
@@ -681,7 +705,7 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
       const slot = slotIndex === undefined ? undefined : slots[slotIndex];
       if (!slot) {
         session.forceDtmf = session.config.conversation.useDtmfFallback;
-        return renderTree(reply, session, 'Prepáčte, nerozumela som. ');
+        return renderTree(reply, session, 'Prepáčte, nerozumela som. ', true);
       }
       const label = formatSlot(slot);
       if (node.confirmSelection) {
@@ -695,7 +719,7 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
     const choice = parseTreeChoice(answer, node);
     if (!choice) {
       session.forceDtmf = session.config.conversation.useDtmfFallback;
-      return renderTree(reply, session, 'Prepáčte, nerozumela som. ');
+      return renderTree(reply, session, 'Prepáčte, nerozumela som. ', true);
     }
     if (node.confirmSelection) {
       session.pendingConfirmation = { nodeId: node.id, label: choice.label, value: choice.value, nextNodeId: choice.nextNodeId, kind: 'choice' };
