@@ -13,6 +13,7 @@ process.env.VOICE_BOT_CONFIG_REPOSITORY_DIR = path.join(os.tmpdir(), `prixi-demo
 
 const app = require('../../src/app').default;
 const { prixiService } = require('../../src/services/prixi.service');
+const { validateVoiceBotConfig } = require('../../src/services/voice-bot-framework.service');
 
 const configDirectory = process.env.VOICE_BOT_CONFIG_DIR;
 const repositoryConfigDirectory = process.env.VOICE_BOT_CONFIG_REPOSITORY_DIR;
@@ -258,6 +259,27 @@ test('výber tlačidlom okamžite pokračuje bez hlasového potvrdenia', async (
   const selected = await signedPost('/voice/demo/tree-dtmf-demo/tree/answer', { CallSid: callSid, Digits: '1' });
   assert.match(selected.body, /Rezerváciu dokončíme/);
   assert.doesNotMatch(selected.body, /Rozumela som správne/);
+});
+
+test('validácia odmietne rovnaké hlasové synonymum pri dvoch voľbách', () => {
+  const config = configFor('duplicate-alias-demo', []);
+  config.conversationTree = {
+    entryNodeId: 'sluzba',
+    nodes: [
+      {
+        id: 'sluzba', type: 'question', prompt: 'Akú službu si prajete?', confirmSelection: false,
+        choices: [
+          { id: 'hygiena', label: 'Dentálna hygiena', voiceAliases: ['hygiena'], dtmf: '1', nextNodeId: 'koniec' },
+          { id: 'bielenie', label: 'Bielenie zubov', voiceAliases: ['bielenie', 'hygiena'], dtmf: '2', nextNodeId: 'koniec' },
+        ],
+      },
+      { id: 'koniec', type: 'end', text: 'Ďakujeme.', outcome: 'complete' },
+    ],
+  };
+
+  const validation = validateVoiceBotConfig(config);
+  assert.equal(validation.valid, false);
+  assert.match(validation.errors.join(' '), /hygiena/);
 });
 
 test('stromový uzol voľných termínov nechá pacienta vybrať a potvrdiť konkrétny slot', async () => {

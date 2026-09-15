@@ -293,6 +293,7 @@ function validateConversationTree(tree: VoiceBotConversationTree, errors: string
       if (!node.prompt.trim()) errors.push(`Otázka „${node.id}“ nemá text.`);
       if (!node.choices.length) errors.push(`Otázka „${node.id}“ potrebuje aspoň jednu odpoveď.`);
       const digits = new Set<string>();
+      const phrases = new Map<string, string>();
       for (const choice of node.choices) {
         if (!choice.id || !ID_PATTERN.test(choice.id)) errors.push(`Odpoveď v uzle „${node.id}“ nemá platné ID.`);
         if (!choice.label.trim()) errors.push(`Odpoveď v uzle „${node.id}“ nemá názov.`);
@@ -300,6 +301,14 @@ function validateConversationTree(tree: VoiceBotConversationTree, errors: string
         if (digits.has(choice.dtmf)) errors.push(`Otázka „${node.id}“ používa klávesu ${choice.dtmf} viackrát.`);
         digits.add(choice.dtmf);
         if (!choice.voiceAliases?.length) warnings.push(`Odpoveď „${choice.label || choice.id}“ v uzle „${node.id}“ nemá hlasové synonymá.`);
+        for (const phrase of [choice.label, ...(choice.voiceAliases || [])]) {
+          const normalizedPhrase = phrase.toLocaleLowerCase('sk-SK').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+          if (!normalizedPhrase) continue;
+          const existingChoice = phrases.get(normalizedPhrase);
+          if (existingChoice && existingChoice !== choice.label) {
+            errors.push(`Otázka „${node.id}“ používa hlasový výraz „${phrase}“ pre voľby „${existingChoice}“ aj „${choice.label}“.`);
+          } else phrases.set(normalizedPhrase, choice.label);
+        }
         if (!nodeIds.has(choice.nextNodeId)) errors.push(`Odpoveď „${choice.label || choice.id}“ odkazuje na neznámy uzol „${choice.nextNodeId}“.`);
       }
     } else if (node.type === 'availability') {

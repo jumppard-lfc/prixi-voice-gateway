@@ -122,8 +122,9 @@
             "id": "dopoludnie",
             "label": "Dentálna hygiena študent 18 až 26 rokov",
             "voiceAliases": [
-              "bielenie",
-              "bielenie zubov"
+              "študentská hygiena",
+              "hygiena pre študenta",
+              "študent 18 až 26 rokov"
             ],
             "dtmf": "2",
             "nextNodeId": "volne-terminy"
@@ -189,7 +190,7 @@
         "type": "end",
         "text": "Ďakujem. Vaša ukážková rezervácia na {{vykon}}, {{termin}}, je potvrdená. Potvrdzujúcu SMS vám posielame hneď po hovore. Ďakujeme a dovidenia.",
         "outcome": "mock_booking",
-        "smsText": "Ďakujeme. Demo rezervácia na {{navsteva}}, {{termin}}, je potvrdená."
+        "smsText": "Ďakujeme. Demo rezervácia na {{vykon}}, {{termin}}, je potvrdená."
       },
       {
         "id": "prepojenie",
