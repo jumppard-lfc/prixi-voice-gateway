@@ -35,7 +35,7 @@
         "id": "ako-pomoct",
         "type": "question",
         "bridge": "",
-        "prompt": "Dobrý deň, vítam vás v eLHa dent. Som virtuálna asistentka PriXi v ukážkovom režime. Pomôžem vám vybrať vhodnú službu a termín. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Potrebujete dentálnu hygienu, bielenie zubov, zubný šperk, alebo máte otázku?",
+        "prompt": "Dobrý deň, vítam vás v Elha dent. Som virtuálna asistentka PriXi v ukážkovom režime. Pomôžem vám vybrať vhodnú službu a termín. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Potrebujete dentálnu hygienu, bielenie zubov, zubný šperk, alebo máte otázku?",
         "retryPrompt": "Zopakujem možnosti. Pre dentálnu hygienu stlačte 1. Pre bielenie zubov stlačte 2. Pre zubný šperk stlačte 3. Ak máte otázku, stlačte 4.",
         "storeAs": "vykon",
         "confirmSelection": true,
@@ -67,9 +67,13 @@
             "id": "zubny-sperk",
             "label": "zubný šperk",
             "voiceAliases": [
+              "zubný šperk",
               "chcem zubný šperk",
               "dentálny šperk",
-              "šperk na zub"
+              "šperk na zub",
+              "šperk",
+              "zubní šperk",
+              "nalepiť šperk"
             ],
             "dtmf": "3",
             "nextNodeId": "volne-terminy"

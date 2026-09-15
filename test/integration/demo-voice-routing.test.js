@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const twilio = require('twilio');
 const path = require('node:path');
 const os = require('node:os');
-const { mkdirSync, rmSync, writeFileSync } = require('node:fs');
+const { mkdirSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
 
 process.env.NODE_ENV = 'test';
 process.env.TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || 'test-auth-token';
@@ -186,6 +186,21 @@ test('vlastný rozhodovací strom vedie hlasovú voľbu cez potvrdenie do správ
 
   const completed = await signedPost('/voice/demo/tree-conversation-demo/tree/answer', { CallSid: callSid, SpeechResult: 'áno' });
   assert.match(completed.body, /Vaša požiadavka na vstupné vyšetrenie je potvrdená/);
+});
+
+test('eLHa dent rozpozná zubný šperk aj pri českom prepise od STT', async () => {
+  const config = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/elha-dent-odorin-demo.json'), 'utf8'));
+  await save(config);
+
+  const slovakCallSid = 'CA90000000000000000000000000000012';
+  await signedPost(`/voice/demo/${config.id}/start`, { From: '+421900000125', CallSid: slovakCallSid });
+  const slovakSelection = await signedPost(`/voice/demo/${config.id}/tree/answer`, { CallSid: slovakCallSid, SpeechResult: 'zubny sperk' });
+  assert.match(slovakSelection.body, /zubný šperk/);
+
+  const czechCallSid = 'CA90000000000000000000000000000013';
+  await signedPost(`/voice/demo/${config.id}/start`, { From: '+421900000125', CallSid: czechCallSid });
+  const czechSelection = await signedPost(`/voice/demo/${config.id}/tree/answer`, { CallSid: czechCallSid, SpeechResult: 'zubní šperk' });
+  assert.match(czechSelection.body, /zubný šperk/);
 });
 
 test('strom rozpozná prirodzenú zmenu slovosledu a po chybe neopakuje úvod', async () => {
