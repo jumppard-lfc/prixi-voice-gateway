@@ -1,0 +1,297 @@
+{
+  "version": 1,
+  "id": "elha-dent-odorin-demo",
+  "clinic": {
+    "displayName": "eLHa dent",
+    "specialty": "ambulancia dentálnej hygieny",
+    "phoneNumber": "+421949140226",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": {
+    "kind": "custom",
+    "mode": "demo_mock"
+  },
+  "services": [],
+  "practitioners": [],
+  "routing": {
+    "inboundTwilioNumbers": []
+  },
+  "conversation": {
+    "confirmService": true,
+    "confirmDatePreference": true,
+    "confirmSlot": true,
+    "confirmName": false,
+    "requireTerms": false,
+    "sendConfirmationSms": true,
+    "useDtmfFallback": true,
+    "playPromptTone": true
+  },
+  "copy": {},
+  "conversationTree": {
+    "entryNodeId": "ako-pomoct",
+    "nodes": [
+      {
+        "id": "ako-pomoct",
+        "type": "question",
+        "bridge": "",
+        "prompt": "Dobrý deň, vítam vás v eLHa dent. Som virtuálna asistentka PriXi v ukážkovom režime. Pomôžem vám vybrať vhodnú službu a termín. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Potrebujete dentálnu hygienu, bielenie zubov, zubný šperk, alebo máte otázku?",
+        "retryPrompt": "Zopakujem možnosti. Pre dentálnu hygienu stlačte 1. Pre bielenie zubov stlačte 2. Pre zubný šperk stlačte 3. Ak máte otázku, stlačte 4.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že máte záujem o {{selected}}?",
+        "choices": [
+          {
+            "id": "dentalna-hygiena",
+            "label": "dentálnu hygienu",
+            "voiceAliases": [
+              "chcem dentálnu hygienu",
+              "chcem hygienu",
+              "objednať hygienu"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "pre-koho"
+          },
+          {
+            "id": "bielenie-zubov",
+            "label": "bielenie zubov",
+            "voiceAliases": [
+              "chcem bielenie zubov",
+              "bielenie",
+              "vybieliť zuby"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "typ-bielenia"
+          },
+          {
+            "id": "zubny-sperk",
+            "label": "zubný šperk",
+            "voiceAliases": [
+              "chcem zubný šperk",
+              "dentálny šperk",
+              "šperk na zub"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "otazka",
+            "label": "mám otázku",
+            "voiceAliases": [
+              "mám otázku",
+              "chcem sa opýtať",
+              "potrebujem informáciu"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "prepojenie"
+          }
+        ]
+      },
+      {
+        "id": "pre-koho",
+        "type": "question",
+        "bridge": "Ďakujem. Aby som vám odporučila správny typ dentálnej hygieny, potrebujem vedieť, pre koho je termín určený.",
+        "prompt": "Je termín pre dospelého, dieťa do 12 rokov, dieťa od 12 do 18 rokov, alebo pre parodontologického pacienta?",
+        "retryPrompt": "Zopakujem možnosti. Pre dospelého stlačte 1. Pre dieťa do 12 rokov stlačte 2. Pre dieťa od 12 do 18 rokov stlačte 3. Pre parodontologického pacienta stlačte 4.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že ide o termín {{selected}}?",
+        "choices": [
+          {
+            "id": "dospely",
+            "label": "pre dospelého",
+            "voiceAliases": [
+              "dospelý",
+              "dospelého",
+              "pre mňa"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "dospely-historia"
+          },
+          {
+            "id": "dieta-do-12",
+            "label": "dentálnu hygienu pre dieťa do 12 rokov",
+            "voiceAliases": [
+              "dieťa do 12 rokov",
+              "do dvanásť rokov",
+              "mladšie dieťa"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "dieta-12-18",
+            "label": "dentálnu hygienu pre dieťa od 12 do 18 rokov",
+            "voiceAliases": [
+              "dieťa od 12 do 18 rokov",
+              "dvanásť až osemnásť rokov",
+              "tínedžer"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "parodontologicky-pacient",
+            "label": "pre parodontologického pacienta",
+            "voiceAliases": [
+              "parodontologický pacient",
+              "parodontitída",
+              "krvácanie ďasien"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "paro-historia"
+          }
+        ]
+      },
+      {
+        "id": "dospely-historia",
+        "type": "question",
+        "bridge": "Výborne. Ešte upresníme, či ide o prvú alebo opakovanú návštevu.",
+        "prompt": "Je to vaše prvé sedenie, opakovaná návšteva do jedného roka, alebo opakovaná návšteva po viac ako roku?",
+        "retryPrompt": "Zopakujem možnosti. Pre prvé sedenie stlačte 1. Pre opakovanú návštevu do roka stlačte 2. Pre návštevu po viac ako roku stlačte 3.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že chcete {{selected}}?",
+        "choices": [
+          {
+            "id": "dospely-prve-sedenie",
+            "label": "Dentálnu hygienu dospelý - 1. sedenie",
+            "voiceAliases": [
+              "prvé sedenie",
+              "prvá návšteva",
+              "som tu prvýkrát"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "dospely-recall-do-roka",
+            "label": "Dentálnu hygienu dospelý - Recall do 1 roka",
+            "voiceAliases": [
+              "recall do roka",
+              "bol som tu do roka",
+              "opakovaná návšteva do roka"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "dospely-recall-po-roku",
+            "label": "Dentálnu hygienu dospelý - Recall po viac ako roku",
+            "voiceAliases": [
+              "recall po viac ako roku",
+              "bol som tu pred viac ako rokom",
+              "viac ako rok"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "volne-terminy"
+          }
+        ]
+      },
+      {
+        "id": "paro-historia",
+        "type": "question",
+        "bridge": "Ďakujem. Pri parodontologickej hygiene ešte rozlíšime prvé sedenie a kontrolnú návštevu.",
+        "prompt": "Je to prvé sedenie, alebo recall do pol roka?",
+        "retryPrompt": "Zopakujem možnosti. Pre prvé sedenie stlačte 1. Pre recall do pol roka stlačte 2.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že chcete {{selected}}?",
+        "choices": [
+          {
+            "id": "paro-prve-sedenie",
+            "label": "Dentálnu hygienu parodontologický pacient - 1. sedenie",
+            "voiceAliases": [
+              "prvé parodontologické sedenie",
+              "prvé sedenie",
+              "som tu prvýkrát"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "paro-recall-do-polroka",
+            "label": "Dentálnu hygienu parodontologický pacient - Recall do pol roka",
+            "voiceAliases": [
+              "parodontologický recall",
+              "recall do pol roka",
+              "kontrola do pol roka"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          }
+        ]
+      },
+      {
+        "id": "typ-bielenia",
+        "type": "question",
+        "bridge": "Ďakujem. Pri kombinovanom bielení je podľa ambulancie potrebná predchádzajúca dentálna hygiena aj konzultácia. Ak ste ich zatiaľ neabsolvovali, odporúčame vám začať konzultáciou.",
+        "prompt": "Želáte si kombinované bielenie, domáce bielenie, alebo konzultáciu k bieleniu?",
+        "retryPrompt": "Zopakujem možnosti. Pre kombinované bielenie stlačte 1. Pre domáce bielenie stlačte 2. Pre konzultáciu stlačte 3.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že chcete {{selected}}?",
+        "choices": [
+          {
+            "id": "kombinovane-bielenie",
+            "label": "Kombinované bielenie zubov Philips Zoom Whitening",
+            "voiceAliases": [
+              "kombinované bielenie",
+              "kombinované",
+              "zoom bielenie"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "domace-bielenie",
+            "label": "Domáce bielenie zubov Philips Zoom Whitening",
+            "voiceAliases": [
+              "domáce bielenie",
+              "bielenie doma",
+              "domáce"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "konzultacia-bielenie",
+            "label": "Bielenie zubov - konzultácia",
+            "voiceAliases": [
+              "konzultácia k bieleniu",
+              "konzultácia bielenia",
+              "najprv konzultácia"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "volne-terminy"
+          }
+        ]
+      },
+      {
+        "id": "volne-terminy",
+        "type": "availability",
+        "bridge": "Ďakujem. Pozrime sa spolu na voľné termíny.",
+        "prompt": "Mám pre vás tieto ukážkové možnosti.",
+        "serviceVariable": "vykon",
+        "preferenceVariable": "",
+        "storeAs": "termin",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že vám vyhovuje {{selected}}?",
+        "nextNodeId": "rezervovane"
+      },
+      {
+        "id": "rezervovane",
+        "type": "end",
+        "text": "Ďakujem. Vaša ukážková rezervácia na {{vykon}}, {{termin}}, je potvrdená. Potvrdzujúcu SMS vám pošleme hneď po hovore. Ďakujeme a dovidenia.",
+        "outcome": "mock_booking",
+        "smsText": "eLHa dent: demo rezervácia na {{vykon}}, {{termin}}, je potvrdená."
+      },
+      {
+        "id": "prepojenie",
+        "type": "end",
+        "text": "Ďakujem za vašu otázku. V tejto ukážke je táto vetva pripravená na prepojenie s kolegyňou z ambulancie. Ďakujeme a dovidenia.",
+        "outcome": "handoff"
+      }
+    ]
+  }
+}
