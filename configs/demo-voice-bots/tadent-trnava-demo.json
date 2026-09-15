@@ -1,0 +1,255 @@
+{
+  "version": 1,
+  "id": "tadent-trnava-demo",
+  "clinic": {
+    "displayName": "TADENT",
+    "specialty": "zubná klinika",
+    "phoneNumber": "+421903279462",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": {
+    "kind": "custom",
+    "mode": "demo_mock"
+  },
+  "services": [],
+  "practitioners": [],
+  "routing": {
+    "inboundTwilioNumbers": []
+  },
+  "conversation": {
+    "confirmService": true,
+    "confirmDatePreference": true,
+    "confirmSlot": true,
+    "confirmName": false,
+    "requireTerms": true,
+    "sendConfirmationSms": true,
+    "useDtmfFallback": true,
+    "playPromptTone": true
+  },
+  "copy": {},
+  "conversationTree": {
+    "entryNodeId": "ako-pomoct",
+    "nodes": [
+      {
+        "id": "ako-pomoct",
+        "type": "question",
+        "bridge": "",
+        "prompt": "Dobrý deň, vítam vás v TADENTe. Som virtuálna asistentka PriXi v ukážkovom režime. Pomôžem vám vybrať vhodný výkon dentálnej hygieny a termín. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Chcete sa objednať, alebo máte otázku?",
+        "retryPrompt": "Zopakujem možnosti. Pre objednanie sa na návštevu stlačte 1. Pre otázku stlačte 2.",
+        "storeAs": "dovod",
+        "confirmSelection": true,
+        "choices": [
+          {
+            "id": "objednanie",
+            "label": "objednať sa",
+            "voiceAliases": [
+              "chcem sa objednať",
+              "objednanie",
+              "chcem termín",
+              "rezervácia"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "pacient"
+          },
+          {
+            "id": "otazka",
+            "label": "mám otázku",
+            "voiceAliases": [
+              "otázka",
+              "informácia",
+              "chcem sa opýtať"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "prepojenie"
+          }
+        ],
+        "confirmationPrompt": "Rozumela som správne, že {{selected}}?"
+      },
+      {
+        "id": "pacient",
+        "type": "question",
+        "bridge": "Ďakujem. Aby som vám ponúkla správny výkon, potrebujem vedieť, pre koho návštevu rezervujeme.",
+        "prompt": "Ide o termín pre dospelého alebo pre dieťa?",
+        "storeAs": "pacient",
+        "confirmSelection": true,
+        "choices": [
+          {
+            "id": "vstupne",
+            "label": "pre dospelého",
+            "voiceAliases": [
+              "dospelý",
+              "dospelého",
+              "pre mňa"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "sluzby-dospely"
+          },
+          {
+            "id": "kontrola",
+            "label": "pre dieťa",
+            "voiceAliases": [
+              "dieťa",
+              "detský",
+              "detskú hygienu"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "sluzby-dieta"
+          }
+        ],
+        "confirmationPrompt": "Rozumela som správne, že {{selected}}?"
+      },
+      {
+        "id": "sluzby-dospely",
+        "type": "question",
+        "bridge": "Výborne. Vyberme teraz konkrétny výkon pre dospelého.",
+        "prompt": "Môžete si vybrať dentálnu hygienu komplet, študentskú hygienu, bielenie zubov alebo iný úkon.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "choices": [
+          {
+            "id": "najblizsi",
+            "label": "Dentálna hygiena komplet",
+            "voiceAliases": [
+              "hygiena komplet",
+              "dentálna hygiena",
+              "hygiena"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "dopoludnie",
+            "label": "Dentálna hygiena študent 18 až 26 rokov",
+            "voiceAliases": [
+              "bielenie",
+              "bielenie zubov"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "popoludnie",
+            "label": "Ambulantné bielenie zubov",
+            "voiceAliases": [
+              "bielenie",
+              "bielenie zubov"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "moznost-4",
+            "label": "Nalepenie dentálneho šperku",
+            "voiceAliases": [
+              "zubný šperk",
+              "dentálny šperk",
+              "šperk"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "moznost-5",
+            "label": "Náhryzová dlaha",
+            "voiceAliases": [
+              "dlaha",
+              "náhryzová dlaha"
+            ],
+            "dtmf": "5",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "moznost-6",
+            "label": "Dlahovanie zuba",
+            "voiceAliases": [
+              "dlahovanie zuba",
+              "dlahovanie"
+            ],
+            "dtmf": "6",
+            "nextNodeId": "volne-terminy"
+          }
+        ],
+        "confirmationPrompt": "Rozumela som správne, že {{selected}}?"
+      },
+      {
+        "id": "volne-terminy",
+        "type": "availability",
+        "bridge": "Ďakujem. Pozrime sa spolu na voľné termíny.",
+        "prompt": "Mám pre vás tieto možnosti.",
+        "serviceVariable": "vykon",
+        "preferenceVariable": "",
+        "storeAs": "termin",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že vám vyhovuje {{selected}}?",
+        "nextNodeId": "rezervovane"
+      },
+      {
+        "id": "rezervovane",
+        "type": "end",
+        "text": "Ďakujem. Vaša ukážková rezervácia na {{vykon}}, {{termin}}, je potvrdená. Potvrdzujúcu SMS vám posielame hneď po hovore. Ďakujeme a dovidenia.",
+        "outcome": "mock_booking",
+        "smsText": "Ďakujeme. Demo rezervácia na {{navsteva}}, {{termin}}, je potvrdená."
+      },
+      {
+        "id": "prepojenie",
+        "type": "end",
+        "text": "Ďakujem za vašu otázku. V tomto deme je táto vetva pripravená pre kolegyňu z ambulancie. Ďakujeme a dovidenia.",
+        "outcome": "handoff"
+      },
+      {
+        "id": "sluzby-dieta",
+        "type": "question",
+        "bridge": "Ďakujem. Vyberme vhodný výkon podľa veku dieťaťa.",
+        "prompt": "Vyberte si dentálnu hygienu od 12 do 18 rokov, pre dieťa do 12 rokov, pre dieťa do 6 rokov, alebo pečatenie fisúr.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "choices": [
+          {
+            "id": "moznost-1",
+            "label": "Dentálna hygiena od 12 do 18 rokov",
+            "voiceAliases": [
+              "12 až 18 rokov",
+              "tínedžer",
+              "staršie dieťa"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "moznost-2",
+            "label": "Dentálna hygiena dieťa do 12 rokov",
+            "voiceAliases": [
+              "dieťa do 12 rokov",
+              "do dvanásť rokov"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "moznost-3",
+            "label": "Dentálna hygiena dieťa do 6 rokov",
+            "voiceAliases": [
+              "dieťa do 6 rokov",
+              "do šesť rokov",
+              "malé dieťa"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "moznost-4",
+            "label": "Pečatenie fisúr",
+            "voiceAliases": [
+              "pečatenie fisúr",
+              "pečatenie"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "volne-terminy"
+          }
+        ],
+        "confirmationPrompt": "Rozumela som správne, že {{selected}}?"
+      }
+    ]
+  }
+}
