@@ -33,6 +33,16 @@ const KLOSTERMANN_EN_GREETING = 'Hello, you have reached Klostermann Orthodontic
 const KLOSTERMANN_SMS = 'Dobry den, pre objednanie do ambulancie kliknite na klostermann.sk/rezervacia\n\nHello, to make an appointment for the clinic, click on klostermann.sk/rezervacia';
 const KLOSTERMANN_GREETING_MEDIA_PATH = '/media/klostermann-greeting-v5.wav';
 const KLOSTERMANN_GREETING_FILE = resolve(__dirname, '../assets/audio/klostermann-greeting-v5.wav');
+const DOBROVODSKA_GREETING_FILE = resolve(__dirname, '../assets/audio/dobrovodska-1-greeting.wav');
+const DOBROVODSKA_NAME_FILE = resolve(__dirname, '../assets/audio/dobrovodska-2-name.wav');
+const DOBROVODSKA_BIRTHYEAR_FILE = resolve(__dirname, '../assets/audio/dobrovodska-3-birthyear.wav');
+const DOBROVODSKA_COMPLETION_FILE = resolve(__dirname, '../assets/audio/dobrovodska-4-completion.wav');
+
+function getPublicBaseUrl(request: FastifyRequest): string {
+  const forwardedProto = String(request.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
+  const forwardedHost = String(request.headers['x-forwarded-host'] || request.headers.host || '').split(',')[0].trim();
+  return (process.env.PUBLIC_BASE_URL || `${forwardedProto}://${forwardedHost}`).replace(/\/$/, '');
+}
 const DEFAULT_GREETING = 'Dobrý deň, dovolali ste sa do ambulancie. Pre zanechanie odkazu popíšte po zaznení tónu najprv váš problém a po skončení stlačte hociktoré tlačidlo.';
 const PEDIATRIC_GREETING = 'Dobrý deň, dovolali ste sa do pediatrickej ambulancie doktorky Čelkovej. Ak ide o náhly život ohrozujúci stav, volajte tiesňovú linku 155 alebo 112. V opačnom prípade nám prosím po zaznení tónu stručne povedzte, s čím sa na ambulanciu obraciate. Môže ísť napríklad o zdravotné ťažkosti dieťaťa, predpis liekov, výsledky vyšetrenia alebo objednanie. Po skončení stlačte ľubovoľné tlačidlo.';
 const ORTHOPEDIC_GREETING = 'Dobrý deň, dovolali ste sa do ortopedickej ambulancie pani doktorky Miroslavy Beňovej Baloghovej. Po zaznení tónu nám, prosím, povedzte, s čím vám môžeme pomôcť. Po skončení stlačte ľubovoľné tlačidlo.';
@@ -305,15 +315,20 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         return reply.type('text/xml').send(twiml.toString());
       }
 
+      const isDobrovodskaNumber = normalizeSlovakPhoneAddress(forwardedFrom) === DOBROVODSKA_ROUTING_PHONE_NUMBER;
       const pediatricMode = isCelkovaNumber || (!isBenovaBaloghovaNumber && !isNovotnyNumber && config.pediatricMode === true);
       const dentalMode = isNovotnyNumber;
       const greeting = config.greetingMessage
         || (isBenovaBaloghovaNumber ? ORTHOPEDIC_GREETING : dentalMode ? NOVOTNY_DENTAL_GREETING : pediatricMode ? PEDIATRIC_GREETING : DEFAULT_GREETING);
 
-      twiml.say(
-        { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
-        greeting
-      );
+      if (isDobrovodskaNumber && existsSync(DOBROVODSKA_GREETING_FILE)) {
+        twiml.play(`${getPublicBaseUrl(request)}/media/dobrovodska-1-greeting.wav`);
+      } else {
+        twiml.say(
+          { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
+          greeting
+        );
+      }
       updateVoicemailDraft(body.CallSid, {
         fromNumber,
         forwardedFrom,
@@ -366,16 +381,21 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
     if (draft?.callCompleted) dispatchDraft(draft);
 
-    if (pediatricMode) {
+    const isDobrovodskaNumber = normalizeSlovakPhoneAddress(forwardedFrom) === DOBROVODSKA_ROUTING_PHONE_NUMBER;
+    if (pediatricMode && !isDobrovodskaNumber) {
       twiml.say(
         { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
         getCelkovaTimeMessage()
       );
     }
-    const namePrompt = pediatricMode
-      ? 'Ďakujem. Teraz, prosím, uveďte meno a priezvisko dieťaťa, ktorého sa požiadavka týka. Po skončení stlačte ľubovoľné tlačidlo.'
-      : 'Ďakujem. Teraz prosím uveďte vaše meno a priezvisko, a po skončení stlačte hociktoré tlačidlo.';
-    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, namePrompt);
+    if (isDobrovodskaNumber && existsSync(DOBROVODSKA_NAME_FILE)) {
+      twiml.play(`${getPublicBaseUrl(request)}/media/dobrovodska-2-name.wav`);
+    } else {
+      const namePrompt = pediatricMode
+        ? 'Ďakujem. Teraz, prosím, uveďte meno a priezvisko dieťaťa, ktorého sa požiadavka týka. Po skončení stlačte ľubovoľné tlačidlo.'
+        : 'Ďakujem. Teraz prosím uveďte vaše meno a priezvisko, a po skončení stlačte hociktoré tlačidlo.';
+      twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, namePrompt);
+    }
     twiml.record({
       action: `/voice/record-name?problemUrl=${encodeURIComponent(problemUrl || '')}&problemDuration=${problemDuration}&forwardedFrom=${encodeURIComponent(forwardedFrom)}&pediatricMode=${pediatricMode}&dentalMode=${dentalMode}`,
       playBeep: true,
@@ -420,10 +440,15 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
     if (draft?.callCompleted) dispatchDraft(draft);
 
-    const birthYearPrompt = pediatricMode
-      ? 'Na záver, prosím, uveďte rok narodenia dieťaťa a stlačte ľubovoľné tlačidlo.'
-      : 'Rozumiem. Na záver prosím uveďte váš rok narodenia a stlačte hociktoré tlačidlo.';
-    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, birthYearPrompt);
+    const isDobrovodskaNumber = normalizeSlovakPhoneAddress(forwardedFrom) === DOBROVODSKA_ROUTING_PHONE_NUMBER;
+    if (isDobrovodskaNumber && existsSync(DOBROVODSKA_BIRTHYEAR_FILE)) {
+      twiml.play(`${getPublicBaseUrl(request)}/media/dobrovodska-3-birthyear.wav`);
+    } else {
+      const birthYearPrompt = pediatricMode
+        ? 'Na záver, prosím, uveďte rok narodenia dieťaťa a stlačte ľubovoľné tlačidlo.'
+        : 'Rozumiem. Na záver prosím uveďte váš rok narodenia a stlačte hociktoré tlačidlo.';
+      twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, birthYearPrompt);
+    }
     twiml.record({
       action: `/voice/recording-complete?problemUrl=${encodeURIComponent(problemUrl)}&problemDuration=${problemDuration}&nameUrl=${encodeURIComponent(nameUrl || '')}&nameDuration=${nameDuration}&forwardedFrom=${encodeURIComponent(forwardedFrom)}&pediatricMode=${pediatricMode}&dentalMode=${dentalMode}`,
       playBeep: true,
@@ -573,12 +598,17 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     fastify.log.info({ from: fromNumber, problemUrl }, 'Voicemail recording complete');
 
     const twiml = new VoiceResponse();
-    const completionMessage = pediatricMode
-      ? 'Ďakujeme, vašu požiadavku sme zaznamenali. Ambulancia sa vám po jej spracovaní ozve na telefónne číslo, z ktorého voláte. Dovidenia.'
-      : dentalMode
-        ? 'Ďakujeme, vašu požiadavku sme zaznamenali. Zubná ambulancia vás bude kontaktovať do 24 hodín na telefónnom čísle, z ktorého voláte. Dovidenia.'
-        : 'Rozumiem, vaša požiadavka je zaznamenaná, ambulancia sa vám po jej prijatí ozve. Ďakujeme a dovidenia.';
-    twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, completionMessage);
+    const isDobrovodskaNumber = normalizeSlovakPhoneAddress(forwardedFrom) === DOBROVODSKA_ROUTING_PHONE_NUMBER;
+    if (isDobrovodskaNumber && existsSync(DOBROVODSKA_COMPLETION_FILE)) {
+      twiml.play(`${getPublicBaseUrl(request)}/media/dobrovodska-4-completion.wav`);
+    } else {
+      const completionMessage = pediatricMode
+        ? 'Ďakujeme, vašu požiadavku sme zaznamenali. Ambulancia sa vám po jej spracovaní ozve na telefónne číslo, z ktorého voláte. Dovidenia.'
+        : dentalMode
+          ? 'Ďakujeme, vašu požiadavku sme zaznamenali. Zubná ambulancia vás bude kontaktovať do 24 hodín na telefónnom čísle, z ktorého voláte. Dovidenia.'
+          : 'Rozumiem, vaša požiadavka je zaznamenaná, ambulancia sa vám po jej prijatí ozve. Ďakujeme a dovidenia.';
+      twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, completionMessage);
+    }
     twiml.hangup();
 
     // Return XML to Twilio immediately to prevent timeouts

@@ -9,6 +9,10 @@ import { voiceBotBuilderRoutes } from './routes/voice-bot-builder.controller';
 import { demoVoiceBotRoutes } from './routes/demo-voice-bot.controller';
 
 const KLOSTERMANN_GREETING_PATH = resolve(__dirname, 'assets/audio/klostermann-greeting-v5.wav');
+const DOBROVODSKA_GREETING_PATH = resolve(__dirname, 'assets/audio/dobrovodska-1-greeting.wav');
+const DOBROVODSKA_NAME_PATH = resolve(__dirname, 'assets/audio/dobrovodska-2-name.wav');
+const DOBROVODSKA_BIRTHYEAR_PATH = resolve(__dirname, 'assets/audio/dobrovodska-3-birthyear.wav');
+const DOBROVODSKA_COMPLETION_PATH = resolve(__dirname, 'assets/audio/dobrovodska-4-completion.wav');
 
 function createPromptToneWav(): Buffer {
   const sampleRate = 8_000;
@@ -79,6 +83,42 @@ app.get('/media/klostermann-greeting-v5.wav', async (_request, reply) => {
     .header('Content-Length', audioStats.size)
     .header('Cache-Control', 'public, max-age=31536000, immutable')
     .send(createReadStream(KLOSTERMANN_GREETING_PATH));
+});
+
+app.get('/media/dobrovodska-1-greeting.wav', async (_request, reply) => {
+  const audioStats = statSync(DOBROVODSKA_GREETING_PATH);
+  return reply
+    .type('audio/wav')
+    .header('Content-Length', audioStats.size)
+    .header('Cache-Control', 'public, max-age=31536000, immutable')
+    .send(createReadStream(DOBROVODSKA_GREETING_PATH));
+});
+
+app.get('/media/dobrovodska-2-name.wav', async (_request, reply) => {
+  const audioStats = statSync(DOBROVODSKA_NAME_PATH);
+  return reply
+    .type('audio/wav')
+    .header('Content-Length', audioStats.size)
+    .header('Cache-Control', 'public, max-age=31536000, immutable')
+    .send(createReadStream(DOBROVODSKA_NAME_PATH));
+});
+
+app.get('/media/dobrovodska-3-birthyear.wav', async (_request, reply) => {
+  const audioStats = statSync(DOBROVODSKA_BIRTHYEAR_PATH);
+  return reply
+    .type('audio/wav')
+    .header('Content-Length', audioStats.size)
+    .header('Cache-Control', 'public, max-age=31536000, immutable')
+    .send(createReadStream(DOBROVODSKA_BIRTHYEAR_PATH));
+});
+
+app.get('/media/dobrovodska-4-completion.wav', async (_request, reply) => {
+  const audioStats = statSync(DOBROVODSKA_COMPLETION_PATH);
+  return reply
+    .type('audio/wav')
+    .header('Content-Length', audioStats.size)
+    .header('Cache-Control', 'public, max-age=31536000, immutable')
+    .send(createReadStream(DOBROVODSKA_COMPLETION_PATH));
 });
 
 app.get('/media/booking-prompt-tone.wav', async (_request, reply) => reply

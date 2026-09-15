@@ -569,7 +569,7 @@ test('Call status callback odosle problem pri zlozeni pocas hlasovej otazky iba 
     });
 
     assert.equal(problemResponse.statusCode, 200);
-    assert.match(problemResponse.body, /vaše meno a priezvisko/);
+    assert.match(problemResponse.body, /dobrovodska-2-name\.wav|vaše meno a priezvisko/);
     assert.equal(sentEvents.length, 0);
 
     const statusParams = {
@@ -923,4 +923,28 @@ test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
   assert.equal(benovaBaloghovaConfig.pediatricMode, false);
   assert.equal(novotnyConfig.clinicId, '112');
   assert.equal(novotnyConfig.pediatricMode, false);
+});
+
+test('MUDr. Dobrovodska prehravanie nahratych audio suborov v TwiML a media endpointoch', async () => {
+  const originalGetConfig = prixiService.getConfig;
+  prixiService.getConfig = async () => ({
+    clinicId: '95',
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+  });
+
+  try {
+    const greetingMedia = await app.inject({ method: 'GET', url: '/media/dobrovodska-1-greeting.wav' });
+    assert.equal(greetingMedia.statusCode, 200);
+    assert.equal(greetingMedia.headers['content-type'], 'audio/wav');
+
+    const incomingRes = await signedVoicePost('/voice/incoming', {
+      From: '+421900000088',
+      To: '+421800232793',
+    });
+    assert.equal(incomingRes.statusCode, 200);
+    assert.match(incomingRes.body, /<Play>.*\/media\/dobrovodska-1-greeting\.wav<\/Play>/);
+  } finally {
+    prixiService.getConfig = originalGetConfig;
+  }
 });
