@@ -43,6 +43,16 @@ function getPublicBaseUrl(request: FastifyRequest): string {
   const forwardedHost = String(request.headers['x-forwarded-host'] || request.headers.host || '').split(',')[0].trim();
   return (process.env.PUBLIC_BASE_URL || `${forwardedProto}://${forwardedHost}`).replace(/\/$/, '');
 }
+
+function isDobrovodskaRoute(phone?: string): boolean {
+  if (!phone) return false;
+  const norm = normalizeSlovakPhoneAddress(phone);
+  return norm === DOBROVODSKA_ROUTING_PHONE_NUMBER
+    || norm === '+421322289055'
+    || norm === '+421800232793'
+    || phone.includes('322289055')
+    || phone.includes('800232793');
+}
 const DEFAULT_GREETING = 'Dobrý deň, dovolali ste sa do ambulancie. Pre zanechanie odkazu popíšte po zaznení tónu najprv váš problém a po skončení stlačte hociktoré tlačidlo.';
 const PEDIATRIC_GREETING = 'Dobrý deň, dovolali ste sa do pediatrickej ambulancie doktorky Čelkovej. Ak ide o náhly život ohrozujúci stav, volajte tiesňovú linku 155 alebo 112. V opačnom prípade nám prosím po zaznení tónu stručne povedzte, s čím sa na ambulanciu obraciate. Môže ísť napríklad o zdravotné ťažkosti dieťaťa, predpis liekov, výsledky vyšetrenia alebo objednanie. Po skončení stlačte ľubovoľné tlačidlo.';
 const ORTHOPEDIC_GREETING = 'Dobrý deň, dovolali ste sa do ortopedickej ambulancie pani doktorky Miroslavy Beňovej Baloghovej. Po zaznení tónu nám, prosím, povedzte, s čím vám môžeme pomôcť. Po skončení stlačte ľubovoľné tlačidlo.';
@@ -273,9 +283,9 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     ) {
       forwardedFrom = PEKARCIK_ROUTING_PHONE_NUMBER;
       fastify.log.info({ from: fromNumber, to: body.To, carrierForwardedFrom }, 'Applied dedicated VipTel routing for Martin Pekarcik');
-    } else if (!forwardedFrom) {
-      if (body.To === '+421800232793' || body.To === '0322289055' || body.To === '+421322289055' || body.To === 'sip:0322289055@sip.twilio.com') {
-        forwardedFrom = '+421911500609'; // Hardcoded fallback for MUDr. Dobrovodska
+    } else if (isDobrovodskaRoute(body.To) || isDobrovodskaRoute(carrierForwardedFrom) || isDobrovodskaRoute(forwardedFrom) || !forwardedFrom) {
+      if (isDobrovodskaRoute(body.To) || isDobrovodskaRoute(carrierForwardedFrom) || isDobrovodskaRoute(forwardedFrom)) {
+        forwardedFrom = DOBROVODSKA_ROUTING_PHONE_NUMBER; // Hardcoded fallback for MUDr. Dobrovodska
         fastify.log.info({ from: fromNumber, to: body.To }, 'Applied hardcoded ForwardedFrom fallback for Dobrovodska');
       } else {
         fastify.log.error({ from: fromNumber, to: body.To }, '[CRITICAL ALERT] Missing ForwardedFrom header! The SIP Diversion header was dropped by the carrier. Routing cannot reliably identify the clinic.');
@@ -315,7 +325,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         return reply.type('text/xml').send(twiml.toString());
       }
 
-      const isDobrovodskaNumber = normalizeSlovakPhoneAddress(forwardedFrom) === DOBROVODSKA_ROUTING_PHONE_NUMBER;
+      const isDobrovodskaNumber = isDobrovodskaRoute(forwardedFrom) || isDobrovodskaRoute(body.To) || isDobrovodskaRoute(carrierForwardedFrom);
       const pediatricMode = isCelkovaNumber || (!isBenovaBaloghovaNumber && !isNovotnyNumber && config.pediatricMode === true);
       const dentalMode = isNovotnyNumber;
       const greeting = config.greetingMessage
@@ -381,7 +391,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
     if (draft?.callCompleted) dispatchDraft(draft);
 
-    const isDobrovodskaNumber = normalizeSlovakPhoneAddress(forwardedFrom) === DOBROVODSKA_ROUTING_PHONE_NUMBER;
+    const isDobrovodskaNumber = isDobrovodskaRoute(forwardedFrom);
     if (pediatricMode && !isDobrovodskaNumber) {
       twiml.say(
         { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
@@ -440,7 +450,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
     if (draft?.callCompleted) dispatchDraft(draft);
 
-    const isDobrovodskaNumber = normalizeSlovakPhoneAddress(forwardedFrom) === DOBROVODSKA_ROUTING_PHONE_NUMBER;
+    const isDobrovodskaNumber = isDobrovodskaRoute(forwardedFrom);
     if (isDobrovodskaNumber && existsSync(DOBROVODSKA_BIRTHYEAR_FILE)) {
       twiml.play(`${getPublicBaseUrl(request)}/media/dobrovodska-3-birthyear.wav`);
     } else {
@@ -598,7 +608,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     fastify.log.info({ from: fromNumber, problemUrl }, 'Voicemail recording complete');
 
     const twiml = new VoiceResponse();
-    const isDobrovodskaNumber = normalizeSlovakPhoneAddress(forwardedFrom) === DOBROVODSKA_ROUTING_PHONE_NUMBER;
+    const isDobrovodskaNumber = isDobrovodskaRoute(forwardedFrom);
     if (isDobrovodskaNumber && existsSync(DOBROVODSKA_COMPLETION_FILE)) {
       twiml.play(`${getPublicBaseUrl(request)}/media/dobrovodska-4-completion.wav`);
     } else {
