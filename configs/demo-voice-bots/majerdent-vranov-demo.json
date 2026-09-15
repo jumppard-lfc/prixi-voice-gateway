@@ -1,0 +1,356 @@
+{
+  "version": 1,
+  "id": "majerdent-vranov-demo",
+  "clinic": {
+    "displayName": "MajerDent",
+    "specialty": "zubná ambulancia",
+    "phoneNumber": "+421918661694",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": {
+    "kind": "custom",
+    "mode": "demo_mock"
+  },
+  "services": [],
+  "practitioners": [],
+  "routing": {
+    "inboundTwilioNumbers": []
+  },
+  "conversation": {
+    "confirmService": true,
+    "confirmDatePreference": true,
+    "confirmSlot": true,
+    "confirmName": false,
+    "requireTerms": false,
+    "sendConfirmationSms": true,
+    "useDtmfFallback": true,
+    "playPromptTone": true
+  },
+  "copy": {},
+  "conversationTree": {
+    "entryNodeId": "ako-pomoct",
+    "nodes": [
+      {
+        "id": "ako-pomoct",
+        "type": "question",
+        "bridge": "",
+        "prompt": "Dobrý deň, vítam vás v zubnej ambulancii MajerDent. Som virtuálna asistentka PriXi v ukážkovom režime. Pomôžem vám vybrať službu a vhodný termín. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Potrebujete akútne ošetrenie, pravidelnú starostlivosť, konkrétny zákrok, prvú návštevu, alebo máte otázku?",
+        "retryPrompt": "Zopakujem možnosti. Pre akútne ošetrenie stlačte 1. Pre preventívnu a pravidelnú starostlivosť stlačte 2. Pre konkrétny zákrok stlačte 3. Pre prvú návštevu alebo administratívnu požiadavku stlačte 4. Ak máte otázku, stlačte 5.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že potrebujete {{selected}}?",
+        "choices": [
+          {
+            "id": "akutne-osetrenie",
+            "label": "akútne ošetrenie",
+            "voiceAliases": [
+              "bolesť zuba",
+              "opuch",
+              "akútne",
+              "zubná pohotovosť"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "akutne-pre-koho"
+          },
+          {
+            "id": "pravidelna-starostlivost",
+            "label": "preventívnu a pravidelnú starostlivosť",
+            "voiceAliases": [
+              "preventívna prehliadka",
+              "dentálna hygiena",
+              "kontrola",
+              "prevencia"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "pravidelna-starostlivost"
+          },
+          {
+            "id": "konkretny-zakrok",
+            "label": "konkrétny zákrok",
+            "voiceAliases": [
+              "plomba",
+              "endodoncia",
+              "extrakcia",
+              "bielenie zubov",
+              "konzultácia"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "konkretny-zakrok"
+          },
+          {
+            "id": "prva-navsteva-admin",
+            "label": "prvú návštevu alebo administratívnu požiadavku",
+            "voiceAliases": [
+              "nový pacient",
+              "prvá návšteva",
+              "vyradenie z evidencie"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "prva-navsteva-admin"
+          },
+          {
+            "id": "otazka",
+            "label": "mám otázku",
+            "voiceAliases": [
+              "mám otázku",
+              "chcem sa opýtať",
+              "potrebujem informáciu"
+            ],
+            "dtmf": "5",
+            "nextNodeId": "prepojenie"
+          }
+        ]
+      },
+      {
+        "id": "akutne-pre-koho",
+        "type": "question",
+        "bridge": "Rozumiem. Pri bolesti alebo opuchu sa ambulancia snaží zabezpečiť termín po telefonáte do 24 hodín. Ešte potrebujem vedieť, pre koho je ošetrenie určené.",
+        "prompt": "Ide o akútne ošetrenie pre dospelého alebo pre dieťa?",
+        "retryPrompt": "Zopakujem možnosti. Pre dospelého stlačte 1. Pre dieťa stlačte 2.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že ide o {{selected}}?",
+        "choices": [
+          {
+            "id": "akutne-dospely",
+            "label": "Akútne ošetrenie",
+            "voiceAliases": [
+              "pre dospelého",
+              "dospelý",
+              "pre mňa"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "akutne-dieta",
+            "label": "Akútne ošetrenie - dieťa",
+            "voiceAliases": [
+              "pre dieťa",
+              "dieťa",
+              "detské ošetrenie"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          }
+        ]
+      },
+      {
+        "id": "pravidelna-starostlivost",
+        "type": "question",
+        "bridge": "Ďakujem. Poďme spolu vybrať vhodnú pravidelnú starostlivosť.",
+        "prompt": "Želáte si dentálnu hygienu, preventívnu prehliadku pre dospelého, preventívnu prehliadku pre dieťa, kontrolu, alebo inštruktáž čistenia zubov?",
+        "retryPrompt": "Zopakujem možnosti. Pre dentálnu hygienu stlačte 1. Pre preventívnu prehliadku dospelého stlačte 2. Pre preventívnu prehliadku dieťaťa stlačte 3. Pre kontrolu stlačte 4. Pre inštruktáž čistenia zubov stlačte 5.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že chcete {{selected}}?",
+        "choices": [
+          {
+            "id": "dentalna-hygiena",
+            "label": "Dentálnu hygienu",
+            "voiceAliases": [
+              "hygiena",
+              "čistenie zubov",
+              "dentálna hygiena"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "preventivna-dospely",
+            "label": "Preventívnu prehliadku",
+            "voiceAliases": [
+              "preventívka pre dospelého",
+              "preventívna prehliadka dospelý",
+              "preventívka"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "preventivna-dieta",
+            "label": "Preventívnu prehliadku - dieťa",
+            "voiceAliases": [
+              "preventívka pre dieťa",
+              "preventívna prehliadka dieťa",
+              "detská preventívka"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "kontrola",
+            "label": "Kontrolu",
+            "voiceAliases": [
+              "kontrola",
+              "kontrolné vyšetrenie"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "instruktaz-cistenia",
+            "label": "Inštruktáž a individuálny nácvik čistenia zubov",
+            "voiceAliases": [
+              "inštruktáž čistenia",
+              "nácvik čistenia",
+              "ako si čistiť zuby"
+            ],
+            "dtmf": "5",
+            "nextNodeId": "volne-terminy"
+          }
+        ]
+      },
+      {
+        "id": "konkretny-zakrok",
+        "type": "question",
+        "bridge": "Ďakujem. Vyberme teraz konkrétny zákrok, aby som vám našla správny termín.",
+        "prompt": "Potrebujete plombu, endodonciu, extrakciu zuba, bielenie zubov alebo konzultáciu?",
+        "retryPrompt": "Zopakujem možnosti. Pre plombu stlačte 1. Pre endodonciu stlačte 2. Pre extrakciu stlačte 3. Pre bielenie zubov stlačte 4. Pre konzultáciu stlačte 5.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že chcete {{selected}}?",
+        "choices": [
+          {
+            "id": "plomba",
+            "label": "Plombu",
+            "voiceAliases": [
+              "plomba",
+              "výplň",
+              "opraviť kaz"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "endodoncia",
+            "label": "Endodonciu",
+            "voiceAliases": [
+              "endodoncia",
+              "koreňové kanáliky",
+              "liečba kanálikov"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "extrakcia",
+            "label": "Extrakciu zuba",
+            "voiceAliases": [
+              "extrakcia",
+              "vytrhnutie zuba",
+              "trhanie zuba"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "bielenie-zubov",
+            "label": "Bielenie zubov",
+            "voiceAliases": [
+              "bielenie",
+              "vybieliť zuby",
+              "bielenie zubov"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "konzultacia",
+            "label": "Konzultáciu",
+            "voiceAliases": [
+              "konzultácia",
+              "poradenstvo",
+              "chcem sa poradiť"
+            ],
+            "dtmf": "5",
+            "nextNodeId": "volne-terminy"
+          }
+        ]
+      },
+      {
+        "id": "prva-navsteva-admin",
+        "type": "question",
+        "bridge": "Ďakujem. Vyberme ešte presný typ vašej požiadavky.",
+        "prompt": "Ide o vstupné vyšetrenie nového dospelého pacienta, nového detského pacienta, alebo vyradenie z evidencie?",
+        "retryPrompt": "Zopakujem možnosti. Pre vstupné vyšetrenie dospelého stlačte 1. Pre vstupné vyšetrenie dieťaťa stlačte 2. Pre vyradenie z evidencie stlačte 3.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že chcete {{selected}}?",
+        "choices": [
+          {
+            "id": "vstupne-dospely",
+            "label": "Vstupné vyšetrenie - nový pacient",
+            "voiceAliases": [
+              "nový dospelý pacient",
+              "vstupné vyšetrenie dospelý",
+              "prvá návšteva dospelého"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "pripravit-udaje-vstupne"
+          },
+          {
+            "id": "vstupne-dieta",
+            "label": "Vstupné vyšetrenie - nový pacient - dieťa",
+            "voiceAliases": [
+              "nový detský pacient",
+              "vstupné vyšetrenie dieťa",
+              "prvá návšteva dieťaťa"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "pripravit-udaje-vstupne"
+          },
+          {
+            "id": "vyradenie-z-evidencie",
+            "label": "Vyradenie z evidencie",
+            "voiceAliases": [
+              "vyradenie z evidencie",
+              "chcem sa vyradiť",
+              "zrušiť evidenciu"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "vyradenie-z-evidencie"
+          }
+        ]
+      },
+      {
+        "id": "pripravit-udaje-vstupne",
+        "type": "message",
+        "text": "Ďakujem. Na prvú návštevu si, prosím, pripravte meno predchádzajúceho zubného lekára a dátum poslednej preventívnej prehliadky. Teraz spolu nájdeme vhodný termín.",
+        "nextNodeId": "volne-terminy"
+      },
+      {
+        "id": "volne-terminy",
+        "type": "availability",
+        "bridge": "Ďakujem. Pozrime sa spolu na voľné termíny.",
+        "prompt": "Mám pre vás tieto ukážkové možnosti.",
+        "serviceVariable": "vykon",
+        "preferenceVariable": "",
+        "storeAs": "termin",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že vám vyhovuje {{selected}}?",
+        "nextNodeId": "rezervovane"
+      },
+      {
+        "id": "rezervovane",
+        "type": "end",
+        "text": "Ďakujem. Vaša ukážková rezervácia na {{vykon}}, {{termin}}, je potvrdená. Potvrdzujúcu SMS vám pošleme hneď po hovore. Ďakujeme a dovidenia.",
+        "outcome": "mock_booking",
+        "smsText": "MajerDent: demo rezervácia na {{vykon}}, {{termin}}, je potvrdená."
+      },
+      {
+        "id": "vyradenie-z-evidencie",
+        "type": "end",
+        "text": "Ďakujem. Pri žiadosti o vyradenie z evidencie je potrebné uviesť dôvod. V tejto ukážke je požiadavka pripravená na odovzdanie kolegyni z ambulancie. Ďakujeme a dovidenia.",
+        "outcome": "handoff"
+      },
+      {
+        "id": "prepojenie",
+        "type": "end",
+        "text": "Ďakujem za vašu otázku. V tejto ukážke je táto vetva pripravená na prepojenie s kolegyňou z ambulancie. Ďakujeme a dovidenia.",
+        "outcome": "handoff"
+      }
+    ]
+  }
+}
