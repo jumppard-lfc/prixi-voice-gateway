@@ -179,7 +179,7 @@ export function slugify(value: string): string {
 
 export function buildIntroduction(config: VoiceBotConfig): string {
   if (config.copy.introduction?.trim()) return config.copy.introduction.trim();
-  return `Dobrý deň, som virtuálna asistentka ${config.clinic.displayName}. Rada vám pomôžem s objednaním. Spoločne vyberieme typ návštevy, vhodný termín a potom vaše meno. Kedykoľvek môžete odpovedať hlasom alebo použiť tlačidlá na telefóne.`;
+  return `Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre ${config.clinic.displayName}. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi navedie pacienta cez výber služby a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici.`;
 }
 
 export function buildFlowSummary(config: VoiceBotConfig): string[] {

@@ -35,7 +35,7 @@
         "id": "ako-pomoct",
         "type": "question",
         "bridge": "",
-        "prompt": "Dobrý deň, vítam vás v TADENTe. Som virtuálna asistentka PriXi v ukážkovom režime. Pomôžem vám vybrať vhodný výkon dentálnej hygieny a termín. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Chcete sa objednať, alebo máte otázku?",
+        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre TADENT. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi navedie pacienta cez výber výkonu dentálnej hygieny a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Chcete sa objednať, alebo máte otázku?",
         "retryPrompt": "Zopakujem možnosti. Pre objednanie sa na návštevu stlačte 1. Pre otázku stlačte 2.",
         "storeAs": "dovod",
         "confirmSelection": true,
@@ -176,8 +176,8 @@
       {
         "id": "volne-terminy",
         "type": "availability",
-        "bridge": "Ďakujem. Pozrime sa spolu na voľné termíny.",
-        "prompt": "Mám pre vás tieto možnosti.",
+        "bridge": "Ďakujem. Teraz prichádza hlavná časť ukážky: v reálnom nasadení PriXi načíta voľné termíny z rezervačného systému ambulancie a ponúkne ich pacientovi jednoducho cez telefón.",
+        "prompt": "Pre túto ukážku mám pripravené tieto testovacie možnosti.",
         "serviceVariable": "vykon",
         "preferenceVariable": "",
         "storeAs": "termin",
@@ -188,7 +188,7 @@
       {
         "id": "rezervovane",
         "type": "end",
-        "text": "Ďakujem. Vaša ukážková rezervácia na {{vykon}}, {{termin}}, je potvrdená. Potvrdzujúcu SMS vám posielame hneď po hovore. Ďakujeme a dovidenia.",
+        "text": "Ďakujem. Vaša ukážková rezervácia na {{vykon}}, {{termin}}, je vytvorená. V reálnom nasadení PriXi zapíše termín priamo do existujúceho rezervačného systému ambulancie a pacientovi môže okamžite poslať potvrdzujúcu SMS. Ďakujeme za vyskúšanie PriXi.",
         "outcome": "mock_booking",
         "smsText": "Ďakujeme. Demo rezervácia na {{vykon}}, {{termin}}, je potvrdená."
       },

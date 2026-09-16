@@ -199,6 +199,6 @@
     "playPromptTone": true
   },
   "copy": {
-    "introduction": "Dobrý deň, vítam vás v Dental Centrum NIVY. Som virtuálna asistentka a rada vám pomôžem s objednaním. Spoločne vyberieme typ návštevy, pri vstupnom vyšetrení aj zubára, potom vhodný termín a vaše meno. Kedykoľvek môžete odpovedať hlasom alebo použiť tlačidlá na telefóne."
+    "introduction": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre Dental Centrum NIVY. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi navedie pacienta cez výber návštevy, ošetrujúceho a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici."
   }
 }

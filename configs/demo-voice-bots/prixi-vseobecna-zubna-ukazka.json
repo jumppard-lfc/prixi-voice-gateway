@@ -34,7 +34,7 @@
         "id": "ako-pomoct",
         "type": "question",
         "bridge": "",
-        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pre zubné ambulancie. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi pacienta navedie k termínu. Chcete sa objednať ako nový pacient, na pravidelnú starostlivosť, riešite akútny problém, potrebujete iný zákrok, alebo vás zaujíma ako PriXi funguje?",
+        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pre zubné ambulancie. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi navedie pacienta cez výber služby a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Chcete sa objednať ako nový pacient, na pravidelnú starostlivosť, riešite akútny problém, potrebujete iný zákrok, alebo vás zaujíma ako PriXi funguje?",
         "retryPrompt": "Zopakujem možnosti. Pre nového pacienta stlačte 1. Pre pravidelnú starostlivosť stlačte 2. Pre akútny problém stlačte 3. Pre iný zákrok stlačte 4. Ak chcete vedieť, ako PriXi funguje, stlačte 5.",
         "storeAs": "vykon",
         "confirmSelection": true,
@@ -207,7 +207,7 @@
         "choices": [
           {
             "id": "akutne-dospely",
-            "label": "Akútne ošetrenie",
+            "label": "Akútne ošetrenie pre dospelého",
             "voiceAliases": [
               "pre dospelého",
               "dospelý",
@@ -218,7 +218,7 @@
           },
           {
             "id": "akutne-dieta",
-            "label": "Akútne ošetrenie - dieťa",
+            "label": "Akútne ošetrenie pre dieťa",
             "voiceAliases": [
               "pre dieťa",
               "dieťa",
@@ -288,8 +288,8 @@
       {
         "id": "volne-terminy",
         "type": "availability",
-        "bridge": "Ďakujem. Teraz prichádza hlavná časť ukážky: PriXi načíta voľné termíny z rezervačného systému ambulancie a ponúkne ich pacientovi jednoducho cez telefón.",
-        "prompt": "Pre túto ukážku mám pripravené tieto mockované možnosti.",
+        "bridge": "Ďakujem. Teraz prichádza hlavná časť ukážky: v reálnom nasadení PriXi načíta voľné termíny z rezervačného systému ambulancie a ponúkne ich pacientovi jednoducho cez telefón.",
+        "prompt": "Pre túto ukážku mám pripravené tieto testovacie možnosti.",
         "serviceVariable": "vykon",
         "preferenceVariable": "",
         "storeAs": "termin",
@@ -300,7 +300,7 @@
       {
         "id": "demo-rezervovane",
         "type": "end",
-        "text": "Ďakujem. Vaša ukážková rezervácia na {{vykon}}, {{termin}}, je vytvorená. V reálnom nasadení PriXi zapíše termín do existujúceho rezervačného systému kliniky a pacientovi môže okamžite poslať potvrdzujúcu SMS. Ďakujeme za vyskúšanie PriXi.",
+        "text": "Ďakujem. Vaša ukážková rezervácia na {{vykon}}, {{termin}}, je vytvorená. V reálnom nasadení PriXi zapíše termín priamo do existujúceho rezervačného systému ambulancie a pacientovi môže okamžite poslať potvrdzujúcu SMS. Ďakujeme za vyskúšanie PriXi.",
         "outcome": "mock_booking",
         "smsText": "PriXi demo: ukážková rezervácia na {{vykon}}, {{termin}}, je potvrdená."
       },

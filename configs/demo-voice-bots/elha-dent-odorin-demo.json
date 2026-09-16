@@ -35,7 +35,7 @@
         "id": "ako-pomoct",
         "type": "question",
         "bridge": "",
-        "prompt": "Dobrý deň, vítam vás v El-ha dent. Som virtuálna asistentka PriXi v ukážkovom režime. Pomôžem vám vybrať vhodnú službu a termín. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Potrebujete dentálnu hygienu, bielenie zubov, zubný šperk, alebo máte otázku?",
+        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre eLHa dent. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi navedie pacienta cez výber služby a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Potrebujete dentálnu hygienu, bielenie zubov, zubný šperk, alebo máte otázku?",
         "retryPrompt": "Zopakujem možnosti. Pre dentálnu hygienu stlačte 1. Pre bielenie zubov stlačte 2. Pre zubný šperk stlačte 3. Ak máte otázku, stlačte 4.",
         "storeAs": "vykon",
         "confirmSelection": true,
@@ -274,8 +274,8 @@
       {
         "id": "volne-terminy",
         "type": "availability",
-        "bridge": "Ďakujem. Pozrime sa spolu na voľné termíny.",
-        "prompt": "Mám pre vás tieto ukážkové možnosti.",
+        "bridge": "Ďakujem. Teraz prichádza hlavná časť ukážky: v reálnom nasadení PriXi načíta voľné termíny z rezervačného systému ambulancie a ponúkne ich pacientovi jednoducho cez telefón.",
+        "prompt": "Pre túto ukážku mám pripravené tieto testovacie možnosti.",
         "serviceVariable": "vykon",
         "preferenceVariable": "",
         "storeAs": "termin",
@@ -286,7 +286,7 @@
       {
         "id": "rezervovane",
         "type": "end",
-        "text": "Ďakujem. Vaša ukážková rezervácia na {{vykon}}, {{termin}}, je potvrdená. Potvrdzujúcu SMS vám pošleme hneď po hovore. Ďakujeme a dovidenia.",
+        "text": "Ďakujem. Vaša ukážková rezervácia na {{vykon}}, {{termin}}, je vytvorená. V reálnom nasadení PriXi zapíše termín priamo do existujúceho rezervačného systému ambulancie a pacientovi môže okamžite poslať potvrdzujúcu SMS. Ďakujeme za vyskúšanie PriXi.",
         "outcome": "mock_booking",
         "smsText": "eLHa dent: demo rezervácia na {{vykon}}, {{termin}}, je potvrdená."
       },

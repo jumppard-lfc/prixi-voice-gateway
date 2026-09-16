@@ -221,7 +221,7 @@ function prompt(reply: FastifyReply, session: DemoSession, prefix = ''): Fastify
       const slots = session.offeredSlots || [];
       const choices = slots.map((slot, index) => `možnosť ${index + 1}: ${formatSlot(slot)}`).join('. ');
       const weekdayHints = slots.map((slot) => new Intl.DateTimeFormat('sk-SK', { weekday: 'long', timeZone: 'Europe/Bratislava' }).format(new Date(slot.startAt))).join(', ');
-      return ask(reply, session, `${prefix}${keyboard}Mám tieto demo termíny. ${choices}. ${forceDtmf ? 'Stlačte číslo možnosti.' : 'Povedzte číslo možnosti alebo názov dňa.'}`, `prvá možnosť, druhá možnosť, tretia možnosť, ${weekdayHints}`, forceDtmf);
+      return ask(reply, session, `${prefix}${keyboard}Teraz prichádza hlavná časť ukážky: v reálnom nasadení PriXi načíta voľné termíny z rezervačného systému ambulancie a ponúkne ich pacientovi jednoducho cez telefón. Pre túto ukážku mám pripravené tieto testovacie možnosti. ${choices}. ${forceDtmf ? 'Stlačte číslo možnosti.' : 'Povedzte číslo možnosti alebo názov dňa.'}`, `prvá možnosť, druhá možnosť, tretia možnosť, ${weekdayHints}`, forceDtmf);
     }
     case 'name': return ask(reply, session, `${prefix}Prosím, povedzte vaše meno a priezvisko.`);
     case 'terms': return ask(reply, session, `${prefix}Súhlasíte so všeobecnými obchodnými podmienkami ambulancie? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`, 'áno, nie', forceDtmf);
@@ -670,10 +670,8 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
         }
         bookingAuditService.record(session.callSid, 'completed', { smsDelivered, mode: 'demo_mock' });
         const twiml = new VoiceResponse();
-        const closing = smsDelivered
-          ? 'Ďakujem. Demo termín je vytvorený a potvrdenie vám posielame SMS správou.'
-          : 'Ďakujem. Demo termín je vytvorený. Potvrdzujúca SMS pre tento demo bot zatiaľ nie je zapnutá.';
-        twiml.say(sayOptions, `${closing} ${session.config.copy.closing || 'Ďakujeme a dovidenia.'}`); twiml.hangup(); sessions.delete(session.callSid);
+        const closing = `Ďakujem. Vaša ukážková rezervácia na ${session.service.label}, ${formatSlot(session.selectedSlot)}, je vytvorená. V reálnom nasadení PriXi zapíše termín priamo do existujúceho rezervačného systému ambulancie a pacientovi môže okamžite poslať potvrdzujúcu SMS.`;
+        twiml.say(sayOptions, `${closing} ${session.config.copy.closing || 'Ďakujeme za vyskúšanie PriXi.'}`); twiml.hangup(); sessions.delete(session.callSid);
         return reply.type('text/xml').send(twiml.toString());
       }
     }
