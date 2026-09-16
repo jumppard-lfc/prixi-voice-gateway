@@ -187,6 +187,7 @@
             "id": "kontrola",
             "label": "Kontrolu",
             "voiceAliases": [
+              "kontrolu",
               "kontrola",
               "kontrolné vyšetrenie"
             ],
@@ -220,6 +221,7 @@
             "id": "plomba",
             "label": "Plombu",
             "voiceAliases": [
+              "plombu",
               "plomba",
               "výplň",
               "opraviť kaz"
@@ -231,6 +233,7 @@
             "id": "endodoncia",
             "label": "Endodonciu",
             "voiceAliases": [
+              "endodonciu",
               "endodoncia",
               "koreňové kanáliky",
               "liečba kanálikov"
@@ -242,8 +245,10 @@
             "id": "extrakcia",
             "label": "Extrakciu zuba",
             "voiceAliases": [
+              "extrakciu",
               "extrakcia",
               "vytrhnutie zuba",
+              "vytrhnúť zub",
               "trhanie zuba"
             ],
             "dtmf": "3",
@@ -264,6 +269,7 @@
             "id": "konzultacia",
             "label": "Konzultáciu",
             "voiceAliases": [
+              "konzultáciu",
               "konzultácia",
               "poradenstvo",
               "chcem sa poradiť"
