@@ -56,7 +56,9 @@
             "label": "objednať sa na pravidelnú starostlivosť",
             "voiceAliases": [
               "pravidelná starostlivosť",
+              "pravidelnú starostlivosť",
               "preventívna prehliadka",
+              "preventívnu prehliadku",
               "dentálna hygiena",
               "kontrola"
             ],
@@ -70,6 +72,7 @@
               "bolesť zuba",
               "opuch",
               "akútne ošetrenie",
+              "akútny problém",
               "pohotovosť"
             ],
             "dtmf": "3",
@@ -82,7 +85,10 @@
               "plomba",
               "extrakcia",
               "bielenie zubov",
-              "konzultácia"
+              "konzultácia",
+              "iný zákrok",
+              "potrebujem iný zákrok",
+              "potrebujem iny zakrok"
             ],
             "dtmf": "4",
             "nextNodeId": "iny-zakrok"
