@@ -149,7 +149,7 @@ function canGoToNextPage(items: unknown[], page: number): boolean {
 }
 
 function navigationPrompt(items: unknown[], page: number): string {
-  return `${canGoToPreviousPage(page) ? ' Pre predchádzajúce možnosti stlačte 8.' : ''}${canGoToNextPage(items, page) ? ' Pre ďalšie možnosti stlačte 9.' : ''}`;
+  return `${canGoToPreviousPage(page) ? ' Pre predchádzajúce možnosti stlačte osmičku.' : ''}${canGoToNextPage(items, page) ? ' Pre ďalšie možnosti stlačte deviatku.' : ''}`;
 }
 
 function practitionersForService(session: DemoSession): VoiceBotPractitionerDefinition[] {
@@ -168,12 +168,12 @@ function continueAfterService(session: DemoSession): DemoStep {
 
 function verificationText(session: DemoSession): string {
   switch (session.verificationTarget) {
-    case 'service': return `Ďakujem. Rozumela som správne, že sa chcete objednať na ${session.service?.label}? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`;
-    case 'practitioner': return `Ďakujem. Rozumela som správne, že preferujete termín u ${session.practitioner?.label}? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`;
-    case 'date_preference': return `Ďakujem. Rozumela som správne, že preferujete ${session.preference?.timeOfDay === 'morning' ? 'termín dopoludnia' : session.preference?.timeOfDay === 'afternoon' ? 'termín popoludní' : 'najbližší voľný termín'}? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`;
-    case 'slot': return `Ďakujem. Rozumela som správne, že vám vyhovuje ${session.selectedSlot ? formatSlot(session.selectedSlot) : 'tento termín'}? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`;
-    case 'name': return `Rozumela som správne, že sa voláte ${session.firstName} ${session.lastName}? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`;
-    default: return 'Rozumela som vám správne? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.';
+    case 'service': return `Ďakujem. Rozumela som správne, že sa chcete objednať na ${session.service?.label}? Povedzte áno alebo stlačte jednotku. Pre nie stlačte dvojku.`;
+    case 'practitioner': return `Ďakujem. Rozumela som správne, že preferujete termín u ${session.practitioner?.label}? Povedzte áno alebo stlačte jednotku. Pre nie stlačte dvojku.`;
+    case 'date_preference': return `Ďakujem. Rozumela som správne, že preferujete ${session.preference?.timeOfDay === 'morning' ? 'termín dopoludnia' : session.preference?.timeOfDay === 'afternoon' ? 'termín popoludní' : 'najbližší voľný termín'}? Povedzte áno alebo stlačte jednotku. Pre nie stlačte dvojku.`;
+    case 'slot': return `Ďakujem. Rozumela som správne, že vám vyhovuje ${session.selectedSlot ? formatSlot(session.selectedSlot) : 'tento termín'}? Povedzte áno alebo stlačte jednotku. Pre nie stlačte dvojku.`;
+    case 'name': return `Rozumela som správne, že sa voláte ${session.firstName} ${session.lastName}? Povedzte áno alebo stlačte jednotku. Pre nie stlačte dvojku.`;
+    default: return 'Rozumela som vám správne? Povedzte áno alebo stlačte jednotku. Pre nie stlačte dvojku.';
   }
 }
 
@@ -216,7 +216,7 @@ function prompt(reply: FastifyReply, session: DemoSession, prefix = ''): Fastify
       return ask(reply, session, `${prefix}${keyboard}Vyberte si, prosím, člena tímu. ${options}${navigationPrompt(practitioners, session.practitionerPage)}`, visiblePractitioners.flatMap((practitioner) => [practitioner.label, ...practitioner.voiceAliases]).join(', '), forceDtmf);
     }
     case 'date_preference':
-      return ask(reply, session, `${prefix}${keyboard}Pre najbližší termín stlačte 1. Pre dopoludnie stlačte 2. Pre popoludnie stlačte 3.${forceDtmf ? '' : ' Môžete odpovedať aj hlasom.'}`, 'najbližší termín, dopoludnie, doobeda, popoludnie', forceDtmf);
+      return ask(reply, session, `${prefix}${keyboard}Pre najbližší termín stlačte jednotku. Pre dopoludnie stlačte dvojku. Pre popoludnie stlačte trojku.${forceDtmf ? '' : ' Môžete odpovedať aj hlasom.'}`, 'najbližší termín, dopoludnie, doobeda, popoludnie', forceDtmf);
     case 'slot': {
       const slots = session.offeredSlots || [];
       const choices = slots.map((slot, index) => `možnosť ${index + 1}: ${formatSlot(slot)}`).join('. ');
@@ -224,9 +224,9 @@ function prompt(reply: FastifyReply, session: DemoSession, prefix = ''): Fastify
       return ask(reply, session, `${prefix}${keyboard}Teraz prichádza hlavná časť ukážky: v reálnom nasadení PriXi načíta voľné termíny z rezervačného systému ambulancie a ponúkne ich pacientovi jednoducho cez telefón. Pre túto ukážku mám pripravené tieto testovacie možnosti. ${choices}. ${forceDtmf ? 'Stlačte číslo možnosti.' : 'Povedzte číslo možnosti alebo názov dňa.'}`, `prvá možnosť, druhá možnosť, tretia možnosť, ${weekdayHints}`, forceDtmf);
     }
     case 'name': return ask(reply, session, `${prefix}Prosím, povedzte vaše meno a priezvisko.`);
-    case 'terms': return ask(reply, session, `${prefix}Súhlasíte so všeobecnými obchodnými podmienkami ambulancie? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`, 'áno, nie', forceDtmf);
+    case 'terms': return ask(reply, session, `${prefix}Súhlasíte so všeobecnými obchodnými podmienkami ambulancie? Povedzte áno alebo stlačte jednotku. Pre nie stlačte dvojku.`, 'áno, nie', forceDtmf);
     case 'verification': return ask(reply, session, verificationText(session), 'áno, nie', forceDtmf);
-    case 'confirmation': return ask(reply, session, `${prefix}Potvrdzujem: ${session.service?.label}, ${session.selectedSlot ? formatSlot(session.selectedSlot) : ''}. Môžem tento demo termín záväzne vytvoriť? Povedzte áno alebo stlačte 1. Pre zmenu termínu stlačte 2.`, 'áno, nie', forceDtmf);
+    case 'confirmation': return ask(reply, session, `${prefix}Potvrdzujem: ${session.service?.label}, ${session.selectedSlot ? formatSlot(session.selectedSlot) : ''}. Môžem tento demo termín záväzne vytvoriť? Povedzte áno alebo stlačte jednotku. Pre zmenu termínu stlačte dvojku.`, 'áno, nie', forceDtmf);
   }
 }
 
@@ -470,7 +470,7 @@ async function renderTreeConfirmation(reply: FastifyReply, session: TreeSession,
   saveTreeSession(session);
   const twiml = new VoiceResponse();
   const gather = twiml.gather({ input: ['speech', 'dtmf'], action: `/voice/demo/${session.config.id}/tree/answer`, method: 'POST', timeout: 5, speechTimeout: 'auto', language: 'sk-SK', hints: 'áno, nie', numDigits: 1 } as any);
-  const fallback = `Ďakujem. Rozumela som správne, že si prajete ${label}? Povedzte áno alebo stlačte 1. Pre nie stlačte 2.`;
+  const fallback = `Ďakujem. Rozumela som správne, že si prajete ${label}? Povedzte áno alebo stlačte jednotku. Pre nie stlačte dvojku.`;
   gather.say(sayOptions, interpolateTreeText(confirmationPrompt, session, label) || fallback);
   if (session.config.conversation.playPromptTone) gather.play(`${session.publicBaseUrl}/media/booking-prompt-tone.wav`);
   twiml.say(sayOptions, 'Odpoveď som nezachytila. Skúsme to, prosím, znova.');

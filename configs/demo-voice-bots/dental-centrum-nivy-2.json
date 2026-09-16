@@ -263,7 +263,7 @@
         "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre Dental Centrum NIVY. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi navedie pacienta cez výber návštevy, ošetrujúceho a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Chcete sa objednať na návštevu, alebo máte otázku?",
         "storeAs": "dovod",
         "confirmSelection": false,
-        "retryPrompt": "Zopakujem možnosti. Pre objednanie sa na návštevu stlačte 1. Pre otázku stlačte 2.",
+        "retryPrompt": "Zopakujem možnosti. Pre objednanie sa na návštevu stlačte jednotku. Pre otázku stlačte dvojku.",
         "choices": [
           {
             "id": "objednanie",

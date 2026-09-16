@@ -121,7 +121,7 @@ test('dlhý zoznam služieb uprednostní hlas a po chybe ponúkne dvojcifernú k
   const callSid = 'CA90000000000000000000000000000004';
   const start = await signedPost('/voice/demo/paginated-team-demo/start', { From: '+421900000125', CallSid: callSid });
   assert.match(start.body, /Povedzte mi, prosím, na akú návštevu sa chcete objednať/);
-  assert.doesNotMatch(start.body, /Pre ďalšie možnosti stlačte 9/);
+  assert.doesNotMatch(start.body, /Pre ďalšie možnosti stlačte deviatku/);
 
   const fallback = await signedPost('/voice/demo/paginated-team-demo/answer', { CallSid: callSid, SpeechResult: 'niečomu nerozumiem' });
   assert.match(fallback.body, /Zadajte číslo služby a potvrďte ho tlačidlom mriežka/);
@@ -210,7 +210,7 @@ test('strom rozpozná prirodzenú zmenu slovosledu a po chybe neopakuje úvod', 
     nodes: [
       {
         id: 'uvod', type: 'question', prompt: 'Dobrý deň, vítajte v ambulancii. Chcete sa objednať na návštevu alebo máte otázku?',
-        retryPrompt: 'Zopakujem možnosti. Pre objednanie stlačte 1. Pre otázku stlačte 2.', storeAs: 'dovod', confirmSelection: false,
+        retryPrompt: 'Zopakujem možnosti. Pre objednanie stlačte jednotku. Pre otázku stlačte dvojku.', storeAs: 'dovod', confirmSelection: false,
         choices: [
           { id: 'objednanie', label: 'objednať sa na návštevu', voiceAliases: ['objednať sa', 'chcem termín'], dtmf: '1', nextNodeId: 'objednane' },
           { id: 'otazka', label: 'máte otázku', voiceAliases: ['otázka'], dtmf: '2', nextNodeId: 'otazka' },
@@ -231,7 +231,7 @@ test('strom rozpozná prirodzenú zmenu slovosledu a po chybe neopakuje úvod', 
   await signedPost('/voice/demo/tree-retry-demo/start', { From: '+421900000125', CallSid: retryCallSid });
   const retry = await signedPost('/voice/demo/tree-retry-demo/tree/answer', { CallSid: retryCallSid, SpeechResult: 'niečomu vôbec nerozumiem' });
   assert.match(retry.body, /Prepáčte, nerozumela som/);
-  assert.match(retry.body, /Zopakujem možnosti. Pre objednanie stlačte 1/);
+  assert.match(retry.body, /Zopakujem možnosti. Pre objednanie stlačte jednotku/);
   assert.doesNotMatch(retry.body, /Dobrý deň, vítajte v ambulancii/);
 });
 

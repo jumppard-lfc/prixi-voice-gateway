@@ -35,8 +35,8 @@
         "id": "ako-pomoct",
         "type": "question",
         "bridge": "",
-        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre TADENT. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi navedie pacienta cez výber výkonu dentálnej hygieny a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Chcete sa objednať, alebo máte otázku?",
-        "retryPrompt": "Zopakujem možnosti. Pre objednanie sa na návštevu stlačte 1. Pre otázku stlačte 2.",
+        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre Tadent. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi navedie pacienta cez výber výkonu dentálnej hygieny a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Chcete sa objednať, alebo máte otázku?",
+        "retryPrompt": "Zopakujem možnosti. Pre objednanie sa na návštevu stlačte jednotku. Pre otázku stlačte dvojku.",
         "storeAs": "dovod",
         "confirmSelection": true,
         "choices": [
@@ -123,6 +123,7 @@
             "label": "Dentálna hygiena študent 18 až 26 rokov",
             "voiceAliases": [
               "študentská hygiena",
+              "študentskú hygienu",
               "hygiena pre študenta",
               "študent 18 až 26 rokov"
             ],
