@@ -1,0 +1,309 @@
+{
+  "version": 1,
+  "id": "prixi-vseobecna-zubna-ukazka",
+  "clinic": {
+    "displayName": "PriXi – ukážka pre zubné ambulancie",
+    "specialty": "všeobecná zubná ambulancia",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": {
+    "kind": "custom",
+    "mode": "demo_mock"
+  },
+  "services": [],
+  "practitioners": [],
+  "routing": {
+    "inboundTwilioNumbers": []
+  },
+  "conversation": {
+    "confirmService": true,
+    "confirmDatePreference": true,
+    "confirmSlot": true,
+    "confirmName": false,
+    "requireTerms": false,
+    "sendConfirmationSms": true,
+    "useDtmfFallback": true,
+    "playPromptTone": true
+  },
+  "copy": {},
+  "conversationTree": {
+    "entryNodeId": "ako-pomoct",
+    "nodes": [
+      {
+        "id": "ako-pomoct",
+        "type": "question",
+        "bridge": "",
+        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pre zubné ambulancie. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi pacienta navedie k termínu. Chcete sa objednať ako nový pacient, na pravidelnú starostlivosť, riešite akútny problém, potrebujete iný zákrok, alebo vás zaujíma ako PriXi funguje?",
+        "retryPrompt": "Zopakujem možnosti. Pre nového pacienta stlačte 1. Pre pravidelnú starostlivosť stlačte 2. Pre akútny problém stlačte 3. Pre iný zákrok stlačte 4. Ak chcete vedieť, ako PriXi funguje, stlačte 5.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že chcete {{selected}}?",
+        "choices": [
+          {
+            "id": "novy-pacient",
+            "label": "objednať sa ako nový pacient",
+            "voiceAliases": [
+              "som nový pacient",
+              "prvá návšteva",
+              "vstupné vyšetrenie"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "novy-pacient-pre-koho"
+          },
+          {
+            "id": "pravidelna-starostlivost",
+            "label": "objednať sa na pravidelnú starostlivosť",
+            "voiceAliases": [
+              "pravidelná starostlivosť",
+              "preventívna prehliadka",
+              "dentálna hygiena",
+              "kontrola"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "pravidelna-starostlivost"
+          },
+          {
+            "id": "akutny-problem",
+            "label": "riešiť akútny problém",
+            "voiceAliases": [
+              "bolesť zuba",
+              "opuch",
+              "akútne ošetrenie",
+              "pohotovosť"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "akutne-pre-koho"
+          },
+          {
+            "id": "iny-zakrok",
+            "label": "objednať sa na iný zákrok",
+            "voiceAliases": [
+              "plomba",
+              "extrakcia",
+              "bielenie zubov",
+              "konzultácia"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "iny-zakrok"
+          },
+          {
+            "id": "ako-funguje-prixi",
+            "label": "zistiť ako PriXi funguje",
+            "voiceAliases": [
+              "ako funguje PriXi",
+              "ako to funguje",
+              "informácie o PriXi"
+            ],
+            "dtmf": "5",
+            "nextNodeId": "o-prixi"
+          }
+        ]
+      },
+      {
+        "id": "novy-pacient-pre-koho",
+        "type": "question",
+        "bridge": "Ďakujem. Pri prvej návšteve potrebujeme ešte rozlíšiť dospelého a detského pacienta.",
+        "prompt": "Je vstupné vyšetrenie pre dospelého alebo pre dieťa?",
+        "retryPrompt": "Zopakujem možnosti. Pre dospelého stlačte 1. Pre dieťa stlačte 2.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že ide o {{selected}}?",
+        "choices": [
+          {
+            "id": "vstupne-dospely",
+            "label": "Vstupné vyšetrenie - nový pacient",
+            "voiceAliases": [
+              "pre dospelého",
+              "dospelý",
+              "pre mňa"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "vstupne-dieta",
+            "label": "Vstupné vyšetrenie - nový pacient - dieťa",
+            "voiceAliases": [
+              "pre dieťa",
+              "dieťa",
+              "detský pacient"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          }
+        ]
+      },
+      {
+        "id": "pravidelna-starostlivost",
+        "type": "question",
+        "bridge": "Výborne. Vyberme teraz konkrétnu pravidelnú starostlivosť.",
+        "prompt": "Želáte si dentálnu hygienu, preventívnu prehliadku pre dospelého, preventívnu prehliadku pre dieťa, alebo kontrolu?",
+        "retryPrompt": "Zopakujem možnosti. Pre dentálnu hygienu stlačte 1. Pre preventívnu prehliadku dospelého stlačte 2. Pre preventívnu prehliadku dieťaťa stlačte 3. Pre kontrolu stlačte 4.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že chcete {{selected}}?",
+        "choices": [
+          {
+            "id": "dentalna-hygiena",
+            "label": "Dentálnu hygienu",
+            "voiceAliases": [
+              "hygiena",
+              "čistenie zubov",
+              "dentálna hygiena"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "preventivna-dospely",
+            "label": "Preventívnu prehliadku",
+            "voiceAliases": [
+              "preventívka pre dospelého",
+              "preventívna prehliadka dospelý",
+              "preventívka"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "preventivna-dieta",
+            "label": "Preventívnu prehliadku - dieťa",
+            "voiceAliases": [
+              "preventívka pre dieťa",
+              "preventívna prehliadka dieťa",
+              "detská preventívka"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "kontrola",
+            "label": "Kontrolu",
+            "voiceAliases": [
+              "kontrola",
+              "kontrolné vyšetrenie"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "volne-terminy"
+          }
+        ]
+      },
+      {
+        "id": "akutne-pre-koho",
+        "type": "question",
+        "bridge": "Rozumiem. Pri reálnom nasadení PriXi dokáže akútnu požiadavku zaradiť do prioritného workflow ambulancie. Ešte potrebujem vedieť, pre koho je ošetrenie určené.",
+        "prompt": "Ide o akútne ošetrenie pre dospelého alebo pre dieťa?",
+        "retryPrompt": "Zopakujem možnosti. Pre dospelého stlačte 1. Pre dieťa stlačte 2.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že ide o {{selected}}?",
+        "choices": [
+          {
+            "id": "akutne-dospely",
+            "label": "Akútne ošetrenie",
+            "voiceAliases": [
+              "pre dospelého",
+              "dospelý",
+              "pre mňa"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "akutne-dieta",
+            "label": "Akútne ošetrenie - dieťa",
+            "voiceAliases": [
+              "pre dieťa",
+              "dieťa",
+              "detské ošetrenie"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          }
+        ]
+      },
+      {
+        "id": "iny-zakrok",
+        "type": "question",
+        "bridge": "Ďakujem. Vyberme presný zákrok, aby som mohla ponúknuť vhodné termíny.",
+        "prompt": "Potrebujete plombu, extrakciu zuba, bielenie zubov alebo konzultáciu?",
+        "retryPrompt": "Zopakujem možnosti. Pre plombu stlačte 1. Pre extrakciu stlačte 2. Pre bielenie zubov stlačte 3. Pre konzultáciu stlačte 4.",
+        "storeAs": "vykon",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že chcete {{selected}}?",
+        "choices": [
+          {
+            "id": "plomba",
+            "label": "Plombu",
+            "voiceAliases": [
+              "plomba",
+              "výplň",
+              "opraviť kaz"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "extrakcia",
+            "label": "Extrakciu zuba",
+            "voiceAliases": [
+              "extrakcia",
+              "vytrhnutie zuba",
+              "trhanie zuba"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "bielenie-zubov",
+            "label": "Bielenie zubov",
+            "voiceAliases": [
+              "bielenie",
+              "vybieliť zuby",
+              "bielenie zubov"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "konzultacia",
+            "label": "Konzultáciu",
+            "voiceAliases": [
+              "konzultácia",
+              "poradenstvo",
+              "chcem sa poradiť"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "volne-terminy"
+          }
+        ]
+      },
+      {
+        "id": "volne-terminy",
+        "type": "availability",
+        "bridge": "Ďakujem. Teraz prichádza hlavná časť ukážky: PriXi načíta voľné termíny z rezervačného systému ambulancie a ponúkne ich pacientovi jednoducho cez telefón.",
+        "prompt": "Pre túto ukážku mám pripravené tieto mockované možnosti.",
+        "serviceVariable": "vykon",
+        "preferenceVariable": "",
+        "storeAs": "termin",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že vám vyhovuje {{selected}}?",
+        "nextNodeId": "demo-rezervovane"
+      },
+      {
+        "id": "demo-rezervovane",
+        "type": "end",
+        "text": "Ďakujem. Vaša ukážková rezervácia na {{vykon}}, {{termin}}, je vytvorená. V reálnom nasadení PriXi zapíše termín do existujúceho rezervačného systému kliniky a pacientovi môže okamžite poslať potvrdzujúcu SMS. Ďakujeme za vyskúšanie PriXi.",
+        "outcome": "mock_booking",
+        "smsText": "PriXi demo: ukážková rezervácia na {{vykon}}, {{termin}}, je potvrdená."
+      },
+      {
+        "id": "o-prixi",
+        "type": "end",
+        "text": "PriXi vedie pacienta deterministickým rozhovorom, rozpoznáva bežné hlasové odpovede, pri nepochopení ponúkne klávesnicu a po potvrdení zapíše termín do existujúceho kalendára alebo booking systému ambulancie. Táto ukážka používa iba mockované termíny. Ďakujeme za váš záujem.",
+        "outcome": "complete"
+      }
+    ]
+  }
+}
