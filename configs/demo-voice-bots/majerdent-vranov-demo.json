@@ -60,7 +60,10 @@
               "preventívna prehliadka",
               "dentálna hygiena",
               "kontrola",
-              "prevencia"
+              "prevencia",
+              "pravidelná starostlivosť",
+              "pravidelnu starostlivost",
+              "bežná starostlivosť"
             ],
             "dtmf": "2",
             "nextNodeId": "pravidelna-starostlivost"
