@@ -84,8 +84,9 @@ test('vseobecny produkcny endpoint routuje priamo na oddeleny Vadkerti flow', as
     ForwardedFrom: '+421911500609',
   });
   assert.equal(response.statusCode, 200);
-  assert.match(response.body, /<phoneme alphabet="ipa" ph="neu̯roloːɡit͡skeːj">neurologickej<\/phoneme>/);
-  assert.match(response.body, /<phoneme alphabet="ipa" ph="vadkertiɦo">Vadkertiho<\/phoneme>/);
+  assert.match(response.body, /voice="Google.sk-SK-Wavenet-B"/);
+  assert.match(response.body, /neurologickej ambulancie doktora Petra Vadkertyho/);
+  assert.doesNotMatch(response.body, /<phoneme/);
   assert.match(response.body, /action="\/voice\/vadkerti\/answer"/);
   assert.doesNotMatch(response.body, /\/voice\/vadkerti\/incoming/);
   assert.doesNotMatch(response.body, /\/voice\/demo\//);
@@ -192,12 +193,12 @@ test('zlozenie pred uvedenim poziadavky nevytvori prazdny Prixi zaznam', async (
 test('slovensky flow noveho pacienta vytvori kategorizovanu poziadavku v PriXi bez terminu', async () => {
   const callSid = 'CA-VADKERTI-SK-00000000000000000001';
   const started = await incoming(callSid);
-  assert.match(started.body, /<phoneme alphabet="ipa" ph="neu̯roloːɡit͡skeːj">neurologickej<\/phoneme>/);
-  assert.match(started.body, /<phoneme alphabet="ipa" ph="vadkertiɦo">Vadkertiho<\/phoneme>/);
+  assert.match(started.body, /voice="Google.sk-SK-Wavenet-B"/);
+  assert.match(started.body, /neurologickej ambulancie doktora Petra Vadkertyho/);
 
   assert.match((await answer(callSid, 'slovensky')).body, /Stručne mi/);
   assert.match((await answer(callSid, 'Chcem sa objednať na neurologické vyšetrenie')).body, /Boli ste už vyšetrený v tejto aktuálnej ambulancii/);
-  assert.match((await answer(callSid, 'nie')).body, /iným <phoneme alphabet="ipa" ph="neu̯roloːɡom">neurológom<\/phoneme>/);
+  assert.match((await answer(callSid, 'nie')).body, /iným neurológom/);
   assert.match((await answer(callSid, 'nie')).body, /meno a priezvisko/);
   assert.match((await answer(callSid, 'Ján Novák')).body, /rok narodenia/);
   const completed = await answer(callSid, '1984');

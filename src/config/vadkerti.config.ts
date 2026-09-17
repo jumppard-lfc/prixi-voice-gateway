@@ -16,6 +16,7 @@ export type VadkertiRequestType =
 export interface VadkertiBotConfig {
   id: string;
   clinic: {
+    clinicId: string;
     displayName: string;
     specialty: string;
     inboundTwilioNumber: string;
@@ -49,6 +50,7 @@ export interface VadkertiBotConfig {
 export const vadkertiBotConfig: VadkertiBotConfig = {
   id: 'mudr-peter-vadkerti',
   clinic: {
+    clinicId: '146',
     displayName: 'neurologická ambulancia MUDr. Petra Vadkertiho',
     specialty: 'neurológia',
     inboundTwilioNumber: '+420910922693',

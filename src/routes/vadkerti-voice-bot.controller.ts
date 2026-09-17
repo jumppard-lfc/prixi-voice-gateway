@@ -32,53 +32,21 @@ const categoryLabels: Record<VadkertiRequestType, string> = {
 };
 
 const sayOptions: Record<VadkertiLanguage, any> = {
-  sk: { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' },
+  sk: { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-B' },
   hu: { language: 'hu-HU', voice: 'Google.hu-HU-Wavenet-A' },
 };
-
-// Slovak TTS otherwise palatalizes the initial "n" in the international word
-// neurológ and the "t" in Vadkerti. Keep the written copy correct and control
-// only the synthesized pronunciation through SSML.
-const slovakPronunciations: Record<string, string> = {
-  neurologickej: 'neu̯roloːɡit͡skeːj',
-  neurologické: 'neu̯roloːɡit͡skeː',
-  neurológa: 'neu̯roloːɡa',
-  neurológom: 'neu̯roloːɡom',
-  neurológovi: 'neu̯roloːɡovi',
-  vadkertiho: 'vadkertiɦo',
-};
-
-const slovakPronunciationPattern = /neurologickej|neurologické|neurológovi|neurológom|neurológa|Vadkertiho/giu;
 
 function sayWithClinicPronunciation(
   target: { say: (options: any, message?: string) => any },
   language: VadkertiLanguage,
   message: string
 ): void {
-  if (language !== 'sk') {
-    target.say(sayOptions[language], message);
-    return;
-  }
-
-  const matches = [...message.matchAll(slovakPronunciationPattern)];
-  if (matches.length === 0) {
-    target.say(sayOptions.sk, message);
-    return;
-  }
-
-  const firstIndex = matches[0].index || 0;
-  const say = target.say(sayOptions.sk, message.slice(0, firstIndex));
-  let cursor = firstIndex;
-
-  for (const match of matches) {
-    const index = match.index || 0;
-    if (index > cursor) say.say.txt(message.slice(cursor, index));
-    const word = match[0];
-    say.phoneme({ alphabet: 'ipa', ph: slovakPronunciations[word.toLocaleLowerCase('sk')] }, word);
-    cursor = index + word.length;
-  }
-
-  if (cursor < message.length) say.say.txt(message.slice(cursor));
+  // Slovak Google TTS softens "ti" in the foreign surname. The phonetic
+  // spelling is used only in synthesized speech; stored data keeps Vadkerti.
+  const spokenMessage = language === 'sk'
+    ? message.replace(/Vadkertiho/gu, 'Vadkertyho')
+    : message;
+  target.say(sayOptions[language], spokenMessage);
 }
 
 const text = {

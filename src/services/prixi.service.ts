@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import { ClinicConfig, PrixiEvent } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import { vadkertiBotConfig } from '../config/vadkerti.config';
 
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -77,6 +78,18 @@ export class PrixiService {
    * Provides a fallback configuration if the API call fails or times out.
    */
   async getConfig(phoneNumber: string): Promise<ClinicConfig> {
+    if (
+      phoneNumber === vadkertiBotConfig.clinic.inboundTwilioNumber
+      || phoneNumber === vadkertiBotConfig.clinic.routingPhoneNumber
+    ) {
+      return {
+        clinicId: vadkertiBotConfig.clinic.clinicId,
+        voiceBotEnabled: true,
+        timezone: vadkertiBotConfig.clinic.timezone,
+        pediatricMode: false,
+      };
+    }
+
     if (phoneNumber === '+420910927082') {
       return {
         clinicId: '142',

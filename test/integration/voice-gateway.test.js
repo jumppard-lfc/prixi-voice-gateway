@@ -914,10 +914,15 @@ test('Predvolene Twilio cislo MUDr. Novotneho je +420910928021', async () => {
 });
 
 test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
+  const vadkertiTwilioConfig = await originalGetConfig('+420910922693');
+  const vadkertiClinicConfig = await originalGetConfig('+421902647072');
   const celkovaConfig = await originalGetConfig('+420910927082');
   const benovaBaloghovaConfig = await originalGetConfig('+420910927739');
   const novotnyConfig = await originalGetConfig('+420910928021');
 
+  assert.equal(vadkertiTwilioConfig.clinicId, '146');
+  assert.equal(vadkertiTwilioConfig.voiceBotEnabled, true);
+  assert.equal(vadkertiClinicConfig.clinicId, '146');
   assert.equal(celkovaConfig.clinicId, '142');
   assert.equal(celkovaConfig.pediatricMode, true);
   assert.equal(benovaBaloghovaConfig.clinicId, '143');
