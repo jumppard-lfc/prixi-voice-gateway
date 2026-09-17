@@ -234,7 +234,7 @@ function requestSummary(session: VadkertiSession): string {
     case 'existing_patient_follow_up': return 'Existujúci pacient aktuálnej ambulancie žiada kontrolu. Konkrétny termín nebol pridelený.';
     case 'follow_up_with_results': return `Kontrola s výsledkom vyšetrenia: ${session.detail || 'neuvedené'}. Konkrétny termín nebol pridelený.`;
     case 'procedure_or_therapy': return `Požadovaný výkon alebo terapia: ${session.detail || 'neuvedené'}. Konkrétny termín nebol pridelený.`;
-    case 'prescription': return `${session.prescriptionEligible ? 'Pacient potvrdil vyšetrenie v aktuálnej ambulancii.' : 'Pacient NEBOL vyšetrený v aktuálnej ambulancii; recept týmto flowom nie je automaticky oprávnený.'} Požiadavka: ${session.detail || 'neuvedené'}.`;
+    case 'prescription': return `${session.prescriptionEligible ? 'Pacient potvrdil, že už tu bol v minulosti vyšetrený.' : 'Pacient NEBOL vyšetrený v aktuálnej ambulancii; recept týmto flowom nie je automaticky oprávnený.'} Požiadavka: ${session.detail || 'neuvedené'}.`;
     case 'medical_report': return `Požiadavka na nález: ${session.detail || 'neuvedené'}.${isSocialPurposeReport(session.detail || '') ? ' Sociálny/posudkový účel – pacient bol upozornený na spoplatnenie podľa cenníka VÚC.' : ''}`;
     case 'appointment_change_or_cancellation': return `Pacient chce termín ${session.appointmentAction === 'cancel' ? 'zrušiť' : 'zmeniť'}. Pôvodný termín: ${session.originalAppointment || 'pacient ho neuviedol'}. Bot termín v Curo nezmenil ani nezrušil.`;
     case 'other': return `Iná požiadavka: ${session.detail || 'neuvedené'}.`;
@@ -259,7 +259,7 @@ function buildProblemTranscript(session: VadkertiSession): string {
     `Telefón: ${session.phone}`,
     `Meno: ${session.patientName || 'neuvedené'}`,
     `Rok narodenia: ${session.birthYear || 'neuvedený'}`,
-    `Zhrnutie: ${requestSummary(session)}`,
+    `**Zhrnutie:** ${requestSummary(session)}`,
     ...(session.outcome === 'abandoned' ? [`Posledný krok: ${session.step}`] : []),
     `Prepis odpovedí: ${transcript}`,
   ].join('\n');

@@ -220,6 +220,23 @@ test('slovensky flow noveho pacienta vytvori kategorizovanu poziadavku v PriXi b
   assert.equal(sentEvents.length, 1);
 });
 
+test('slovenska poziadavka na recept ma zvyraznene a prirodzene zhrnutie', async () => {
+  const callSid = 'CA-VADKERTI-SK-RX-000000000000000001';
+  await incoming(callSid);
+  await answer(callSid, 'slovensky');
+  await answer(callSid, 'recept');
+  await answer(callSid, 'Áno, už som bol');
+  await answer(callSid, 'Potreboval by som Ibalgin a Ibuprofen');
+  await answer(callSid, 'Matej Skok');
+  await answer(callSid, '1991');
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(sentEvents.length, 1);
+  assert.match(sentEvents[0].problemTranscript, /\*\*Zhrnutie:\*\* Pacient potvrdil, že už tu bol v minulosti vyšetrený\./);
+  assert.match(sentEvents[0].problemTranscript, /Požiadavka: Potreboval by som Ibalgin a Ibuprofen\./);
+  assert.doesNotMatch(sentEvents[0].problemTranscript, /Pacient potvrdil vyšetrenie v aktuálnej ambulancii/);
+});
+
 test('madarsky flow receptu od pacienta mimo aktualnej ambulancie neslubuje predpis', async () => {
   const callSid = 'CA-VADKERTI-HU-00000000000000000001';
   await incoming(callSid, '+421905111223');
