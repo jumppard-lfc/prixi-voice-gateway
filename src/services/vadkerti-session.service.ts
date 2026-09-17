@@ -27,7 +27,9 @@ export interface VadkertiSession {
   answers: Array<{ step: VadkertiStep; text: string }>;
   attempts: number;
   clinicId?: string;
+  outcome?: 'completed' | 'abandoned';
   startedAt: string;
+  endedAt?: string;
   expiresAt: number;
 }
 

@@ -12,7 +12,7 @@ import { resolve } from 'node:path';
 import { voiceBotConfigStore } from '../services/voice-bot-config.store';
 import { normalizeBirthYearTranscript } from '../utils/transcript-normalization';
 import { getVoicemailDraft, updateVoicemailDraft, VoicemailDraft } from '../utils/voicemail-draft-store';
-import { startVadkertiVoiceBot } from './vadkerti-voice-bot.controller';
+import { finalizeAbandonedVadkertiCall, startVadkertiVoiceBot } from './vadkerti-voice-bot.controller';
 import { vadkertiBotConfig } from '../config/vadkerti.config';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -666,5 +666,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     if (draft?.problemUrl) {
       dispatchDraft(draft);
     }
+
+    finalizeAbandonedVadkertiCall(fastify, body.CallSid, new Date().toISOString());
   });
 }

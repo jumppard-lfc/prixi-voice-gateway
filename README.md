@@ -102,6 +102,9 @@ https://<voice-gateway-host>/voice/call-status
 ```
 
 This callback finalizes a request when a caller hangs up while the bot is
-speaking between two recording steps. Drafts expire after 24 hours. Because the
-store is intentionally in memory, an application restart or a request routed to
-a different instance can lose an unfinished draft.
+speaking between two recording steps. For the Vadkerti flow it creates a
+clearly marked partial request only after the caller has stated what they need;
+language-only, after-hours, and urgent calls do not create one. Drafts expire
+after 24 hours. Because the stores are intentionally in memory, an application
+restart or a request routed to a different instance can lose an unfinished
+draft.

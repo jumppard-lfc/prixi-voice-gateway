@@ -38,6 +38,15 @@ async function answer(callSid, speech) {
   return post('/voice/vadkerti/answer', { CallSid: callSid, From: '+421905111222', SpeechResult: speech });
 }
 
+async function callStatus(callSid, from = '+421905111222') {
+  return post('/voice/call-status', {
+    CallSid: callSid,
+    From: from,
+    To: '+420910922693',
+    CallStatus: 'completed',
+  });
+}
+
 async function incoming(callSid, from = '+421905111222') {
   return post('/voice/incoming', {
     CallSid: callSid,
@@ -116,6 +125,48 @@ test('Vadkerti routing nezapise poziadavku pri nerozpoznanom Prixi clinicId', as
   }
 });
 
+test('zlozenie po uvedeni poziadavky vytvori jednu oznacenu ciastocnu poziadavku', async () => {
+  const callSid = 'CA-VADKERTI-PARTIAL-000000000000001';
+  await incoming(callSid);
+  await answer(callSid, 'slovensky');
+  await answer(callSid, 'Mám výsledok MRI vyšetrenia');
+
+  const firstStatus = await callStatus(callSid);
+  const duplicateStatus = await callStatus(callSid);
+  assert.equal(firstStatus.statusCode, 204);
+  assert.equal(duplicateStatus.statusCode, 204);
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(sentEvents.length, 1);
+  assert.match(sentEvents[0].problemTranscript, /Stav hovoru: NEDOKONČENÝ/);
+  assert.match(sentEvents[0].problemTranscript, /Kategória: kontrola s výsledkom vyšetrenia/);
+  assert.match(sentEvents[0].problemTranscript, /Mám výsledok MRI vyšetrenia/);
+  assert.equal(sentEvents[0].nameTranscript, '');
+});
+
+test('nedotriedena ziadost o termin sa pri zlozeni zachova na manualne dotriedenie', async () => {
+  const callSid = 'CA-VADKERTI-PARTIAL-TERM-00000000001';
+  await incoming(callSid);
+  await answer(callSid, 'slovensky');
+  await answer(callSid, 'Chcem termín na neurologické vyšetrenie');
+  await callStatus(callSid);
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(sentEvents.length, 1);
+  assert.match(sentEvents[0].problemTranscript, /nedokončená požiadavka – čaká na manuálne dotriedenie/);
+  assert.match(sentEvents[0].problemTranscript, /Chcem termín na neurologické vyšetrenie/);
+});
+
+test('zlozenie pred uvedenim poziadavky nevytvori prazdny Prixi zaznam', async () => {
+  const callSid = 'CA-VADKERTI-EMPTY-PARTIAL-0000000001';
+  await incoming(callSid);
+  await answer(callSid, 'slovensky');
+  await callStatus(callSid);
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(sentEvents.length, 0);
+});
+
 test('slovensky flow noveho pacienta vytvori kategorizovanu poziadavku v PriXi bez terminu', async () => {
   const callSid = 'CA-VADKERTI-SK-00000000000000000001';
   const started = await incoming(callSid);
@@ -138,6 +189,11 @@ test('slovensky flow noveho pacienta vytvori kategorizovanu poziadavku v PriXi b
   assert.match(sentEvents[0].problemTranscript, /Kategória: nový pacient \/ ešte nebol u neurológa/);
   assert.match(sentEvents[0].problemTranscript, /Jazyk hovoru: SK/);
   assert.match(sentEvents[0].problemTranscript, /Konkrétny termín nebol pridelený/);
+  assert.match(sentEvents[0].problemTranscript, /Stav hovoru: dokončený/);
+
+  await callStatus(callSid);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(sentEvents.length, 1);
 });
 
 test('madarsky flow receptu od pacienta mimo aktualnej ambulancie neslubuje predpis', async () => {
@@ -165,6 +221,8 @@ test('urgentny symptom ukonci administrativny flow a odkáže na 155 alebo 112',
   const response = await answer(callSid, 'Náhle mi ochrnula pravá strana a neviem rozprávať');
   assert.match(response.body, /155 alebo 112/);
   assert.match(response.body, /<Hangup\/>/);
+  await callStatus(callSid, '+421905111224');
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(sentEvents.length, 0);
 });
 
@@ -175,5 +233,7 @@ test('po 12:00 bot pouzije lokalizovany after-hours flow a nevytvori poziadavku'
   const response = await answer(callSid, 'magyarul');
   assert.match(response.body, /fél nyolctól délig/);
   assert.match(response.body, /következő munkanapon/);
+  await callStatus(callSid, '+421905111225');
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(sentEvents.length, 0);
 });

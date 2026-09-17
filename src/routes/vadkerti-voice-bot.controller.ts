@@ -216,20 +216,29 @@ function requestSummary(session: VadkertiSession): string {
     case 'medical_report': return `Požiadavka na nález: ${session.detail || 'neuvedené'}.${isSocialPurposeReport(session.detail || '') ? ' Sociálny/posudkový účel – pacient bol upozornený na spoplatnenie podľa cenníka VÚC.' : ''}`;
     case 'appointment_change_or_cancellation': return `Pacient chce termín ${session.appointmentAction === 'cancel' ? 'zrušiť' : 'zmeniť'}. Pôvodný termín: ${session.originalAppointment || 'pacient ho neuviedol'}. Bot termín v Curo nezmenil ani nezrušil.`;
     case 'other': return `Iná požiadavka: ${session.detail || 'neuvedené'}.`;
-    default: return 'Nezaradená telefonická požiadavka.';
+    default: return session.outcome === 'abandoned'
+      ? 'Pacient uviedol požiadavku, ale hovor ukončil pred dokončením triáže.'
+      : 'Nezaradená telefonická požiadavka.';
   }
 }
 
 function buildProblemTranscript(session: VadkertiSession): string {
   const transcript = session.answers.map((answer) => `${answer.step}: ${answer.text}`).join(' | ');
+  const category = session.requestType
+    ? categoryLabels[session.requestType]
+    : session.outcome === 'abandoned'
+      ? 'nedokončená požiadavka – čaká na manuálne dotriedenie'
+      : 'nezistená';
   return [
     '[Voice-bot MUDr. Peter Vadkerti]',
-    `Kategória: ${session.requestType ? categoryLabels[session.requestType] : 'nezistená'}`,
+    `Stav hovoru: ${session.outcome === 'abandoned' ? 'NEDOKONČENÝ – volajúci zložil pred ukončením flow' : 'dokončený'}`,
+    `Kategória: ${category}`,
     `Jazyk hovoru: ${session.language === 'hu' ? 'HU' : 'SK'}`,
     `Telefón: ${session.phone}`,
     `Meno: ${session.patientName || 'neuvedené'}`,
     `Rok narodenia: ${session.birthYear || 'neuvedený'}`,
     `Zhrnutie: ${requestSummary(session)}`,
+    ...(session.outcome === 'abandoned' ? [`Posledný krok: ${session.step}`] : []),
     `Prepis odpovedí: ${transcript}`,
   ].join('\n');
 }
@@ -255,9 +264,17 @@ function closingMessage(session: VadkertiSession): string {
   return `${base} Dovidenia.`;
 }
 
-function dispatchRequest(fastify: FastifyInstance, session: VadkertiSession): void {
-  if (!session.clinicId || !session.requestType) return;
-  const endedAt = new Date().toISOString();
+function hasMeaningfulRequest(session: VadkertiSession): boolean {
+  return session.answers.some((answer) => answer.step === 'intent' && answer.text.trim().length > 0);
+}
+
+function dispatchRequest(
+  fastify: FastifyInstance,
+  session: VadkertiSession,
+  onSuccess?: () => void
+): boolean {
+  if (!session.clinicId || (!session.requestType && !hasMeaningfulRequest(session))) return false;
+  const endedAt = session.endedAt || new Date().toISOString();
   const durationSeconds = Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(session.startedAt)) / 1000));
   const event: VoicemailRecordedEvent = {
     event: 'voicemail_recorded',
@@ -276,17 +293,23 @@ function dispatchRequest(fastify: FastifyInstance, session: VadkertiSession): vo
     problemTranscript: buildProblemTranscript(session),
   };
   const eventKey = createVoiceEventKey('voicemail_recorded', session.callSid);
-  if (!claimVoiceEvent(eventKey)) return;
+  if (!claimVoiceEvent(eventKey)) return false;
   prixiService.sendEvent(event, 3, eventKey)
-    .then(() => completeVoiceEvent(eventKey))
+    .then(() => {
+      completeVoiceEvent(eventKey);
+      onSuccess?.();
+    })
     .catch((error) => {
       failVoiceEvent(eventKey);
       fastify.log.error(error, 'Failed to create Vadkerti PriXi request');
     });
+  return true;
 }
 
 function completeCall(fastify: FastifyInstance, reply: FastifyReply, session: VadkertiSession): FastifyReply {
   const message = closingMessage(session);
+  session.outcome = 'completed';
+  session.endedAt = new Date().toISOString();
   dispatchRequest(fastify, session);
   vadkertiSessionService.delete(session.callSid);
   return renderSimpleEnd(reply, session.language || 'sk', message);
@@ -310,6 +333,30 @@ export function startVadkertiVoiceBot(
   return renderLanguagePrompt(reply, session);
 }
 
+/**
+ * Finalizes a useful but unfinished call from the shared terminal-status
+ * webhook. Calls that contain only a language choice are intentionally
+ * discarded, so the clinic does not receive empty requests.
+ */
+export function finalizeAbandonedVadkertiCall(
+  fastify: FastifyInstance,
+  callSid: string,
+  endedAt: string = new Date().toISOString()
+): boolean {
+  const session = vadkertiSessionService.get(callSid);
+  if (!session) return false;
+
+  if (!session.clinicId || !hasMeaningfulRequest(session)) {
+    vadkertiSessionService.delete(callSid);
+    return false;
+  }
+
+  session.outcome = 'abandoned';
+  session.endedAt = endedAt;
+  vadkertiSessionService.save(session);
+  return dispatchRequest(fastify, session, () => vadkertiSessionService.delete(callSid));
+}
+
 export async function vadkertiVoiceBotRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post('/vadkerti/prompt', async (request, reply) => {
     const body = request.body as Record<string, string>;
@@ -317,7 +364,7 @@ export async function vadkertiVoiceBotRoutes(fastify: FastifyInstance): Promise<
     if (!session) return expired(reply);
     session.attempts += 1;
     if (session.attempts >= 3) {
-      vadkertiSessionService.delete(session.callSid);
+      finalizeAbandonedVadkertiCall(fastify, session.callSid);
       return renderSimpleEnd(reply, session.language || 'sk', text[session.language || 'sk'].expired);
     }
     return renderPrompt(reply, session, text[session.language || 'sk'].retry + ' ');
