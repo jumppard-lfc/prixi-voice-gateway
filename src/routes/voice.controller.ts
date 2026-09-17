@@ -60,7 +60,8 @@ function isDobrovodskaRoute(phone?: string): boolean {
 const DEFAULT_GREETING = 'Dobrý deň, dovolali ste sa do ambulancie. Pre zanechanie odkazu popíšte po zaznení tónu najprv váš problém a po skončení stlačte hociktoré tlačidlo.';
 const PEDIATRIC_GREETING = 'Dobrý deň, dovolali ste sa do pediatrickej ambulancie doktorky Čelkovej. Ak ide o náhly život ohrozujúci stav, volajte tiesňovú linku 155 alebo 112. V opačnom prípade nám prosím po zaznení tónu stručne povedzte, s čím sa na ambulanciu obraciate. Môže ísť napríklad o zdravotné ťažkosti dieťaťa, predpis liekov, výsledky vyšetrenia alebo objednanie. Po skončení stlačte ľubovoľné tlačidlo.';
 const ORTHOPEDIC_GREETING = 'Dobrý deň, dovolali ste sa do ortopedickej ambulancie pani doktorky Miroslavy Beňovej Baloghovej. Po zaznení tónu nám, prosím, povedzte, s čím vám môžeme pomôcť. Po skončení stlačte ľubovoľné tlačidlo.';
-const NOVOTNY_DENTAL_GREETING = 'Dobrý deň, dovolali ste sa do zubnej ambulancie doktora Miroslava Novotného v Kvetoslavove. Telefón je momentálne nedostupný alebo obsadený. Po zaznení tónu nám, prosím, stručne povedzte, s čím vám môžeme pomôcť. Po skončení stlačte ľubovoľné tlačidlo.';
+const NOVOTNY_DENTAL_GREETING = 'Prepáčte za zdržanie. Tu je virtuálna sestra PriXi z ambulancie doktora Novotného. Povedzte mi, prosím, svoje meno a s čím vám môžem pomôcť.';
+const NOVOTNY_DENTAL_COMPLETION = 'Rozumiem. Vašu požiadavku odovzdám doktorovi Novotnému a ozveme sa vám späť do 24 hodín. Ďakujem a dovidenia.';
 const PROTECTED_PRODUCTION_TWILIO_NUMBERS = new Set([
   CELKOVA_PHONE_NUMBER,
   BENOVA_BALOGHOVA_PHONE_NUMBER,
@@ -371,7 +372,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         action: `/voice/record-problem?forwardedFrom=${encodeURIComponent(forwardedFrom)}&pediatricMode=${pediatricMode}&dentalMode=${dentalMode}`,
         playBeep: true,
         maxLength: 120,
-        timeout: 10
+        timeout: dentalMode ? 3 : 10
       });
 
       return reply.type('text/xml').send(twiml.toString());
@@ -407,6 +408,21 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         callCompleted: true,
         callEndedAt: new Date().toISOString(),
       }) || draft;
+      if (completedDraft) dispatchDraft(completedDraft);
+      return;
+    }
+
+    if (dentalMode) {
+      const completedDraft = updateVoicemailDraft(body.CallSid, {
+        callCompleted: true,
+        callEndedAt: new Date().toISOString(),
+      }) || draft;
+      twiml.say(
+        { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
+        NOVOTNY_DENTAL_COMPLETION
+      );
+      twiml.hangup();
+      reply.type('text/xml').send(twiml.toString());
       if (completedDraft) dispatchDraft(completedDraft);
       return;
     }
@@ -537,7 +553,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
           transcribeSafe(problemUrl, pediatricMode
             ? 'Telefonická požiadavka rodiča pre pediatrickú ambulanciu v slovenčine.'
             : dentalMode
-              ? 'Telefonická požiadavka pacienta pre zubnú ambulanciu v slovenčine.'
+              ? 'Telefonická požiadavka pacienta pre zubnú ambulanciu v slovenčine. Pacient môže na začiatku uviesť svoje meno; zachovaj ho v prepise.'
               : 'Telefonická požiadavka pacienta pre lekársku ambulanciu v slovenčine.')
         ]);
         const birthYearTranscript = normalizeBirthYearTranscript(rawBirthYearTranscript);
@@ -637,7 +653,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       const completionMessage = pediatricMode
         ? 'Ďakujeme, vašu požiadavku sme zaznamenali. Ambulancia sa vám po jej spracovaní ozve na telefónne číslo, z ktorého voláte. Dovidenia.'
         : dentalMode
-          ? 'Ďakujeme, vašu požiadavku sme zaznamenali. Zubná ambulancia vás bude kontaktovať do 24 hodín na telefónnom čísle, z ktorého voláte. Dovidenia.'
+          ? NOVOTNY_DENTAL_COMPLETION
           : 'Rozumiem, vaša požiadavka je zaznamenaná, ambulancia sa vám po jej prijatí ozve. Ďakujeme a dovidenia.';
       twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, completionMessage);
     }

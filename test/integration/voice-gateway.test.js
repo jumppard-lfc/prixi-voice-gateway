@@ -817,6 +817,7 @@ test('Twilio cislo MUDr. Benovej Baloghovej aktivuje ortopedicky voice bot', asy
 test('Konfigurovane Twilio cislo MUDr. Novotneho aktivuje zubarsky voice bot', async () => {
   const previousPhoneNumber = process.env.NOVOTNY_VOICE_BOT_PHONE_NUMBER;
   process.env.NOVOTNY_VOICE_BOT_PHONE_NUMBER = '+420910927999';
+  sttService.transcribeAudioUrl = async () => 'Ján Novák, bolí ma zub.';
   let requestedPhoneNumber = null;
   prixiService.getConfig = async (phoneNumber) => {
     requestedPhoneNumber = phoneNumber;
@@ -837,8 +838,10 @@ test('Konfigurovane Twilio cislo MUDr. Novotneho aktivuje zubarsky voice bot', a
 
     assert.equal(incoming.statusCode, 200);
     assert.equal(requestedPhoneNumber, '+420910927999');
-    assert.match(incoming.body, /zubnej ambulancie doktora Miroslava Novotného v Kvetoslavove/);
-    assert.match(incoming.body, /nedostupný alebo obsadený/);
+    assert.match(incoming.body, /virtuálna sestra PriXi z ambulancie doktora Novotného/);
+    assert.match(incoming.body, /Povedzte mi, prosím, svoje meno a s čím vám môžem pomôcť/);
+    assert.doesNotMatch(incoming.body, /Vašu požiadavku odovzdám doktorovi Novotnému/);
+    assert.match(incoming.body, /timeout="3"/);
     assert.match(incoming.body, /forwardedFrom=%2B420910927999/);
     assert.match(incoming.body, /pediatricMode=false/);
     assert.match(incoming.body, /dentalMode=true/);
@@ -851,17 +854,12 @@ test('Konfigurovane Twilio cislo MUDr. Novotneho aktivuje zubarsky voice bot', a
       RecordingDuration: '12',
     });
     assert.equal(problem.statusCode, 200);
-    assert.match(problem.body, /dentalMode=true/);
-
-    const completeEndpoint = '/voice/recording-complete?forwardedFrom=%2B420910927999&pediatricMode=false&dentalMode=true';
-    const complete = await signedVoicePost(completeEndpoint, {
-      From: '+421900000007',
-      CallSid: 'CA99999999999999999999999999999985',
-      RecordingDuration: '0',
-    });
-    assert.equal(complete.statusCode, 200);
-    assert.match(complete.body, /kontaktovať do 24 hodín/);
-    assert.match(complete.body, /telefónnom čísle, z ktorého voláte/);
+    assert.match(problem.body, /Rozumiem/);
+    assert.match(problem.body, /Vašu požiadavku odovzdám doktorovi Novotnému/);
+    assert.match(problem.body, /ozveme sa vám späť do 24 hodín/);
+    assert.doesNotMatch(problem.body, /record-name/);
+    assert.match(problem.body, /<Hangup\/>/);
+    await new Promise(resolve => setImmediate(resolve));
   } finally {
     if (previousPhoneNumber === undefined) {
       delete process.env.NOVOTNY_VOICE_BOT_PHONE_NUMBER;
@@ -873,6 +871,7 @@ test('Konfigurovane Twilio cislo MUDr. Novotneho aktivuje zubarsky voice bot', a
       voiceBotEnabled: false,
       timezone: 'Europe/Bratislava',
     });
+    sttService.transcribeAudioUrl = originalTranscribeAudioUrl;
   }
 });
 
@@ -898,7 +897,9 @@ test('Predvolene Twilio cislo MUDr. Novotneho je +420910928021', async () => {
 
     assert.equal(response.statusCode, 200);
     assert.equal(requestedPhoneNumber, '+420910928021');
-    assert.match(response.body, /zubnej ambulancie doktora Miroslava Novotného v Kvetoslavove/);
+    assert.match(response.body, /virtuálna sestra PriXi z ambulancie doktora Novotného/);
+    assert.match(response.body, /svoje meno a s čím vám môžem pomôcť/);
+    assert.match(response.body, /timeout="3"/);
     assert.match(response.body, /forwardedFrom=%2B420910928021/);
     assert.match(response.body, /dentalMode=true/);
   } finally {
