@@ -42,8 +42,7 @@ async function incoming(callSid, from = '+421905111222') {
   return post('/voice/incoming', {
     CallSid: callSid,
     From: from,
-    To: '+421900777777',
-    ForwardedFrom: '+421902647072',
+    To: '+420910922693',
   });
 }
 
@@ -72,8 +71,8 @@ test('vseobecny produkcny endpoint routuje priamo na oddeleny Vadkerti flow', as
   const response = await post('/voice/incoming', {
     CallSid: 'CA-VADKERTI-ROUTING-000000000000001',
     From: '+421905111222',
-    To: '+421900777777',
-    ForwardedFrom: '+421902647072',
+    To: '+420910922693',
+    ForwardedFrom: '+421911500609',
   });
   assert.equal(response.statusCode, 200);
   assert.match(response.body, /neurologickej ambulancie doktora Petra Vadkertiho/);
@@ -81,6 +80,26 @@ test('vseobecny produkcny endpoint routuje priamo na oddeleny Vadkerti flow', as
   assert.doesNotMatch(response.body, /\/voice\/vadkerti\/incoming/);
   assert.doesNotMatch(response.body, /\/voice\/demo\//);
   assert.equal(app.hasRoute({ method: 'POST', url: '/voice/vadkerti/incoming' }), false);
+});
+
+test('cudzie chranene Twilio cislo ma prednost pred Vadkerti ForwardedFrom fallbackom', async () => {
+  const validGetConfig = prixiService.getConfig;
+  prixiService.getConfig = async (phone) => {
+    assert.equal(phone, '+420910927082');
+    return { clinicId: '142', voiceBotEnabled: true, timezone: 'Europe/Bratislava' };
+  };
+  try {
+    const response = await post('/voice/incoming', {
+      CallSid: 'CA-VADKERTI-FOREIGN-DID-000000000001',
+      From: '+421905111229',
+      To: '+420910927082',
+      ForwardedFrom: '+421902647072',
+    });
+    assert.match(response.body, /pediatrickej ambulancie doktorky Čelkovej/);
+    assert.doesNotMatch(response.body, /Petra Vadkertiho/);
+  } finally {
+    prixiService.getConfig = validGetConfig;
+  }
 });
 
 test('Vadkerti routing nezapise poziadavku pri nerozpoznanom Prixi clinicId', async () => {

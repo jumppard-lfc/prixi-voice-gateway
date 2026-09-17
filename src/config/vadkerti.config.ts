@@ -18,6 +18,7 @@ export interface VadkertiBotConfig {
   clinic: {
     displayName: string;
     specialty: string;
+    inboundTwilioNumber: string;
     routingPhoneNumber: string;
     timezone: string;
   };
@@ -50,6 +51,7 @@ export const vadkertiBotConfig: VadkertiBotConfig = {
   clinic: {
     displayName: 'neurologická ambulancia MUDr. Petra Vadkertiho',
     specialty: 'neurológia',
+    inboundTwilioNumber: '+420910922693',
     routingPhoneNumber: '+421902647072',
     timezone: 'Europe/Bratislava',
   },

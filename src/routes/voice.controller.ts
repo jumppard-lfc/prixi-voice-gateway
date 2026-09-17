@@ -13,6 +13,7 @@ import { voiceBotConfigStore } from '../services/voice-bot-config.store';
 import { normalizeBirthYearTranscript } from '../utils/transcript-normalization';
 import { getVoicemailDraft, updateVoicemailDraft, VoicemailDraft } from '../utils/voicemail-draft-store';
 import { startVadkertiVoiceBot } from './vadkerti-voice-bot.controller';
+import { vadkertiBotConfig } from '../config/vadkerti.config';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
@@ -28,6 +29,7 @@ const DOBROVODSKA_CLINIC_ID = '95';
 const PEKARCIK_VIPTEL_PHONE_NUMBER = '+421332289010';
 const PEKARCIK_ROUTING_PHONE_NUMBER = '+421940610160';
 const PEKARCIK_CLINIC_ID = '64';
+const VADKERTI_TWILIO_PHONE_NUMBER = vadkertiBotConfig.clinic.inboundTwilioNumber;
 const VADKERTI_ROUTING_PHONE_NUMBER = '+421902647072';
 const UNRESOLVED_CLINIC_IDS = new Set(['', 'orphan', 'fallback', 'local-dev']);
 const KLOSTERMANN_SK_GREETING = 'Dobrý deň, dovolali ste sa do Ortodoncia Klostermann. Aby ste nemuseli čakať, posielame Vám SMS správu s odkazom na objednanie. Ďakujeme.';
@@ -67,6 +69,7 @@ const PROTECTED_PRODUCTION_TWILIO_NUMBERS = new Set([
   PEKARCIK_VIPTEL_PHONE_NUMBER,
   PEKARCIK_ROUTING_PHONE_NUMBER,
   DOBROVODSKA_ROUTING_PHONE_NUMBER,
+  VADKERTI_TWILIO_PHONE_NUMBER,
   VADKERTI_ROUTING_PHONE_NUMBER,
   '+421800232793',
 ]);
@@ -215,7 +218,9 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       || normalizedTo === KLOSTERMANN_PHONE_NUMBER
       || normalizedTo === normalizeSlovakPhoneAddress(novotnyVoiceBotPhoneNumber)
       || isDobrovodskaRoute(body.To);
-    const isVadkertiCall = (!isExistingDedicatedDestination && normalizedCarrierForwardedFrom === VADKERTI_ROUTING_PHONE_NUMBER)
+    const isVadkertiDedicatedDestination = normalizedTo === VADKERTI_TWILIO_PHONE_NUMBER;
+    const isVadkertiCall = isVadkertiDedicatedDestination
+      || (!isExistingDedicatedDestination && normalizedCarrierForwardedFrom === VADKERTI_ROUTING_PHONE_NUMBER)
       || normalizedTo === VADKERTI_ROUTING_PHONE_NUMBER;
 
     if (isVadkertiCall) {

@@ -68,8 +68,9 @@ Run verification with `npm test`.
 The Vadkerti neurology bot is a production intake flow, not a Builder demo.
 Like the other production bots, its Twilio DID posts to the single public
 `/voice/incoming` webhook. The shared router identifies it from
-`ForwardedFrom: +421902647072` (or when `To` is the clinic number itself) and
-hands the call directly to the isolated Vadkerti flow. The clinic-specific
+the authoritative `To: +420910922693`. `ForwardedFrom: +421902647072` remains
+available only as a carrier fallback. The router then hands the call directly
+to the isolated Vadkerti flow. The clinic-specific
 `/voice/vadkerti/answer` and `/voice/vadkerti/prompt` routes are internal Twilio
 continuations, not incoming webhooks.
 
