@@ -57,7 +57,7 @@ async function incoming(callSid, from = '+421905111222') {
 
 test.before(async () => {
   prixiService.getConfig = async (phone) => {
-    assert.equal(phone, '+421902647072');
+    assert.equal(phone, '+420910922693');
     return { clinicId: '777', voiceBotEnabled: true, timezone: 'Europe/Bratislava' };
   };
   prixiService.sendEvent = async (event) => sentEvents.push(event);
@@ -84,7 +84,8 @@ test('vseobecny produkcny endpoint routuje priamo na oddeleny Vadkerti flow', as
     ForwardedFrom: '+421911500609',
   });
   assert.equal(response.statusCode, 200);
-  assert.match(response.body, /neurologickej ambulancie doktora Petra Vadkertiho/);
+  assert.match(response.body, /<phoneme alphabet="ipa" ph="neu̯roloːɡit͡skeːj">neurologickej<\/phoneme>/);
+  assert.match(response.body, /<phoneme alphabet="ipa" ph="vadkertiɦo">Vadkertiho<\/phoneme>/);
   assert.match(response.body, /action="\/voice\/vadkerti\/answer"/);
   assert.doesNotMatch(response.body, /\/voice\/vadkerti\/incoming/);
   assert.doesNotMatch(response.body, /\/voice\/demo\//);
@@ -120,6 +121,27 @@ test('Vadkerti routing nezapise poziadavku pri nerozpoznanom Prixi clinicId', as
     const response = await answer(callSid, 'slovensky');
     assert.match(response.body, /Momentálne máme technické problémy/);
     assert.equal(sentEvents.length, 0);
+  } finally {
+    prixiService.getConfig = validGetConfig;
+  }
+});
+
+test('Vadkerti PriXi config pouzije cislo ambulancie ako fallback za Twilio DID', async () => {
+  const validGetConfig = prixiService.getConfig;
+  const lookups = [];
+  prixiService.getConfig = async (phone) => {
+    lookups.push(phone);
+    if (phone === '+420910922693') {
+      return { clinicId: 'fallback', voiceBotEnabled: true, timezone: 'Europe/Bratislava' };
+    }
+    return { clinicId: '777', voiceBotEnabled: true, timezone: 'Europe/Bratislava' };
+  };
+  try {
+    const callSid = 'CA-VADKERTI-CONFIG-FALLBACK-0000000001';
+    await incoming(callSid);
+    const response = await answer(callSid, 'slovensky');
+    assert.match(response.body, /Stručne mi/);
+    assert.deepEqual(lookups, ['+420910922693', '+421902647072']);
   } finally {
     prixiService.getConfig = validGetConfig;
   }
@@ -170,11 +192,12 @@ test('zlozenie pred uvedenim poziadavky nevytvori prazdny Prixi zaznam', async (
 test('slovensky flow noveho pacienta vytvori kategorizovanu poziadavku v PriXi bez terminu', async () => {
   const callSid = 'CA-VADKERTI-SK-00000000000000000001';
   const started = await incoming(callSid);
-  assert.match(started.body, /neurologickej ambulancie doktora Petra Vadkertiho/);
+  assert.match(started.body, /<phoneme alphabet="ipa" ph="neu̯roloːɡit͡skeːj">neurologickej<\/phoneme>/);
+  assert.match(started.body, /<phoneme alphabet="ipa" ph="vadkertiɦo">Vadkertiho<\/phoneme>/);
 
   assert.match((await answer(callSid, 'slovensky')).body, /Stručne mi/);
   assert.match((await answer(callSid, 'Chcem sa objednať na neurologické vyšetrenie')).body, /Boli ste už vyšetrený v tejto aktuálnej ambulancii/);
-  assert.match((await answer(callSid, 'nie')).body, /iným neurológom/);
+  assert.match((await answer(callSid, 'nie')).body, /iným <phoneme alphabet="ipa" ph="neu̯roloːɡom">neurológom<\/phoneme>/);
   assert.match((await answer(callSid, 'nie')).body, /meno a priezvisko/);
   assert.match((await answer(callSid, 'Ján Novák')).body, /rok narodenia/);
   const completed = await answer(callSid, '1984');

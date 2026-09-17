@@ -36,6 +36,51 @@ const sayOptions: Record<VadkertiLanguage, any> = {
   hu: { language: 'hu-HU', voice: 'Google.hu-HU-Wavenet-A' },
 };
 
+// Slovak TTS otherwise palatalizes the initial "n" in the international word
+// neurológ and the "t" in Vadkerti. Keep the written copy correct and control
+// only the synthesized pronunciation through SSML.
+const slovakPronunciations: Record<string, string> = {
+  neurologickej: 'neu̯roloːɡit͡skeːj',
+  neurologické: 'neu̯roloːɡit͡skeː',
+  neurológa: 'neu̯roloːɡa',
+  neurológom: 'neu̯roloːɡom',
+  neurológovi: 'neu̯roloːɡovi',
+  vadkertiho: 'vadkertiɦo',
+};
+
+const slovakPronunciationPattern = /neurologickej|neurologické|neurológovi|neurológom|neurológa|Vadkertiho/giu;
+
+function sayWithClinicPronunciation(
+  target: { say: (options: any, message?: string) => any },
+  language: VadkertiLanguage,
+  message: string
+): void {
+  if (language !== 'sk') {
+    target.say(sayOptions[language], message);
+    return;
+  }
+
+  const matches = [...message.matchAll(slovakPronunciationPattern)];
+  if (matches.length === 0) {
+    target.say(sayOptions.sk, message);
+    return;
+  }
+
+  const firstIndex = matches[0].index || 0;
+  const say = target.say(sayOptions.sk, message.slice(0, firstIndex));
+  let cursor = firstIndex;
+
+  for (const match of matches) {
+    const index = match.index || 0;
+    if (index > cursor) say.say.txt(message.slice(cursor, index));
+    const word = match[0];
+    say.phoneme({ alphabet: 'ipa', ph: slovakPronunciations[word.toLocaleLowerCase('sk')] }, word);
+    cursor = index + word.length;
+  }
+
+  if (cursor < message.length) say.say.txt(message.slice(cursor));
+}
+
 const text = {
   sk: {
     expired: 'Platnosť hovoru vypršala. Zavolajte, prosím, znova.',
@@ -109,7 +154,7 @@ function renderLanguagePrompt(reply: FastifyReply, session: VadkertiSession): Fa
     hints: 'slovensky, po slovensky, magyarul, po maďarsky',
     numDigits: 1,
   } as any);
-  gather.say(sayOptions.sk, 'Dobrý deň, dovolali ste sa do neurologickej ambulancie doktora Petra Vadkertiho. Pre slovenčinu povedzte slovensky alebo stlačte jednotku.');
+  sayWithClinicPronunciation(gather, 'sk', 'Dobrý deň, dovolali ste sa do neurologickej ambulancie doktora Petra Vadkertiho. Pre slovenčinu povedzte slovensky alebo stlačte jednotku.');
   gather.say(sayOptions.hu, 'Jó napot kívánok, Vadkerti Péter doktor neurológiai rendelőjét hívta. Magyar nyelvhez mondja, hogy magyarul, vagy nyomja meg a kettes gombot.');
   twiml.redirect('/voice/vadkerti/prompt');
   return reply.type('text/xml').send(twiml.toString());
@@ -158,26 +203,35 @@ function renderPrompt(reply: FastifyReply, session: VadkertiSession, prefix = ''
         ? language === 'hu' ? 'módosítani, lemondani' : 'zmeniť, zrušiť'
         : '',
   } as any);
-  gather.say(sayOptions[language], `${prefix}${promptFor(session)}`.trim());
+  sayWithClinicPronunciation(gather, language, `${prefix}${promptFor(session)}`.trim());
   twiml.redirect('/voice/vadkerti/prompt');
   return reply.type('text/xml').send(twiml.toString());
 }
 
 function renderSimpleEnd(reply: FastifyReply, language: VadkertiLanguage, message: string): FastifyReply {
   const twiml = new VoiceResponse();
-  twiml.say(sayOptions[language], message);
+  sayWithClinicPronunciation(twiml, language, message);
   twiml.hangup();
   return reply.type('text/xml').send(twiml.toString());
 }
 
 async function resolveClinicId(): Promise<string> {
-  const config = await prixiService.getConfig(vadkertiBotConfig.clinic.routingPhoneNumber);
-  const clinicId = String(config.clinicId ?? '').trim();
-  if (config.voiceBotEnabled !== true) throw new Error('Vadkerti voice bot is disabled in PriXi configuration');
-  if (UNRESOLVED_CLINIC_IDS.has(clinicId.toLowerCase())) {
-    throw new Error(`Blocked unresolved Vadkerti clinic: received ${clinicId || '<missing>'}`);
+  const lookupNumbers = [
+    vadkertiBotConfig.clinic.inboundTwilioNumber,
+    vadkertiBotConfig.clinic.routingPhoneNumber,
+  ];
+  const failures: string[] = [];
+
+  for (const phoneNumber of lookupNumbers) {
+    const config = await prixiService.getConfig(phoneNumber);
+    const clinicId = String(config.clinicId ?? '').trim();
+    if (config.voiceBotEnabled === true && !UNRESOLVED_CLINIC_IDS.has(clinicId.toLowerCase())) {
+      return clinicId;
+    }
+    failures.push(`${phoneNumber}: clinic=${clinicId || '<missing>'}, enabled=${config.voiceBotEnabled === true}`);
   }
-  return clinicId;
+
+  throw new Error(`Blocked unresolved or disabled Vadkerti clinic (${failures.join('; ')})`);
 }
 
 function moveAfterIntent(session: VadkertiSession, rawIntent: string): void {

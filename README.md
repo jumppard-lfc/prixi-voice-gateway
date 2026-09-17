@@ -84,9 +84,11 @@ TWILIO_AUTH_TOKEN="..."
 ```
 
 The bot writes through the existing PriXi
-`/api/voice/event` integration. PriXi must resolve `+421902647072` to the
-correct clinic with `voiceBotEnabled: true`. Do not enable `PRIXI_MOCK_MODE` in
-production. No Vadkerti-specific environment variable is required.
+`/api/voice/event` integration. PriXi first resolves the authoritative Twilio
+DID `+420910922693`; the clinic number `+421902647072` is retained as a
+compatibility fallback. At least one of them must resolve to the correct clinic
+with `voiceBotEnabled: true`. Do not enable `PRIXI_MOCK_MODE` in production. No
+Vadkerti-specific environment variable is required.
 
 The current version never reads or writes Curo. Future slot mappings are kept
 inactive in `src/config/vadkerti.config.ts` for a later reviewed connector.
