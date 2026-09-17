@@ -56,7 +56,7 @@ const text = {
     afterHours: 'Telefonické požiadavky ambulancia prijíma v pracovné dni od siedmej tridsať do dvanástej. Kontaktujte nás, prosím, nasledujúci pracovný deň. Ďakujeme a dovidenia.',
     intent: 'Stručne mi, prosím, povedzte, čo potrebujete. Napríklad termín alebo kontrolu, výsledok vyšetrenia, výkon, recept, nález, alebo zmenu termínu.',
     currentClinic: 'Boli ste už vyšetrený v tejto aktuálnej ambulancii doktora Vadkertiho? Odpovedzte áno alebo nie.',
-    priorNeurologist: 'Boli ste už niekedy vyšetrovaný iným neurológom? Odpovedzte áno alebo nie.',
+    priorNeurologist: 'Boli ste už niekedy vyšetrovaný iným lekárom v tomto odbore? Odpovedzte áno alebo nie.',
     resultDetail: 'O aký výsledok vyšetrenia ide? Napríklad CT, MRI, EMG alebo EEG.',
     procedureDetail: 'Aký konkrétny výkon potrebujete? Napríklad USG karotíd, USG kĺbov, obstrek alebo kinesiotape.',
     prescriptionDetail: 'Ktoré lieky alebo recept potrebujete?',
@@ -122,7 +122,7 @@ function renderLanguagePrompt(reply: FastifyReply, session: VadkertiSession): Fa
     hints: 'slovensky, po slovensky, magyarul, po maďarsky',
     numDigits: 1,
   } as any);
-  sayWithClinicPronunciation(gather, 'sk', 'Dobrý deň, dovolali ste sa do neurologickej ambulancie doktora Petra Vadkertiho. Pre slovenčinu povedzte slovensky alebo stlačte jednotku.');
+  sayWithClinicPronunciation(gather, 'sk', 'Dobrý deň, dovolali ste sa do ambulancie doktora Petra Vadkertiho. Pre slovenčinu povedzte slovensky alebo stlačte jednotku.');
   gather.say(sayOptions.hu, 'Jó napot kívánok, Vadkerti Péter doktor neurológiai rendelőjét hívta. Magyar nyelvhez mondja, hogy magyarul, vagy nyomja meg a kettes gombot.');
   twiml.redirect('/voice/vadkerti/prompt');
   return reply.type('text/xml').send(twiml.toString());
@@ -179,6 +179,14 @@ function renderPrompt(reply: FastifyReply, session: VadkertiSession, prefix = ''
 function renderSimpleEnd(reply: FastifyReply, language: VadkertiLanguage, message: string): FastifyReply {
   const twiml = new VoiceResponse();
   sayWithClinicPronunciation(twiml, language, message);
+  twiml.hangup();
+  return reply.type('text/xml').send(twiml.toString());
+}
+
+function renderAfterHoursEnd(reply: FastifyReply): FastifyReply {
+  const twiml = new VoiceResponse();
+  sayWithClinicPronunciation(twiml, 'sk', text.sk.afterHours);
+  sayWithClinicPronunciation(twiml, 'hu', text.hu.afterHours);
   twiml.hangup();
   return reply.type('text/xml').send(twiml.toString());
 }
@@ -278,7 +286,7 @@ function closingMessage(session: VadkertiSession): string {
   }
 
   const base = 'Ďakujem. Vašu požiadavku sme zaznamenali. Ambulancia ju spracuje a následne vás bude informovať. Konkrétny termín sme teraz nerezervovali.';
-  if (session.requestType === 'new_to_clinic_seen_neurologist') return `${base} Na vyšetrenie si prineste predchádzajúce neurologické nálezy a posledné výsledky vyšetrení ordinovaných vaším neurológom. Dovidenia.`;
+  if (session.requestType === 'new_to_clinic_seen_neurologist') return `${base} Na vyšetrenie si prineste predchádzajúce odborné nálezy a posledné výsledky vyšetrení, ktoré vám ordinoval váš predchádzajúci odborný lekár. Dovidenia.`;
   if (session.requestType === 'prescription' && session.prescriptionEligible) return 'Ďakujem. Požiadavku na recept sme zaznamenali. Ambulancia tieto požiadavky štandardne vybavuje v priebehu poobedia toho istého dňa a následne vás bude informovať. Dovidenia.';
   if (session.requestType === 'prescription' && !session.prescriptionEligible) return 'Ambulancia môže týmto spôsobom vybaviť recept iba pacientom, ktorí už boli vyšetrení v tejto aktuálnej ambulancii. Váš kontakt sme zaznamenali pre personál; nejde o prísľub predpísania receptu. Dovidenia.';
   if (session.requestType === 'medical_report') return `${base} Pre nález je potrebné zastaviť sa osobne a predĺženie nálezu ambulancia štandardne vybavuje do nasledujúceho poobedia.${isSocialPurposeReport(session.detail || '') ? ' Nálezy na sociálne alebo posudkové účely sú spoplatnené podľa cenníka ambulancie dostupného na portáli VÚC.' : ''} Dovidenia.`;
@@ -351,6 +359,7 @@ export function startVadkertiVoiceBot(
   reply: FastifyReply,
   body: Record<string, string>
 ): FastifyReply {
+  if (!isVadkertiWithinBusinessHours()) return renderAfterHoursEnd(reply);
   const session = vadkertiSessionService.create(body.CallSid, body.From || '');
   return renderLanguagePrompt(reply, session);
 }

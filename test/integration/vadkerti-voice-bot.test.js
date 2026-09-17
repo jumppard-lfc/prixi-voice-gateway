@@ -85,7 +85,8 @@ test('vseobecny produkcny endpoint routuje priamo na oddeleny Vadkerti flow', as
   });
   assert.equal(response.statusCode, 200);
   assert.match(response.body, /voice="Google.sk-SK-Wavenet-B"/);
-  assert.match(response.body, /neurologickej ambulancie doktora Petra Vadkertyho/);
+  assert.match(response.body, /ambulancie doktora Petra Vadkertyho/);
+  assert.doesNotMatch(response.body, /neurologickej ambulancie/iu);
   assert.doesNotMatch(response.body, /<phoneme/);
   assert.match(response.body, /action="\/voice\/vadkerti\/answer"/);
   assert.doesNotMatch(response.body, /\/voice\/vadkerti\/incoming/);
@@ -194,11 +195,12 @@ test('slovensky flow noveho pacienta vytvori kategorizovanu poziadavku v PriXi b
   const callSid = 'CA-VADKERTI-SK-00000000000000000001';
   const started = await incoming(callSid);
   assert.match(started.body, /voice="Google.sk-SK-Wavenet-B"/);
-  assert.match(started.body, /neurologickej ambulancie doktora Petra Vadkertyho/);
+  assert.match(started.body, /ambulancie doktora Petra Vadkertyho/);
+  assert.doesNotMatch(started.body, /neurologickej ambulancie/iu);
 
   assert.match((await answer(callSid, 'slovensky')).body, /Stručne mi/);
   assert.match((await answer(callSid, 'Chcem sa objednať na neurologické vyšetrenie')).body, /Boli ste už vyšetrený v tejto aktuálnej ambulancii/);
-  assert.match((await answer(callSid, 'nie')).body, /iným neurológom/);
+  assert.match((await answer(callSid, 'nie')).body, /iným lekárom v tomto odbore/);
   assert.match((await answer(callSid, 'nie')).body, /meno a priezvisko/);
   assert.match((await answer(callSid, 'Ján Novák')).body, /rok narodenia/);
   const completed = await answer(callSid, '1984');
@@ -270,10 +272,14 @@ test('urgentny symptom ukonci administrativny flow a odkáže na 155 alebo 112',
 test('po 12:00 bot pouzije lokalizovany after-hours flow a nevytvori poziadavku', async () => {
   Settings.now = () => afterHoursTimestamp;
   const callSid = 'CA-VADKERTI-AFTER-00000000000000001';
-  await incoming(callSid, '+421905111225');
-  const response = await answer(callSid, 'magyarul');
+  const response = await incoming(callSid, '+421905111225');
+  assert.match(response.body, /od siedmej tridsať do dvanástej/);
   assert.match(response.body, /fél nyolctól délig/);
   assert.match(response.body, /következő munkanapon/);
+  assert.match(response.body, /<Hangup\/>/);
+  assert.doesNotMatch(response.body, /<Gather/);
+  assert.doesNotMatch(response.body, /Pre slovenčinu/);
+  assert.doesNotMatch(response.body, /\/voice\/vadkerti\/answer/);
   await callStatus(callSid, '+421905111225');
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(sentEvents.length, 0);
