@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 import { voiceRoutes } from './routes/voice.controller';
 import { voiceBotBuilderRoutes } from './routes/voice-bot-builder.controller';
 import { demoVoiceBotRoutes } from './routes/demo-voice-bot.controller';
+import { vadkertiVoiceBotRoutes } from './routes/vadkerti-voice-bot.controller';
 
 const KLOSTERMANN_GREETING_PATH = resolve(__dirname, 'assets/audio/klostermann-greeting-v5.wav');
 const DOBROVODSKA_GREETING_PATH = resolve(__dirname, 'assets/audio/dobrovodska-1-greeting.wav');
@@ -157,6 +158,7 @@ app.addHook('preHandler', async (request, reply) => {
 
 app.register(voiceRoutes, { prefix: '/voice' });
 app.register(demoVoiceBotRoutes, { prefix: '/voice' });
+app.register(vadkertiVoiceBotRoutes, { prefix: '/voice' });
 app.register(voiceBotBuilderRoutes);
 
 const start = async () => {

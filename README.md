@@ -63,6 +63,33 @@ The builder exposes this as **Dedikované Twilio číslo bota**. Existing produc
 
 Run verification with `npm test`.
 
+## MUDr. Peter Vadkerti production bot
+
+The Vadkerti neurology bot is a production intake flow, not a Builder demo.
+Like the other production bots, its Twilio DID posts to the single public
+`/voice/incoming` webhook. The shared router identifies it from
+`ForwardedFrom: +421902647072` (or when `To` is the clinic number itself) and
+hands the call directly to the isolated Vadkerti flow. The clinic-specific
+`/voice/vadkerti/answer` and `/voice/vadkerti/prompt` routes are internal Twilio
+continuations, not incoming webhooks.
+
+It uses the existing production settings only:
+
+```bash
+PRIXI_API_URL="https://..."
+PRIXI_MOCK_MODE=false
+TWILIO_ACCOUNT_SID="..."
+TWILIO_AUTH_TOKEN="..."
+```
+
+The bot writes through the existing PriXi
+`/api/voice/event` integration. PriXi must resolve `+421902647072` to the
+correct clinic with `voiceBotEnabled: true`. Do not enable `PRIXI_MOCK_MODE` in
+production. No Vadkerti-specific environment variable is required.
+
+The current version never reads or writes Curo. Future slot mappings are kept
+inactive in `src/config/vadkerti.config.ts` for a later reviewed connector.
+
 ### Production call status callback
 
 The production voicemail flow keeps a short-lived in-memory draft keyed by the

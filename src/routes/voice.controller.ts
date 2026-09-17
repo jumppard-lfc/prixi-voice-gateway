@@ -12,6 +12,7 @@ import { resolve } from 'node:path';
 import { voiceBotConfigStore } from '../services/voice-bot-config.store';
 import { normalizeBirthYearTranscript } from '../utils/transcript-normalization';
 import { getVoicemailDraft, updateVoicemailDraft, VoicemailDraft } from '../utils/voicemail-draft-store';
+import { startVadkertiVoiceBot } from './vadkerti-voice-bot.controller';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
@@ -27,6 +28,7 @@ const DOBROVODSKA_CLINIC_ID = '95';
 const PEKARCIK_VIPTEL_PHONE_NUMBER = '+421332289010';
 const PEKARCIK_ROUTING_PHONE_NUMBER = '+421940610160';
 const PEKARCIK_CLINIC_ID = '64';
+const VADKERTI_ROUTING_PHONE_NUMBER = '+421902647072';
 const UNRESOLVED_CLINIC_IDS = new Set(['', 'orphan', 'fallback', 'local-dev']);
 const KLOSTERMANN_SK_GREETING = 'Dobrý deň, dovolali ste sa do Ortodoncia Klostermann. Aby ste nemuseli čakať, posielame Vám SMS správu s odkazom na objednanie. Ďakujeme.';
 const KLOSTERMANN_EN_GREETING = 'Hello, you have reached Klostermann Orthodontics. So that you don’t have to wait, we will send you an SMS with a link to order. Thank you.';
@@ -65,6 +67,7 @@ const PROTECTED_PRODUCTION_TWILIO_NUMBERS = new Set([
   PEKARCIK_VIPTEL_PHONE_NUMBER,
   PEKARCIK_ROUTING_PHONE_NUMBER,
   DOBROVODSKA_ROUTING_PHONE_NUMBER,
+  VADKERTI_ROUTING_PHONE_NUMBER,
   '+421800232793',
 ]);
 
@@ -205,6 +208,20 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const isOtherDedicatedDestination = body.To === CELKOVA_PHONE_NUMBER
       || body.To === BENOVA_BALOGHOVA_PHONE_NUMBER
       || body.To === novotnyVoiceBotPhoneNumber;
+
+    const isExistingDedicatedDestination = isPekarcikVipTelDestination
+      || normalizedTo === CELKOVA_PHONE_NUMBER
+      || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
+      || normalizedTo === KLOSTERMANN_PHONE_NUMBER
+      || normalizedTo === normalizeSlovakPhoneAddress(novotnyVoiceBotPhoneNumber)
+      || isDobrovodskaRoute(body.To);
+    const isVadkertiCall = (!isExistingDedicatedDestination && normalizedCarrierForwardedFrom === VADKERTI_ROUTING_PHONE_NUMBER)
+      || normalizedTo === VADKERTI_ROUTING_PHONE_NUMBER;
+
+    if (isVadkertiCall) {
+      fastify.log.info({ from: fromNumber, to: body.To, forwardedFrom: carrierForwardedFrom }, 'Routing call to MUDr. Vadkerti production voice bot');
+      return startVadkertiVoiceBot(reply, body);
+    }
 
     // Klostermann's carrier forwards an unanswered call from the clinic mobile
     // to this dedicated bot number after approximately 15 seconds.

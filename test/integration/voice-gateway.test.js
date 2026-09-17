@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const twilio = require('twilio');
 const path = require('node:path');
 const { execSync } = require('node:child_process');
+const { DateTime, Settings } = require('luxon');
 
 process.env.NODE_ENV = 'test';
 process.env.TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || 'test-auth-token';
@@ -927,11 +928,16 @@ test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
 
 test('MUDr. Dobrovodska prehravanie nahratych audio suborov v TwiML a media endpointoch', async () => {
   const originalGetConfig = prixiService.getConfig;
+  const originalNow = Settings.now;
   prixiService.getConfig = async () => ({
     clinicId: '95',
     voiceBotEnabled: true,
     timezone: 'Europe/Bratislava',
   });
+  // The route intentionally rejects calls outside the clinic's hours. Freeze
+  // this media-routing test inside that window so it is deterministic.
+  const officeHoursTimestamp = DateTime.fromISO('2026-09-16T09:00:00+02:00').toMillis();
+  Settings.now = () => officeHoursTimestamp;
 
   try {
     const greetingMedia = await app.inject({ method: 'GET', url: '/media/dobrovodska-1-greeting.wav' });
@@ -946,5 +952,6 @@ test('MUDr. Dobrovodska prehravanie nahratych audio suborov v TwiML a media endp
     assert.match(incomingRes.body, /<Play>.*\/media\/dobrovodska-1-greeting\.wav<\/Play>/);
   } finally {
     prixiService.getConfig = originalGetConfig;
+    Settings.now = originalNow;
   }
 });
