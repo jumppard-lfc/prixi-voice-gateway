@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "id": "bov-clinic-nitra-demo",
+  "clinic": {
+    "displayName": "BOV Clinic",
+    "specialty": "očná ambulancia",
+    "phoneNumber": "+421905444002",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": {
+    "kind": "bookio",
+    "mode": "demo_mock"
+  },
+  "services": [],
+  "practitioners": [],
+  "routing": {
+    "inboundTwilioNumbers": []
+  },
+  "conversation": {
+    "confirmService": true,
+    "confirmDatePreference": false,
+    "confirmSlot": true,
+    "confirmName": false,
+    "requireTerms": false,
+    "sendConfirmationSms": true,
+    "useDtmfFallback": true,
+    "playPromptTone": true
+  },
+  "copy": {},
+  "conversationTree": {
+    "entryNodeId": "vyber-vysetrenia",
+    "nodes": [
+      {
+        "id": "vyber-vysetrenia",
+        "type": "question",
+        "bridge": "",
+        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre BOV Clinic v Nitre. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi navedie pacienta cez výber vyšetrenia a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Želáte si vstupné očné vyšetrenie, kontrolu, akútne vyšetrenie, vyšetrenie na preukaz alebo estetickú medicínu?",
+        "retryPrompt": "Zopakujem možnosti. Pre vstupné očné vyšetrenie stlačte 1. Pre kontrolu stlačte 2. Pre akútne vyšetrenie stlačte 3. Pre vyšetrenie na preukaz stlačte 4. Pre estetickú medicínu stlačte 5. Ak máte otázku, stlačte 6.",
+        "storeAs": "vysetrenie",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že si želáte {{selected}}?",
+        "choices": [
+          {
+            "id": "vstupne-ocne-vysetrenie",
+            "label": "Vstupné očné vyšetrenie – prvá návšteva",
+            "voiceAliases": [
+              "vstupné očné vyšetrenie",
+              "prvá návšteva",
+              "nový pacient",
+              "prvé vyšetrenie"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "kontrola",
+            "label": "Kontrolu",
+            "voiceAliases": [
+              "kontrola",
+              "kontrolné vyšetrenie",
+              "bol som už u vás",
+              "bola som už u vás"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "akutne-vysetrenie",
+            "label": "Akútne vyšetrenie",
+            "voiceAliases": [
+              "akútne vyšetrenie",
+              "bolesť oka",
+              "červené oko",
+              "zápal oka",
+              "cudzie teleso v oku"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "vysetrenie-na-preukaz",
+            "label": "Vyšetrenie na vodičský, zbrojný preukaz alebo výškové práce",
+            "voiceAliases": [
+              "vodičský preukaz",
+              "zbrojný preukaz",
+              "výškové práce",
+              "vyšetrenie na preukaz",
+              "perimeter"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "esteticka-medicina",
+            "label": "Estetickú medicínu",
+            "voiceAliases": [
+              "estetická medicína",
+              "estetiku",
+              "estetické ošetrenie"
+            ],
+            "dtmf": "5",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "otazka",
+            "label": "mám otázku",
+            "voiceAliases": [
+              "mám otázku",
+              "chcem sa opýtať",
+              "potrebujem informáciu"
+            ],
+            "dtmf": "6",
+            "nextNodeId": "prepojenie"
+          }
+        ]
+      },
+      {
+        "id": "volne-terminy",
+        "type": "availability",
+        "bridge": "Ďakujem. Teraz prichádza hlavná časť ukážky: v reálnom nasadení PriXi načíta voľné termíny priamo z Bookio a ponúkne ich pacientovi jednoducho cez telefón.",
+        "prompt": "Pre túto ukážku mám pripravené tieto testovacie možnosti.",
+        "serviceVariable": "vysetrenie",
+        "preferenceVariable": "",
+        "storeAs": "termin",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že vám vyhovuje {{selected}}?",
+        "nextNodeId": "rezervovane"
+      },
+      {
+        "id": "rezervovane",
+        "type": "end",
+        "text": "Ďakujem. Vaša ukážková rezervácia na {{vysetrenie}}, {{termin}}, je vytvorená. V reálnom nasadení PriXi zapíše termín priamo do Bookio a pacientovi môže okamžite poslať potvrdzujúcu SMS. Ďakujeme za vyskúšanie PriXi.",
+        "outcome": "mock_booking",
+        "smsText": "BOV Clinic: ukážková rezervácia na {{vysetrenie}}, {{termin}}, je potvrdená."
+      },
+      {
+        "id": "prepojenie",
+        "type": "end",
+        "text": "Ďakujem za vašu otázku. V tejto ukážke je táto vetva pripravená na odovzdanie kolegyni z ambulancie. Ďakujeme a dovidenia.",
+        "outcome": "handoff"
+      }
+    ]
+  }
+}
