@@ -2,7 +2,7 @@
   "version": 1,
   "id": "gajdos-dental-care-demo",
   "clinic": {
-    "displayName": "Gajdoš Dental Care",
+    "displayName": "Doktor Gajdoš",
     "specialty": "zubná klinika",
     "phoneNumber": "+421940238274",
     "locale": "sk-SK",
@@ -29,7 +29,7 @@
       {
         "id": "oblast-navstevy",
         "type": "question",
-        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre Gajdoš Dental Care. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi navedie pacienta cez výber služby, lekára a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Ide o akútny problém, vyšetrenie a konzultáciu, alebo o konkrétne ošetrenie zuba?",
+        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre Doktora Gajdoša. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi navedie pacienta cez výber služby, lekára a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Ide o akútny problém, vyšetrenie a konzultáciu, alebo o konkrétne ošetrenie zuba?",
         "retryPrompt": "Pre akútny problém stlačte 1. Pre vyšetrenie alebo konzultáciu stlačte 2. Pre konkrétne ošetrenie zuba stlačte 3.",
         "storeAs": "oblast",
         "confirmSelection": false,
@@ -86,7 +86,7 @@
       {
         "id": "lekar",
         "type": "message",
-        "text": "Ďakujem. Online rezervácia Gajdoš Dental Care ďalej pracuje s kalendárom doktora Michala Gajdoša. Teraz vám ukážem výber voľného termínu.",
+        "text": "Ďakujem. Online rezervácia Doktora Gajdoša ďalej pracuje s kalendárom doktora Michala Gajdoša. Teraz vám ukážem výber voľného termínu.",
         "nextNodeId": "volne-terminy"
       },
       {
@@ -105,7 +105,7 @@
         "type": "end",
         "text": "Ďakujem. Vaša ukážková rezervácia na {{sluzba}}, {{termin}}, je vytvorená. V reálnom nasadení PriXi zapíše termín priamo do Bookio a pacientovi môže okamžite poslať potvrdzujúcu SMS. Ďakujeme za vyskúšanie PriXi.",
         "outcome": "mock_booking",
-        "smsText": "Gajdoš Dental Care: ukážková rezervácia na {{sluzba}}, {{termin}}, je potvrdená."
+        "smsText": "Doktor Gajdoš: ukážková rezervácia na {{sluzba}}, {{termin}}, je potvrdená."
       }
     ]
   }
