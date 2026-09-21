@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "id": "be-white-piestany-demo",
+  "clinic": {
+    "displayName": "Be White zubná ambulancia",
+    "specialty": "zubná ambulancia a dentálna hygiena",
+    "phoneNumber": "+421911941804",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": { "kind": "custom", "mode": "demo_mock" },
+  "services": [],
+  "practitioners": [],
+  "routing": { "inboundTwilioNumbers": [] },
+  "conversation": {
+    "confirmService": true,
+    "confirmDatePreference": false,
+    "confirmSlot": true,
+    "confirmName": false,
+    "requireTerms": false,
+    "sendConfirmationSms": true,
+    "useDtmfFallback": true,
+    "playPromptTone": true
+  },
+  "copy": {},
+  "conversationTree": {
+    "entryNodeId": "ucel-navstevy",
+    "nodes": [
+      {
+        "id": "ucel-navstevy",
+        "type": "question",
+        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre Be White zubnú ambulanciu. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi vedie pacienta cez výber služby a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Želáte si dentálnu hygienu, alebo vstupné vyšetrenie?",
+        "retryPrompt": "Pre dentálnu hygienu stlačte 1. Pre vstupné vyšetrenie stlačte 2.",
+        "storeAs": "ucel",
+        "confirmSelection": false,
+        "choices": [
+          { "id": "hygiena", "label": "dentálnu hygienu", "voiceAliases": ["dentálna hygiena", "hygiena", "čistenie zubov"], "dtmf": "1", "nextNodeId": "vek-hygiena" },
+          { "id": "vstupne", "label": "vstupné vyšetrenie", "voiceAliases": ["vstupné vyšetrenie", "prvá návšteva", "nový pacient"], "dtmf": "2", "nextNodeId": "vek-vstupne" }
+        ]
+      },
+      {
+        "id": "vek-hygiena",
+        "type": "question",
+        "bridge": "Ďakujem. Pri dentálnej hygiene potrebujem už len vekovú skupinu pacienta.",
+        "prompt": "Ide o dieťa do dvanásť rokov, alebo o dospelého?",
+        "retryPrompt": "Pre dieťa do dvanásť rokov stlačte 1. Pre dospelého stlačte 2.",
+        "storeAs": "sluzba",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že si želáte {{selected}}?",
+        "choices": [
+          { "id": "hygiena-dieta", "label": "dentálnu hygienu pre dieťa do dvanásť rokov", "voiceAliases": ["dieťa", "do dvanásť rokov", "detská hygiena"], "dtmf": "1", "nextNodeId": "volne-terminy" },
+          { "id": "hygiena-dospely", "label": "dentálnu hygienu pre dospelého", "voiceAliases": ["dospelý", "dospelá", "pre dospelého"], "dtmf": "2", "nextNodeId": "volne-terminy" }
+        ]
+      },
+      {
+        "id": "vek-vstupne",
+        "type": "question",
+        "bridge": "Ďakujem. Pri vstupnom vyšetrení potrebujem už len vekovú skupinu pacienta.",
+        "prompt": "Ide o dieťa do štyri rokov, dieťa od štyri do osemnásť rokov, alebo o dospelého?",
+        "retryPrompt": "Pre dieťa do štyri rokov stlačte 1. Pre dieťa od štyri do osemnásť rokov stlačte 2. Pre dospelého stlačte 3.",
+        "storeAs": "sluzba",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že si želáte {{selected}}?",
+        "choices": [
+          { "id": "vstupne-do4", "label": "vstupné vyšetrenie pre dieťa do štyri rokov", "voiceAliases": ["do štyri rokov", "dieťa do štyri", "malé dieťa"], "dtmf": "1", "nextNodeId": "upozornenie-odhlaska" },
+          { "id": "vstupne-4-18", "label": "vstupné vyšetrenie pre dieťa od štyri do osemnásť rokov", "voiceAliases": ["od štyri do osemnásť", "dieťa od štyri", "tínedžer"], "dtmf": "2", "nextNodeId": "upozornenie-odhlaska" },
+          { "id": "vstupne-dospely", "label": "vstupné vyšetrenie pre dospelého", "voiceAliases": ["dospelý", "dospelá", "pre dospelého"], "dtmf": "3", "nextNodeId": "upozornenie-odhlaska" }
+        ]
+      },
+      {
+        "id": "upozornenie-odhlaska",
+        "type": "message",
+        "text": "Ďakujem. Pri vstupnom vyšetrení si ambulancia pri pacientovi, ktorý už bol vyšetrený inde, vyžiada odhlášku od pôvodného lekára s dátumom poslednej preventívnej prehliadky. Teraz vám ukážem výber termínu.",
+        "nextNodeId": "volne-terminy"
+      },
+      {
+        "id": "volne-terminy",
+        "type": "availability",
+        "bridge": "Teraz prichádza hlavná časť ukážky: PriXi v reálnom nasadení prejde len voľné dni a konkrétne časy zo systému Semafor Dental. Neponúka pracovníka, pretože ho tento rezervačný strom samostatne nevyberá.",
+        "prompt": "Pre túto ukážku mám pripravené tieto testovacie možnosti.",
+        "serviceVariable": "sluzba",
+        "storeAs": "termin",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že vám vyhovuje {{selected}}?",
+        "nextNodeId": "rezervovane"
+      },
+      {
+        "id": "rezervovane",
+        "type": "end",
+        "text": "Ďakujem. Vaša ukážková rezervácia na {{sluzba}}, {{termin}}, je vytvorená. V reálnom nasadení PriXi zapíše termín do existujúceho systému, vyžiada požadované kontaktné údaje a pacientovi môže okamžite poslať potvrdzujúcu SMS. Ďakujeme za vyskúšanie PriXi.",
+        "outcome": "mock_booking",
+        "smsText": "Be White: ukážková rezervácia na {{sluzba}}, {{termin}}, je potvrdená."
+      }
+    ]
+  }
+}

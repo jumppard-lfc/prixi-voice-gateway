@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "id": "naturedent-demo",
+  "clinic": {
+    "displayName": "NatureDENT",
+    "specialty": "dentálna hygiena a estetická stomatológia",
+    "phoneNumber": "+421940100710",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": { "kind": "bookio", "mode": "demo_mock" },
+  "services": [],
+  "practitioners": [],
+  "routing": { "inboundTwilioNumbers": [] },
+  "conversation": {
+    "confirmService": true,
+    "confirmDatePreference": false,
+    "confirmSlot": true,
+    "confirmName": false,
+    "requireTerms": false,
+    "sendConfirmationSms": true,
+    "useDtmfFallback": true,
+    "playPromptTone": true
+  },
+  "copy": {},
+  "conversationTree": {
+    "entryNodeId": "rezim-uhrady",
+    "nodes": [
+      {
+        "id": "rezim-uhrady",
+        "type": "question",
+        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre NatureDENT. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi vedie pacienta cez podmienky kliniky, výber služby a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Ste poistený pacient na Slovensku, alebo samoplatca?",
+        "retryPrompt": "Ak ste poistený pacient na Slovensku, stlačte 1. Ak ste samoplatca, stlačte 2.",
+        "storeAs": "uhrada",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že ste {{selected}}?",
+        "choices": [
+          { "id": "poisteny", "label": "poistený pacient na Slovensku", "voiceAliases": ["poistený", "poistenec", "som poistený", "mám slovenské poistenie"], "dtmf": "1", "nextNodeId": "sluzby-poisteny" },
+          { "id": "samoplatca", "label": "samoplatca", "voiceAliases": ["samoplatca", "platím sám", "som samoplatca"], "dtmf": "2", "nextNodeId": "sluzby-samoplatca" }
+        ]
+      },
+      {
+        "id": "sluzby-poisteny",
+        "type": "question",
+        "bridge": "Ďakujem. Teraz vyberieme službu v cenníku pre poisteného pacienta.",
+        "prompt": "Želáte si dentálnu hygienu Diamond, dentálnu hygienu Platinum, detskú hygienu do dvanásť rokov, Purewhitening, Purewhitening s hygienou, alebo Temporary Tattooth?",
+        "retryPrompt": "Pre hygienu Diamond stlačte 1. Pre hygienu Platinum stlačte 2. Pre detskú hygienu stlačte 3. Pre Purewhitening stlačte 4. Pre Purewhitening s hygienou stlačte 5. Pre Temporary Tattooth stlačte 6.",
+        "storeAs": "sluzba",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že si želáte {{selected}}?",
+        "choices": [
+          { "id": "diamond", "label": "dentálnu hygienu Diamond", "voiceAliases": ["Diamond", "hygiena Diamond", "dentálna hygiena Diamond"], "dtmf": "1", "nextNodeId": "volne-terminy" },
+          { "id": "platinum", "label": "dentálnu hygienu Platinum", "voiceAliases": ["Platinum", "hygiena Platinum", "dentálna hygiena Platinum"], "dtmf": "2", "nextNodeId": "volne-terminy" },
+          { "id": "detska-hygiena", "label": "detskú dentálnu hygienu do dvanásť rokov", "voiceAliases": ["detská hygiena", "hygiena pre dieťa", "dieťa do dvanásť rokov"], "dtmf": "3", "nextNodeId": "volne-terminy" },
+          { "id": "purewhitening", "label": "Purewhitening", "voiceAliases": ["Purewhitening", "bielenie", "bielenie zubov"], "dtmf": "4", "nextNodeId": "volne-terminy" },
+          { "id": "purewhitening-hygiena", "label": "Purewhitening s dentálnou hygienou", "voiceAliases": ["Purewhitening s hygienou", "bielenie s hygienou", "bielenie a hygiena"], "dtmf": "5", "nextNodeId": "volne-terminy" },
+          { "id": "tattooth", "label": "Temporary Tattooth", "voiceAliases": ["Temporary Tattooth", "Tattooth", "dočasné tetovanie na zub"], "dtmf": "6", "nextNodeId": "volne-terminy" }
+        ]
+      },
+      {
+        "id": "sluzby-samoplatca",
+        "type": "question",
+        "bridge": "Ďakujem. Teraz vyberieme službu v cenníku pre samoplatcu.",
+        "prompt": "Želáte si dentálnu hygienu Diamond pre samoplatcu, dentálnu hygienu Platinum pre samoplatcu, detskú hygienu, Purewhitening, Purewhitening s hygienou, alebo Temporary Tattooth?",
+        "retryPrompt": "Pre hygienu Diamond stlačte 1. Pre hygienu Platinum stlačte 2. Pre detskú hygienu stlačte 3. Pre Purewhitening stlačte 4. Pre Purewhitening s hygienou stlačte 5. Pre Temporary Tattooth stlačte 6.",
+        "storeAs": "sluzba",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že si želáte {{selected}}?",
+        "choices": [
+          { "id": "diamond-s", "label": "dentálnu hygienu Diamond pre samoplatcu", "voiceAliases": ["Diamond", "hygiena Diamond", "dentálna hygiena Diamond"], "dtmf": "1", "nextNodeId": "volne-terminy" },
+          { "id": "platinum-s", "label": "dentálnu hygienu Platinum pre samoplatcu", "voiceAliases": ["Platinum", "hygiena Platinum", "dentálna hygiena Platinum"], "dtmf": "2", "nextNodeId": "volne-terminy" },
+          { "id": "detska-hygiena-s", "label": "detskú dentálnu hygienu pre samoplatcu", "voiceAliases": ["detská hygiena", "hygiena pre dieťa", "dieťa do dvanásť rokov"], "dtmf": "3", "nextNodeId": "volne-terminy" },
+          { "id": "purewhitening-s", "label": "Purewhitening", "voiceAliases": ["Purewhitening", "bielenie", "bielenie zubov"], "dtmf": "4", "nextNodeId": "volne-terminy" },
+          { "id": "purewhitening-hygiena-s", "label": "Purewhitening s dentálnou hygienou pre samoplatcu", "voiceAliases": ["Purewhitening s hygienou", "bielenie s hygienou", "bielenie a hygiena"], "dtmf": "5", "nextNodeId": "volne-terminy" },
+          { "id": "tattooth-s", "label": "Temporary Tattooth pre samoplatcu", "voiceAliases": ["Temporary Tattooth", "Tattooth", "dočasné tetovanie na zub"], "dtmf": "6", "nextNodeId": "volne-terminy" }
+        ]
+      },
+      {
+        "id": "volne-terminy",
+        "type": "availability",
+        "bridge": "Ďakujem. Teraz prichádza hlavná časť ukážky: PriXi v reálnom nasadení načíta voľné termíny priamo z Bookio pre správny režim úhrady a zvolenú službu.",
+        "prompt": "Pre túto ukážku mám pripravené tieto testovacie možnosti.",
+        "serviceVariable": "sluzba",
+        "storeAs": "termin",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že vám vyhovuje {{selected}}?",
+        "nextNodeId": "rezervovane"
+      },
+      {
+        "id": "rezervovane",
+        "type": "end",
+        "text": "Ďakujem. Vaša ukážková rezervácia na {{sluzba}}, {{termin}}, je vytvorená. V reálnom nasadení PriXi zapíše termín priamo do Bookio a pacientovi môže okamžite poslať potvrdzujúcu SMS. Ďakujeme za vyskúšanie PriXi.",
+        "outcome": "mock_booking",
+        "smsText": "NatureDENT: ukážková rezervácia na {{sluzba}}, {{termin}}, je potvrdená."
+      }
+    ]
+  }
+}

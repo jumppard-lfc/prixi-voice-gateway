@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "id": "bb-dent-hlohovec-demo",
+  "clinic": {
+    "displayName": "BB Dent Hlohovec",
+    "specialty": "zubná ambulancia",
+    "phoneNumber": "+421903276263",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": { "kind": "custom", "mode": "demo_mock" },
+  "services": [],
+  "practitioners": [],
+  "routing": { "inboundTwilioNumbers": [] },
+  "conversation": {
+    "confirmService": true,
+    "confirmDatePreference": false,
+    "confirmSlot": true,
+    "confirmName": false,
+    "requireTerms": false,
+    "sendConfirmationSms": true,
+    "useDtmfFallback": true,
+    "playPromptTone": true
+  },
+  "copy": {},
+  "conversationTree": {
+    "entryNodeId": "druh-vysetrenia",
+    "nodes": [
+      {
+        "id": "druh-vysetrenia",
+        "type": "question",
+        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre BB Dent Hlohovec. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi vedie pacienta cez výber návštevy, termínu a SMS overenia. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Želáte si ošetrenie, preventívnu prehliadku, alebo iné vyšetrenie?",
+        "retryPrompt": "Pre ošetrenie stlačte 1. Pre preventívnu prehliadku stlačte 2. Pre iné vyšetrenie stlačte 3.",
+        "storeAs": "vysetrenie",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že si želáte {{selected}}?",
+        "choices": [
+          { "id": "osetrenie", "label": "ošetrenie", "voiceAliases": ["ošetrenie", "chcem ošetriť zub", "bolesť", "problém so zubom"], "dtmf": "1", "nextNodeId": "dovod-osetrenia" },
+          { "id": "preventivka", "label": "preventívnu prehliadku", "voiceAliases": ["preventívka", "preventívna prehliadka", "prehliadka"], "dtmf": "2", "nextNodeId": "informacia-prevencia" },
+          { "id": "ine", "label": "iné vyšetrenie", "voiceAliases": ["iné vyšetrenie", "iné", "niečo iné"], "dtmf": "3", "nextNodeId": "bez-terminu" }
+        ]
+      },
+      {
+        "id": "dovod-osetrenia",
+        "type": "question",
+        "bridge": "Ďakujem. Pri ošetrení sa ambulancia krátko opýta aj na dôvod návštevy, aby vedela termín vhodne pripraviť.",
+        "prompt": "Ide o ošetrenie kazu, vytrhnutie zuba, röntgen, dentálnu hygienu alebo protézu?",
+        "retryPrompt": "Pre ošetrenie kazu stlačte 1. Pre vytrhnutie zuba stlačte 2. Pre röntgen stlačte 3. Pre dentálnu hygienu stlačte 4. Pre protézu stlačte 5.",
+        "storeAs": "dovod",
+        "confirmSelection": false,
+        "choices": [
+          { "id": "kaz", "label": "ošetrenie kazu", "voiceAliases": ["kaz", "plomba", "ošetrenie kazu"], "dtmf": "1", "nextNodeId": "volne-terminy" },
+          { "id": "extrakcia", "label": "vytrhnutie zuba", "voiceAliases": ["vytrhnutie", "extrakcia", "vytrhnúť zub"], "dtmf": "2", "nextNodeId": "volne-terminy" },
+          { "id": "rtg", "label": "röntgenové vyšetrenie", "voiceAliases": ["röntgen", "RTG", "snímok"], "dtmf": "3", "nextNodeId": "volne-terminy" },
+          { "id": "hygiena", "label": "dentálnu hygienu", "voiceAliases": ["dentálna hygiena", "hygiena", "zubný kameň"], "dtmf": "4", "nextNodeId": "volne-terminy" },
+          { "id": "proteza", "label": "odtlačky na snímateľnú náhradu", "voiceAliases": ["protéza", "náhrada", "odtlačky"], "dtmf": "5", "nextNodeId": "volne-terminy" }
+        ]
+      },
+      {
+        "id": "informacia-prevencia",
+        "type": "message",
+        "text": "Ďakujem. Pri preventívnej prehliadke ambulancia skontroluje chrup a pripraví liečebný plán. Neakútny patologický nález sa však v tom istom termíne neošetruje; ambulancia naň pridelí samostatný termín.",
+        "nextNodeId": "bez-terminu"
+      },
+      {
+        "id": "bez-terminu",
+        "type": "end",
+        "text": "V kontrolovanom období táto vetva online systému nemala voľný termín. PriXi by v reálnom nasadení overila ďalšie dostupné dni, prípadne pacienta plynulo odovzdala ambulancii. Táto ukážka preto nevytvorí rezerváciu. Ďakujeme za vyskúšanie PriXi.",
+        "outcome": "handoff"
+      },
+      {
+        "id": "volne-terminy",
+        "type": "availability",
+        "bridge": "Ďakujem. Teraz prichádza hlavná časť ukážky: PriXi v reálnom nasadení načíta iba reálne dostupné dni a presné časy pre vetvu ošetrenia.",
+        "prompt": "Pre túto ukážku mám pripravené tieto testovacie možnosti.",
+        "serviceVariable": "vysetrenie",
+        "storeAs": "termin",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že vám vyhovuje {{selected}}?",
+        "nextNodeId": "sms-overenie"
+      },
+      {
+        "id": "sms-overenie",
+        "type": "message",
+        "text": "Ďakujem. Tento poskytovateľ v reálnom procese odošle pacientovi SMS s jednorazovým potvrdzovacím kódom. Až po jeho úspešnom zadaní je rezervácia platná.",
+        "nextNodeId": "rezervovane"
+      },
+      {
+        "id": "rezervovane",
+        "type": "end",
+        "text": "Ďakujem. Vaša ukážková rezervácia na {{vysetrenie}}, {{termin}}, je vytvorená. V reálnom nasadení PriXi termín zapíše až po úspešnom SMS overení v existujúcom systéme a pacientovi môže okamžite poslať potvrdzujúcu alebo pripomienkovú SMS. Ďakujeme za vyskúšanie PriXi.",
+        "outcome": "mock_booking",
+        "smsText": "BB Dent Hlohovec: ukážková rezervácia na {{vysetrenie}}, {{termin}}, je potvrdená."
+      }
+    ]
+  }
+}

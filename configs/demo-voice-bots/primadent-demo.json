@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "id": "primadent-demo",
+  "clinic": {
+    "displayName": "Primadent",
+    "specialty": "zubná ambulancia",
+    "phoneNumber": "+421414333466",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": { "kind": "custom", "mode": "demo_mock" },
+  "services": [],
+  "practitioners": [],
+  "routing": { "inboundTwilioNumbers": [] },
+  "conversation": {
+    "confirmService": true,
+    "confirmDatePreference": false,
+    "confirmSlot": true,
+    "confirmName": false,
+    "requireTerms": false,
+    "sendConfirmationSms": true,
+    "useDtmfFallback": true,
+    "playPromptTone": true
+  },
+  "copy": {},
+  "conversationTree": {
+    "entryNodeId": "ziadany-zakrok",
+    "nodes": [
+      {
+        "id": "ziadany-zakrok",
+        "type": "question",
+        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre Primadent. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi navedie pacienta cez výber zákroku, lekára a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Želáte si preventívnu prehliadku, cielené vyšetrenie alebo konzultáciu, akútne ošetrenie pre bolesť, bežné ošetrenie, nasadenie protetickej práce, konzultáciu k chirurgii alebo implantátom, alebo iný zákrok?",
+        "retryPrompt": "Pre preventívnu prehliadku stlačte 1. Pre cielené vyšetrenie alebo konzultáciu stlačte 2. Pre akútne ošetrenie stlačte 3. Pre ošetrenie stlačte 4. Pre protetickú prácu stlačte 5. Pre chirurgiu alebo implantáty stlačte 6. Pre iné stlačte 7.",
+        "storeAs": "zakrok",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že si želáte {{selected}}?",
+        "choices": [
+          { "id": "preventivka", "label": "preventívnu prehliadku", "voiceAliases": ["preventívka", "preventívna prehliadka", "prehliadka"], "dtmf": "1", "nextNodeId": "vyber-lekara" },
+          { "id": "cielene-vysetrenie", "label": "cielené vyšetrenie alebo konzultáciu", "voiceAliases": ["cielené vyšetrenie", "konzultácia", "vyšetrenie"], "dtmf": "2", "nextNodeId": "vyber-lekara" },
+          { "id": "akutne", "label": "akútne ošetrenie pre bolesť", "voiceAliases": ["akútne ošetrenie", "bolesť", "bolí ma zub"], "dtmf": "3", "nextNodeId": "vyber-lekara" },
+          { "id": "osetrenie", "label": "bežné ošetrenie", "voiceAliases": ["ošetrenie", "liečba zuba", "plomba"], "dtmf": "4", "nextNodeId": "vyber-lekara" },
+          { "id": "protetika", "label": "nasadenie protetickej práce", "voiceAliases": ["protetická práca", "protetika", "náhrada"], "dtmf": "5", "nextNodeId": "vyber-lekara" },
+          { "id": "chirurgia", "label": "konzultáciu k zubnej chirurgii alebo implantátom", "voiceAliases": ["chirurgia", "implantát", "implantáty"], "dtmf": "6", "nextNodeId": "vyber-lekara" },
+          { "id": "ine", "label": "iný zákrok", "voiceAliases": ["iné", "iný zákrok", "niečo iné"], "dtmf": "7", "nextNodeId": "vyber-lekara" }
+        ]
+      },
+      {
+        "id": "vyber-lekara",
+        "type": "question",
+        "bridge": "Ďakujem. Primadent umožňuje voľný termín filtrovať aj podľa zubára.",
+        "prompt": "Máte preferenciu lekára, alebo vám vyhovuje najbližší termín bez preferencie? Môžete vybrať doktora Vladimíra Paulecha, doktora Radoslava Paulecha, doktora Martina Talafu, doktora Martina Rudinského, doktorku Kristínu Kvašňovskú, alebo najbližší termín bez preferencie.",
+        "retryPrompt": "Pre doktora Vladimíra Paulecha stlačte 1. Pre doktora Radoslava Paulecha stlačte 2. Pre doktora Talafu stlačte 3. Pre doktora Rudinského stlačte 4. Pre doktorku Kvašňovskú stlačte 5. Pre termín bez preferencie stlačte 6.",
+        "storeAs": "lekar",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že preferujete {{selected}}?",
+        "choices": [
+          { "id": "vladimir-paulech", "label": "MUDr. Vladimíra Paulecha", "voiceAliases": ["Vladimír Paulech", "doktor Vladimír"], "dtmf": "1", "nextNodeId": "volne-terminy" },
+          { "id": "radoslav-paulech", "label": "MDDr. Radoslava Paulecha", "voiceAliases": ["Radoslav Paulech", "doktor Radoslav"], "dtmf": "2", "nextNodeId": "volne-terminy" },
+          { "id": "martin-talafa", "label": "MUDr. Martina Talafu", "voiceAliases": ["Martin Talafa", "doktor Talafa"], "dtmf": "3", "nextNodeId": "volne-terminy" },
+          { "id": "martin-rudinsky", "label": "MDDr. Martina Rudinského", "voiceAliases": ["Martin Rudinský", "doktor Rudinský"], "dtmf": "4", "nextNodeId": "volne-terminy" },
+          { "id": "kristina-kvasnovska", "label": "MDDr. Kristínu Kvašňovskú", "voiceAliases": ["Kristína Kvašňovská", "doktorka Kvašňovská"], "dtmf": "5", "nextNodeId": "volne-terminy" },
+          { "id": "bez-preferencie", "label": "najbližší termín bez preferencie lekára", "voiceAliases": ["bez preferencie", "najbližší termín", "je mi to jedno"], "dtmf": "6", "nextNodeId": "volne-terminy" }
+        ]
+      },
+      {
+        "id": "volne-terminy",
+        "type": "availability",
+        "bridge": "Ďakujem. Teraz prichádza hlavná časť ukážky: PriXi v reálnom nasadení načíta voľné sloty s príslušným lekárom v rámci najbližších dostupných dní.",
+        "prompt": "Pre túto ukážku mám pripravené tieto testovacie možnosti.",
+        "serviceVariable": "zakrok",
+        "storeAs": "termin",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že vám vyhovuje {{selected}}?",
+        "nextNodeId": "rezervovane"
+      },
+      {
+        "id": "rezervovane",
+        "type": "end",
+        "text": "Ďakujem. Vaša ukážková rezervácia na {{zakrok}}, {{termin}}, je vytvorená. V reálnom nasadení PriXi doplní údaje pacienta, zapíše termín do systému Primadent a bezpečne odovzdá pacientovi existujúci krok na úhradu zálohy 30 eur. Pacientovi môže okamžite prísť potvrdzujúca SMS. Ďakujeme za vyskúšanie PriXi.",
+        "outcome": "mock_booking",
+        "smsText": "Primadent: ukážková rezervácia na {{zakrok}}, {{termin}}, je potvrdená."
+      }
+    ]
+  }
+}

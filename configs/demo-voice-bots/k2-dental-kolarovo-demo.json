@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "id": "k2-dental-kolarovo-demo",
+  "clinic": {
+    "displayName": "K2 Dental Clinic Kolárovo",
+    "specialty": "zubná klinika",
+    "phoneNumber": "+421910299333",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": { "kind": "bookio", "mode": "demo_mock" },
+  "services": [],
+  "practitioners": [],
+  "routing": { "inboundTwilioNumbers": [] },
+  "conversation": {
+    "confirmService": true,
+    "confirmDatePreference": false,
+    "confirmSlot": true,
+    "confirmName": false,
+    "requireTerms": false,
+    "sendConfirmationSms": true,
+    "useDtmfFallback": true,
+    "playPromptTone": true
+  },
+  "copy": {},
+  "conversationTree": {
+    "entryNodeId": "oblast-navstevy",
+    "nodes": [
+      {
+        "id": "oblast-navstevy",
+        "type": "question",
+        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre K2 Dental Clinic Kolárovo. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi navedie pacienta cez výber služby a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Ide o akútny problém, liečbu zuba, alebo vyšetrenie či preventívnu návštevu?",
+        "retryPrompt": "Pre akútny problém stlačte 1. Pre liečbu zuba stlačte 2. Pre vyšetrenie alebo preventívnu návštevu stlačte 3.",
+        "storeAs": "oblast",
+        "confirmSelection": false,
+        "choices": [
+          { "id": "akutne", "label": "akútny problém", "voiceAliases": ["akútne", "bolesť", "bolí ma zub", "pohotovosť"], "dtmf": "1", "nextNodeId": "sluzby-akutne" },
+          { "id": "liecba", "label": "liečbu zuba", "voiceAliases": ["liečba", "ošetrenie", "kaz", "extrakcia", "kanáliky"], "dtmf": "2", "nextNodeId": "sluzby-liecba" },
+          { "id": "vysetrenie", "label": "vyšetrenie alebo preventívnu návštevu", "voiceAliases": ["vyšetrenie", "preventívka", "kontrola", "nový pacient"], "dtmf": "3", "nextNodeId": "sluzby-vysetrenie" }
+        ]
+      },
+      {
+        "id": "sluzby-akutne",
+        "type": "question",
+        "bridge": "Ďakujem. Vyberieme presnú službu.",
+        "prompt": "Želáte si termín pre bolesť alebo akútne ošetrenie?",
+        "retryPrompt": "Pre bolesť alebo akútne ošetrenie stlačte 1.",
+        "storeAs": "sluzba",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že si želáte {{selected}}?",
+        "choices": [
+          { "id": "bolest", "label": "bolesť alebo akútne ošetrenie", "voiceAliases": ["bolesť", "akútne ošetrenie", "bolí ma zub"], "dtmf": "1", "nextNodeId": "volne-terminy" }
+        ]
+      },
+      {
+        "id": "sluzby-liecba",
+        "type": "question",
+        "bridge": "Ďakujem. Vyberieme presný zákrok.",
+        "prompt": "Želáte si extrakciu zuba, ošetrenie kazu, alebo ošetrenie koreňových kanálikov?",
+        "retryPrompt": "Pre extrakciu zuba stlačte 1. Pre ošetrenie kazu stlačte 2. Pre ošetrenie koreňových kanálikov stlačte 3.",
+        "storeAs": "sluzba",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že si želáte {{selected}}?",
+        "choices": [
+          { "id": "extrakcia", "label": "extrakciu zuba", "voiceAliases": ["extrakcia", "vytrhnutie zuba", "vytrhnúť zub"], "dtmf": "1", "nextNodeId": "volne-terminy" },
+          { "id": "kaz", "label": "ošetrenie kazu", "voiceAliases": ["kaz", "plomba", "ošetrenie kazu"], "dtmf": "2", "nextNodeId": "volne-terminy" },
+          { "id": "kanaliky", "label": "ošetrenie koreňových kanálikov", "voiceAliases": ["koreňové kanáliky", "kanáliky", "endodoncia"], "dtmf": "3", "nextNodeId": "volne-terminy" }
+        ]
+      },
+      {
+        "id": "sluzby-vysetrenie",
+        "type": "question",
+        "bridge": "Ďakujem. Vyberieme presný typ návštevy.",
+        "prompt": "Želáte si konzultáciu, preventívnu prehliadku, RTG vyšetrenie, alebo vstupné stomatologické vyšetrenie?",
+        "retryPrompt": "Pre konzultáciu stlačte 1. Pre preventívnu prehliadku stlačte 2. Pre RTG vyšetrenie stlačte 3. Pre vstupné stomatologické vyšetrenie stlačte 4.",
+        "storeAs": "sluzba",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že si želáte {{selected}}?",
+        "choices": [
+          { "id": "konzultacia", "label": "konzultáciu", "voiceAliases": ["konzultácia", "poradenstvo"], "dtmf": "1", "nextNodeId": "volne-terminy" },
+          { "id": "preventivka", "label": "preventívnu prehliadku", "voiceAliases": ["preventívka", "preventívna prehliadka", "prehliadka"], "dtmf": "2", "nextNodeId": "volne-terminy" },
+          { "id": "rtg", "label": "RTG vyšetrenie", "voiceAliases": ["RTG", "röntgen", "röntgenové vyšetrenie"], "dtmf": "3", "nextNodeId": "volne-terminy" },
+          { "id": "vstupne", "label": "vstupné stomatologické vyšetrenie", "voiceAliases": ["vstupné vyšetrenie", "nový pacient", "prvá návšteva"], "dtmf": "4", "nextNodeId": "volne-terminy" }
+        ]
+      },
+      {
+        "id": "volne-terminy",
+        "type": "availability",
+        "bridge": "Ďakujem. Teraz prichádza hlavná časť ukážky: PriXi v reálnom nasadení načíta z Bookio len dostupné dni a presné ranné alebo popoludňajšie časy pre vybranú službu. Neponúka lekára, pretože tento rezervačný strom ho samostatne nevyberá.",
+        "prompt": "Pre túto ukážku mám pripravené tieto testovacie možnosti.",
+        "serviceVariable": "sluzba",
+        "storeAs": "termin",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že vám vyhovuje {{selected}}?",
+        "nextNodeId": "rezervovane"
+      },
+      {
+        "id": "rezervovane",
+        "type": "end",
+        "text": "Ďakujem. Vaša ukážková rezervácia na {{sluzba}}, {{termin}}, je vytvorená. V reálnom nasadení PriXi zapíše termín priamo do Bookio, vyžiada potrebné údaje a súhlas s podmienkami a pacientovi môže okamžite poslať potvrdzujúcu SMS. Ďakujeme za vyskúšanie PriXi.",
+        "outcome": "mock_booking",
+        "smsText": "K2 Dental Clinic: ukážková rezervácia na {{sluzba}}, {{termin}}, je potvrdená."
+      }
+    ]
+  }
+}

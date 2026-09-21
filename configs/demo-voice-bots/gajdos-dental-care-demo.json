@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "id": "gajdos-dental-care-demo",
+  "clinic": {
+    "displayName": "Gajdoš Dental Care",
+    "specialty": "zubná klinika",
+    "phoneNumber": "+421940238274",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": { "kind": "bookio", "mode": "demo_mock" },
+  "services": [],
+  "practitioners": [],
+  "routing": { "inboundTwilioNumbers": [] },
+  "conversation": {
+    "confirmService": true,
+    "confirmDatePreference": false,
+    "confirmSlot": true,
+    "confirmName": false,
+    "requireTerms": false,
+    "sendConfirmationSms": true,
+    "useDtmfFallback": true,
+    "playPromptTone": true
+  },
+  "copy": {},
+  "conversationTree": {
+    "entryNodeId": "oblast-navstevy",
+    "nodes": [
+      {
+        "id": "oblast-navstevy",
+        "type": "question",
+        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre Gajdoš Dental Care. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi navedie pacienta cez výber služby, lekára a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Ide o akútny problém, vyšetrenie a konzultáciu, alebo o konkrétne ošetrenie zuba?",
+        "retryPrompt": "Pre akútny problém stlačte 1. Pre vyšetrenie alebo konzultáciu stlačte 2. Pre konkrétne ošetrenie zuba stlačte 3.",
+        "storeAs": "oblast",
+        "confirmSelection": false,
+        "choices": [
+          { "id": "akutne", "label": "akútny problém", "voiceAliases": ["akútne", "bolesť", "bolí ma zub", "pohotovosť"], "dtmf": "1", "nextNodeId": "sluzby-akutne" },
+          { "id": "vysetrenie", "label": "vyšetrenie alebo konzultáciu", "voiceAliases": ["vyšetrenie", "konzultácia", "preventívka", "nový pacient"], "dtmf": "2", "nextNodeId": "sluzby-vysetrenie" },
+          { "id": "liecba", "label": "konkrétne ošetrenie zuba", "voiceAliases": ["ošetrenie", "liečba", "korunka", "extrakcia", "plomba"], "dtmf": "3", "nextNodeId": "sluzby-liecba" }
+        ]
+      },
+      {
+        "id": "sluzby-akutne",
+        "type": "question",
+        "bridge": "Ďakujem. Vyberieme presný dôvod návštevy.",
+        "prompt": "Želáte si akútne ošetrenie pre bolesť zuba?",
+        "retryPrompt": "Pre akútne ošetrenie stlačte 1.",
+        "storeAs": "sluzba",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že si želáte {{selected}}?",
+        "choices": [
+          { "id": "akutne-osetrenie", "label": "akútne ošetrenie bolesti zuba", "voiceAliases": ["akútne ošetrenie", "bolesť zuba", "opuch"], "dtmf": "1", "nextNodeId": "lekar" }
+        ]
+      },
+      {
+        "id": "sluzby-vysetrenie",
+        "type": "question",
+        "bridge": "Ďakujem. Vyberieme presný typ návštevy.",
+        "prompt": "Želáte si vstupné vyšetrenie s röntgenom, preventívnu prehliadku s röntgenom, alebo konzultáciu?",
+        "retryPrompt": "Pre vstupné vyšetrenie s röntgenom stlačte 1. Pre preventívnu prehliadku s röntgenom stlačte 2. Pre konzultáciu stlačte 3.",
+        "storeAs": "sluzba",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že si želáte {{selected}}?",
+        "choices": [
+          { "id": "vstupne", "label": "vstupné vyšetrenie s röntgenom", "voiceAliases": ["vstupné vyšetrenie", "nový pacient", "prvé vyšetrenie"], "dtmf": "1", "nextNodeId": "lekar" },
+          { "id": "preventivka", "label": "preventívnu prehliadku s röntgenom", "voiceAliases": ["preventívna prehliadka", "preventívka", "röntgen"], "dtmf": "2", "nextNodeId": "lekar" },
+          { "id": "konzultacia", "label": "konzultáciu", "voiceAliases": ["konzultácia", "poradenstvo"], "dtmf": "3", "nextNodeId": "lekar" }
+        ]
+      },
+      {
+        "id": "sluzby-liecba",
+        "type": "question",
+        "bridge": "Ďakujem. Vyberieme presný zákrok.",
+        "prompt": "Želáte si CEREC korunku, endodontické ošetrenie, extrakciu zuba alebo výplň zuba?",
+        "retryPrompt": "Pre CEREC korunku stlačte 1. Pre endodontické ošetrenie stlačte 2. Pre extrakciu zuba stlačte 3. Pre výplň zuba stlačte 4.",
+        "storeAs": "sluzba",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že si želáte {{selected}}?",
+        "choices": [
+          { "id": "cerec", "label": "CEREC korunku", "voiceAliases": ["CEREC", "keramická korunka", "korunka"], "dtmf": "1", "nextNodeId": "lekar" },
+          { "id": "endo", "label": "endodontické ošetrenie", "voiceAliases": ["endodoncia", "koreňové kanáliky", "kanáliky"], "dtmf": "2", "nextNodeId": "lekar" },
+          { "id": "extrakcia", "label": "extrakciu zuba", "voiceAliases": ["extrakcia", "vytrhnutie zuba", "vytrhnúť zub"], "dtmf": "3", "nextNodeId": "lekar" },
+          { "id": "vypln", "label": "výplň zuba", "voiceAliases": ["výplň", "plomba", "kaz"], "dtmf": "4", "nextNodeId": "lekar" }
+        ]
+      },
+      {
+        "id": "lekar",
+        "type": "message",
+        "text": "Ďakujem. Online rezervácia Gajdoš Dental Care ďalej pracuje s kalendárom doktora Michala Gajdoša. Teraz vám ukážem výber voľného termínu.",
+        "nextNodeId": "volne-terminy"
+      },
+      {
+        "id": "volne-terminy",
+        "type": "availability",
+        "bridge": "Teraz prichádza hlavná časť ukážky: PriXi v reálnom nasadení načíta presnú dostupnosť z Bookio pre zvolenú službu a lekára.",
+        "prompt": "Pre túto ukážku mám pripravené tieto testovacie možnosti.",
+        "serviceVariable": "sluzba",
+        "storeAs": "termin",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že vám vyhovuje {{selected}}?",
+        "nextNodeId": "rezervovane"
+      },
+      {
+        "id": "rezervovane",
+        "type": "end",
+        "text": "Ďakujem. Vaša ukážková rezervácia na {{sluzba}}, {{termin}}, je vytvorená. V reálnom nasadení PriXi zapíše termín priamo do Bookio a pacientovi môže okamžite poslať potvrdzujúcu SMS. Ďakujeme za vyskúšanie PriXi.",
+        "outcome": "mock_booking",
+        "smsText": "Gajdoš Dental Care: ukážková rezervácia na {{sluzba}}, {{termin}}, je potvrdená."
+      }
+    ]
+  }
+}

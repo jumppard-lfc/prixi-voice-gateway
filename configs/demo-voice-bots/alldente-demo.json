@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "id": "alldente-demo",
+  "clinic": {
+    "displayName": "AllDente",
+    "specialty": "zubná klinika",
+    "phoneNumber": "+421948501136",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": { "kind": "bookio", "mode": "demo_mock" },
+  "services": [],
+  "practitioners": [],
+  "routing": { "inboundTwilioNumbers": [] },
+  "conversation": {
+    "confirmService": true,
+    "confirmDatePreference": false,
+    "confirmSlot": true,
+    "confirmName": false,
+    "requireTerms": false,
+    "sendConfirmationSms": true,
+    "useDtmfFallback": true,
+    "playPromptTone": true
+  },
+  "copy": {},
+  "conversationTree": {
+    "entryNodeId": "vyber-navstevy",
+    "nodes": [
+      {
+        "id": "vyber-navstevy",
+        "type": "question",
+        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre AllDente. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi navedie pacienta cez výber návštevy a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Chcete sa stať pacientom AllDente, alebo si želáte konzultáciu a liečebný plán na mieru?",
+        "retryPrompt": "Zopakujem možnosti. Ak sa chcete stať pacientom AllDente, stlačte 1. Pre konzultáciu a liečebný plán na mieru stlačte 2.",
+        "storeAs": "navsteva",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že si želáte {{selected}}?",
+        "choices": [
+          {
+            "id": "novy-pacient",
+            "label": "stať sa pacientom AllDente",
+            "voiceAliases": ["chcem sa stať pacientom", "nový pacient", "prvá návšteva", "chcem byť pacientom"],
+            "dtmf": "1",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "konzultacia-plan",
+            "label": "konzultáciu a liečebný plán na mieru",
+            "voiceAliases": ["konzultácia", "liečebný plán", "fazety", "korunky", "bielenie"],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          }
+        ]
+      },
+      {
+        "id": "volne-terminy",
+        "type": "availability",
+        "bridge": "Ďakujem. Teraz prichádza hlavná časť ukážky: v reálnom nasadení PriXi načíta voľné termíny priamo z Bookio a ponúkne ich pacientovi jednoducho cez telefón.",
+        "prompt": "Pre túto ukážku mám pripravené tieto testovacie možnosti.",
+        "serviceVariable": "navsteva",
+        "storeAs": "termin",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že vám vyhovuje {{selected}}?",
+        "nextNodeId": "rezervovane"
+      },
+      {
+        "id": "rezervovane",
+        "type": "end",
+        "text": "Ďakujem. Vaša ukážková rezervácia na {{navsteva}}, {{termin}}, je vytvorená. V reálnom nasadení PriXi zapíše termín priamo do Bookio a pacientovi môže okamžite poslať potvrdzujúcu SMS. Ďakujeme za vyskúšanie PriXi.",
+        "outcome": "mock_booking",
+        "smsText": "AllDente: ukážková rezervácia na {{navsteva}}, {{termin}}, je potvrdená."
+      }
+    ]
+  }
+}
