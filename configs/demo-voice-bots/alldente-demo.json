@@ -22,7 +22,11 @@
     "useDtmfFallback": true,
     "playPromptTone": true
   },
-  "copy": {},
+  "copy": {
+    "pronunciations": {
+      "AllDente": { "alphabet": "ipa", "phonetic": "ˈal.dɛn.tɛ" }
+    }
+  },
   "conversationTree": {
     "entryNodeId": "vyber-navstevy",
     "nodes": [

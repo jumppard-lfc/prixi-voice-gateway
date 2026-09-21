@@ -330,9 +330,39 @@ function mockTreeSlots(session: TreeSession, node: VoiceBotTreeAvailabilityNode)
   return mockSlots({ id: `tree-${node.serviceVariable}`, label: visit, voiceAliases: [] }, datePreference);
 }
 
-function addTreeAudioOrSpeech(target: any, text: string, audioUrl?: string): void {
+function addTreeAudioOrSpeech(target: any, text: string, audioUrl?: string, config?: VoiceBotConfig): void {
   if (audioUrl) target.play(audioUrl);
-  else if (text.trim()) target.say(sayOptions, text);
+  else if (text.trim()) {
+    const pronunciations = Object.entries(config?.copy.pronunciations || {})
+      .filter(([written, pronunciation]) => written && pronunciation?.phonetic)
+      .sort(([first], [second]) => second.length - first.length) as [string, { alphabet: 'ipa' | 'x-sampa'; phonetic: string }][];
+    if (!pronunciations.length) {
+      target.say(sayOptions, text);
+      return;
+    }
+
+    let remainder = text;
+    while (remainder) {
+      let selected: [string, { alphabet: 'ipa' | 'x-sampa'; phonetic: string }] | undefined;
+      let index = -1;
+      for (const pronunciation of pronunciations) {
+        const matchIndex = remainder.indexOf(pronunciation[0]);
+        if (matchIndex !== -1 && (index === -1 || matchIndex < index)) {
+          selected = pronunciation;
+          index = matchIndex;
+        }
+      }
+      if (!selected || index === -1) {
+        target.say(sayOptions, remainder);
+        return;
+      }
+      if (index > 0) target.say(sayOptions, remainder.slice(0, index));
+      const [written, pronunciation] = selected;
+      const say = target.say(sayOptions, '');
+      say.phoneme({ alphabet: pronunciation.alphabet, ph: pronunciation.phonetic }, written);
+      remainder = remainder.slice(index + written.length);
+    }
+  }
 }
 
 async function sendTreeDemoSms(session: TreeSession, node: VoiceBotTreeEndNode): Promise<boolean> {
@@ -363,7 +393,7 @@ async function renderTreeAvailability(reply: FastifyReply, session: TreeSession,
     hints: `prvá možnosť, druhá možnosť, tretia možnosť, ${slots.map((slot) => new Intl.DateTimeFormat('sk-SK', { weekday: 'long', timeZone: 'Europe/Bratislava' }).format(new Date(slot.startAt))).join(', ')}`,
     numDigits: 1,
   } as any);
-  for (const preamble of preambles) addTreeAudioOrSpeech(gather, preamble.text, preamble.audioUrl);
+  for (const preamble of preambles) addTreeAudioOrSpeech(gather, preamble.text, preamble.audioUrl, session.config);
   const choices = slots.map((slot, index) => `možnosť ${index + 1}: ${formatSlot(slot)}`).join('. ');
   const keyboard = forceDtmf ? 'Prosím, pre istotu teraz použite klávesnicu. ' : '';
   const defaultPrompt = 'Mám pre vás tieto voľné demo termíny.';
@@ -414,7 +444,7 @@ async function renderTree(reply: FastifyReply, session: TreeSession, prefix = ''
 
   if (node.type === 'end') {
     const end = node as VoiceBotTreeEndNode;
-    for (const preamble of preambles) addTreeAudioOrSpeech(twiml, preamble.text, preamble.audioUrl);
+    for (const preamble of preambles) addTreeAudioOrSpeech(twiml, preamble.text, preamble.audioUrl, session.config);
     let smsDelivered = false;
     if (end.outcome === 'mock_booking') {
       bookingAuditService.record(session.callSid, 'booking_created', { bookingId: `tree-demo-${Date.now()}`, provider: 'demo_mock', mode: 'conversation_tree' });
@@ -425,7 +455,7 @@ async function renderTree(reply: FastifyReply, session: TreeSession, prefix = ''
         bookingAuditService.record(session.callSid, 'sms_failed', { message: error instanceof Error ? error.message : String(error) });
       }
     }
-    addTreeAudioOrSpeech(twiml, interpolateTreeText(end.text, session), end.audioUrl);
+    addTreeAudioOrSpeech(twiml, interpolateTreeText(end.text, session), end.audioUrl, session.config);
     twiml.hangup();
     bookingAuditService.record(session.callSid, 'completed', { outcome: end.outcome, smsDelivered, mode: 'conversation_tree' });
     treeSessions.delete(session.callSid);
@@ -450,7 +480,7 @@ async function renderTree(reply: FastifyReply, session: TreeSession, prefix = ''
     hints: question.choices.flatMap((choice) => [choice.label, ...choice.voiceAliases]).join(', '),
     numDigits: 1,
   } as any);
-  for (const preamble of preambles) addTreeAudioOrSpeech(gather, preamble.text, preamble.audioUrl);
+  for (const preamble of preambles) addTreeAudioOrSpeech(gather, preamble.text, preamble.audioUrl, session.config);
   const fallback = forceDtmf ? 'Prosím, pre istotu teraz použite klávesnicu. ' : '';
   const defaultRetryPrompt = `Zopakujem možnosti. ${question.choices.map((choice) => `pre ${choice.label} stlačte ${choice.dtmf}`).join('. ')}.`;
   const questionPrompt = retry
@@ -459,7 +489,7 @@ async function renderTree(reply: FastifyReply, session: TreeSession, prefix = ''
   // A full question recording often includes a greeting. On retry we always
   // use concise speech so that callers never hear the greeting again.
   if (retry) gather.say(sayOptions, `${fallback}${questionPrompt}`.trim());
-  else addTreeAudioOrSpeech(gather, `${fallback}${questionPrompt}`.trim(), question.audioUrl);
+  else addTreeAudioOrSpeech(gather, `${fallback}${questionPrompt}`.trim(), question.audioUrl, session.config);
   if (session.config.conversation.playPromptTone) gather.play(`${session.publicBaseUrl}/media/booking-prompt-tone.wav`);
   twiml.say(sayOptions, 'Odpoveď som nezachytila. Skúsme to, prosím, znova.');
   twiml.redirect(`/voice/demo/${session.config.id}/tree/retry`);

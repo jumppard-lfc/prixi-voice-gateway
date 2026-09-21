@@ -152,6 +152,7 @@ export interface VoiceBotConfig {
   copy: {
     introduction?: string;
     closing?: string;
+    pronunciations?: Record<string, VoiceBotSpeechPronunciation>;
   };
 }
 
@@ -159,6 +160,16 @@ export interface VoiceBotConfigValidation {
   valid: boolean;
   errors: string[];
   warnings: string[];
+}
+
+/**
+ * An intentional pronunciation override for a brand or clinical term in
+ * synthesized speech. The map key remains the public spelling used in UI and
+ * SMS messages; only the voice receives the phonetic representation.
+ */
+export interface VoiceBotSpeechPronunciation {
+  alphabet: 'ipa' | 'x-sampa';
+  phonetic: string;
 }
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{2,63}$/;
@@ -265,6 +276,13 @@ export function validateVoiceBotConfig(config: Partial<VoiceBotConfig>): VoiceBo
   }
   if (config.conversation && !config.conversation.useDtmfFallback) {
     warnings.push('Bez klávesnicového fallbacku bude bot citlivejší na chyby rozpoznávania hlasu.');
+  }
+  for (const [spokenText, pronunciation] of Object.entries(config.copy?.pronunciations || {})) {
+    if (!spokenText.trim()) errors.push('Výslovnosť potrebuje text, ktorý sa má nahradiť.');
+    if (!pronunciation?.phonetic?.trim()) errors.push(`Výslovnosť pre „${spokenText}“ nemá fonetický zápis.`);
+    if (pronunciation?.alphabet !== 'ipa' && pronunciation?.alphabet !== 'x-sampa') {
+      errors.push(`Výslovnosť pre „${spokenText}“ musí používať abecedu ipa alebo x-sampa.`);
+    }
   }
 
   if (config.conversationTree) {

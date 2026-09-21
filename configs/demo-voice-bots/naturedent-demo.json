@@ -22,7 +22,11 @@
     "useDtmfFallback": true,
     "playPromptTone": true
   },
-  "copy": {},
+  "copy": {
+    "pronunciations": {
+      "NatureDENT": { "alphabet": "ipa", "phonetic": "ˈna.tuːr.dɛnt" }
+    }
+  },
   "conversationTree": {
     "entryNodeId": "rezim-uhrady",
     "nodes": [
