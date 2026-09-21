@@ -14,6 +14,8 @@ import { normalizeBirthYearTranscript } from '../utils/transcript-normalization'
 import { getVoicemailDraft, updateVoicemailDraft, VoicemailDraft } from '../utils/voicemail-draft-store';
 import { finalizeAbandonedVadkertiCall, startVadkertiVoiceBot } from './vadkerti-voice-bot.controller';
 import { vadkertiBotConfig } from '../config/vadkerti.config';
+import { finalizeAbandonedNeurocentrumCall, startNeurocentrumVoiceBot } from './neurocentrum-voice-bot.controller';
+import { neurocentrumBotConfig } from '../config/neurocentrum.config';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
@@ -31,6 +33,8 @@ const PEKARCIK_ROUTING_PHONE_NUMBER = '+421940610160';
 const PEKARCIK_CLINIC_ID = '64';
 const VADKERTI_TWILIO_PHONE_NUMBER = vadkertiBotConfig.clinic.inboundTwilioNumber;
 const VADKERTI_ROUTING_PHONE_NUMBER = '+421902647072';
+const NEUROCENTRUM_TWILIO_PHONE_NUMBER = neurocentrumBotConfig.clinic.inboundTwilioNumber;
+const NEUROCENTRUM_ROUTING_PHONE_NUMBER = neurocentrumBotConfig.clinic.routingPhoneNumber;
 const UNRESOLVED_CLINIC_IDS = new Set(['', 'orphan', 'fallback', 'local-dev']);
 const KLOSTERMANN_SK_GREETING = 'Dobrý deň, dovolali ste sa do Ortodoncia Klostermann. Aby ste nemuseli čakať, posielame Vám SMS správu s odkazom na objednanie. Ďakujeme.';
 const KLOSTERMANN_EN_GREETING = 'Hello, you have reached Klostermann Orthodontics. So that you don’t have to wait, we will send you an SMS with a link to order. Thank you.';
@@ -41,6 +45,26 @@ const DOBROVODSKA_GREETING_FILE = resolve(__dirname, '../assets/audio/dobrovodsk
 const DOBROVODSKA_NAME_FILE = resolve(__dirname, '../assets/audio/dobrovodska-2-name.wav');
 const DOBROVODSKA_BIRTHYEAR_FILE = resolve(__dirname, '../assets/audio/dobrovodska-3-birthyear.wav');
 const DOBROVODSKA_COMPLETION_FILE = resolve(__dirname, '../assets/audio/dobrovodska-4-completion.wav');
+
+const RESERVED_OTHER_CLINIC_NUMBERS = new Set([
+  CELKOVA_PHONE_NUMBER,
+  BENOVA_BALOGHOVA_PHONE_NUMBER,
+  KLOSTERMANN_PHONE_NUMBER,
+  NOVOTNY_PHONE_NUMBER,
+  PEKARCIK_VIPTEL_PHONE_NUMBER,
+  PEKARCIK_ROUTING_PHONE_NUMBER,
+  DOBROVODSKA_ROUTING_PHONE_NUMBER,
+  VADKERTI_TWILIO_PHONE_NUMBER,
+  VADKERTI_ROUTING_PHONE_NUMBER,
+  '+421800232793',
+].map(normalizeSlovakPhoneAddress));
+
+if (
+  NEUROCENTRUM_TWILIO_PHONE_NUMBER
+  && RESERVED_OTHER_CLINIC_NUMBERS.has(normalizeSlovakPhoneAddress(NEUROCENTRUM_TWILIO_PHONE_NUMBER))
+) {
+  throw new Error(`NEUROCENTRUM_TWILIO_PHONE_NUMBER conflicts with an existing production route: ${NEUROCENTRUM_TWILIO_PHONE_NUMBER}`);
+}
 
 function getPublicBaseUrl(request: FastifyRequest): string {
   const forwardedProto = String(request.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
@@ -72,8 +96,10 @@ const PROTECTED_PRODUCTION_TWILIO_NUMBERS = new Set([
   DOBROVODSKA_ROUTING_PHONE_NUMBER,
   VADKERTI_TWILIO_PHONE_NUMBER,
   VADKERTI_ROUTING_PHONE_NUMBER,
+  NEUROCENTRUM_TWILIO_PHONE_NUMBER,
+  NEUROCENTRUM_ROUTING_PHONE_NUMBER,
   '+421800232793',
-]);
+].filter(Boolean));
 
 function getNovotnyVoiceBotPhoneNumber(): string {
   return process.env.NOVOTNY_VOICE_BOT_PHONE_NUMBER?.trim() || NOVOTNY_PHONE_NUMBER;
@@ -218,7 +244,20 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
       || normalizedTo === KLOSTERMANN_PHONE_NUMBER
       || normalizedTo === normalizeSlovakPhoneAddress(novotnyVoiceBotPhoneNumber)
+      || (Boolean(NEUROCENTRUM_TWILIO_PHONE_NUMBER) && normalizedTo === normalizeSlovakPhoneAddress(NEUROCENTRUM_TWILIO_PHONE_NUMBER))
+      || normalizedTo === NEUROCENTRUM_ROUTING_PHONE_NUMBER
       || isDobrovodskaRoute(body.To);
+    const isNeurocentrumDedicatedDestination = Boolean(NEUROCENTRUM_TWILIO_PHONE_NUMBER)
+      && normalizedTo === normalizeSlovakPhoneAddress(NEUROCENTRUM_TWILIO_PHONE_NUMBER);
+    const isNeurocentrumCall = isNeurocentrumDedicatedDestination
+      || (!isExistingDedicatedDestination && normalizedCarrierForwardedFrom === NEUROCENTRUM_ROUTING_PHONE_NUMBER)
+      || normalizedTo === NEUROCENTRUM_ROUTING_PHONE_NUMBER;
+
+    if (isNeurocentrumCall) {
+      fastify.log.info({ from: fromNumber, to: body.To, forwardedFrom: carrierForwardedFrom }, 'Routing call to Neurocentrum production voice bot');
+      return startNeurocentrumVoiceBot(fastify, reply, body, NEUROCENTRUM_ROUTING_PHONE_NUMBER);
+    }
+
     const isVadkertiDedicatedDestination = normalizedTo === VADKERTI_TWILIO_PHONE_NUMBER;
     const isVadkertiCall = isVadkertiDedicatedDestination
       || (!isExistingDedicatedDestination && normalizedCarrierForwardedFrom === VADKERTI_ROUTING_PHONE_NUMBER)
@@ -684,5 +723,6 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     }
 
     finalizeAbandonedVadkertiCall(fastify, body.CallSid, new Date().toISOString());
+    finalizeAbandonedNeurocentrumCall(body.CallSid);
   });
 }

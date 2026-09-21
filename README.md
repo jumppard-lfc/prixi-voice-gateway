@@ -110,3 +110,66 @@ language-only, after-hours, and urgent calls do not create one. Drafts expire
 after 24 hours. Because the stores are intentionally in memory, an application
 restart or a request routed to a different instance can lose an unfinished
 draft.
+
+## NEUROCENTRUM Levice production bot
+
+The Neurocentrum bot is a separate production intake flow. EDS owns its runtime
+configuration, opening/vacation status, patient-facing messages and Curo email
+delivery. The gateway only conducts the call, enforces the concurrency limit
+from EDS, and submits a typed `patient_request.created` event after the caller
+confirms the summary. A caller requesting a first examination hears the
+clinic's approved in-person instructions and no patient request is created.
+
+Assign the dedicated Twilio DID and configure its voice webhook and terminal
+status callback:
+
+```text
+POST https://<voice-gateway-host>/voice/incoming
+POST https://<voice-gateway-host>/voice/call-status
+```
+
+Required production settings:
+
+```bash
+NEUROCENTRUM_TWILIO_PHONE_NUMBER="+421..."
+PRIXI_API_URL="https://<eds-host>"
+PRIXI_API_KEY="<shared-voice-api-token>"
+```
+
+`EDS_API_URL` and `EDS_VOICE_API_TOKEN` can override those shared values for
+this integration. The gateway calls `GET /api/voice/config?phoneNumber=...`
+with Bearer authentication. A successful configuration is cached for 30
+seconds and remains an eligible last-known-good fallback for five minutes.
+Without a current or last-known-good configuration the gateway plays a
+technical-failure message and does not start intake.
+
+After confirmation the gateway posts this versioned contract to
+`POST /api/voice/event`:
+
+```json
+{
+  "event": "patient_request.created",
+  "version": 1,
+  "clinicId": "42",
+  "callSid": "CA...",
+  "occurredAt": "2026-09-20T09:15:00.000Z",
+  "call": { "phone": "+421...", "durationSeconds": 84 },
+  "patient": {
+    "existingPatient": true,
+    "firstName": "Ján",
+    "lastName": "Novák",
+    "birthDate": "1980-03-15"
+  },
+  "request": { "type": "prescription", "detail": "Tegretol..." }
+}
+```
+
+The `CallSid` is also sent as `Idempotency-Key`. Transient errors are retried;
+an explicit EDS duplicate response counts as success. The success message is
+played only after EDS confirms durable storage. SMTP/Curo credentials and the
+Curo email format never enter the gateway.
+
+Neurocentrum settings are administered only in EDS. The former
+`/admin/neurocentrum` gateway routes are intentionally not registered. The
+concurrency counter remains process-local, so run a single gateway instance
+until a shared call-state store is introduced.
