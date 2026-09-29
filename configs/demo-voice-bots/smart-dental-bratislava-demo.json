@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "id": "smart-dental-bratislava-demo",
+  "clinic": {
+    "displayName": "Smart Dental Bratislava",
+    "specialty": "zubná klinika a dentálna hygiena",
+    "phoneNumber": "+421948679706",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": { "kind": "custom", "mode": "demo_mock" },
+  "services": [],
+  "practitioners": [],
+  "routing": { "inboundTwilioNumbers": [] },
+  "conversation": {
+    "confirmService": true,
+    "confirmDatePreference": false,
+    "confirmSlot": true,
+    "confirmName": false,
+    "requireTerms": false,
+    "sendConfirmationSms": true,
+    "useDtmfFallback": true,
+    "playPromptTone": true
+  },
+  "copy": {},
+  "conversationTree": {
+    "entryNodeId": "vyber-sluzby",
+    "nodes": [
+      {
+        "id": "vyber-sluzby",
+        "type": "question",
+        "prompt": "Dobrý deň, vítam vás v krátkej ukážke virtuálnej telefonickej asistentky PriXi pripravenej pre Smart Dental Bratislava. Nevoláte do reálnej kliniky a nevytvorí sa skutočná rezervácia. Počas hovoru si však môžete vyskúšať, ako PriXi navedie pacienta cez výber služby a termínu. Môžete odpovedať hlasom alebo stlačiť číslo na klávesnici. Želáte si dentálnu hygienu pre dospelého, bielenie zubov, dentálnu hygienu pre dieťa alebo inštruktáž čistenia zubov?",
+        "retryPrompt": "Zopakujem možnosti. Pre dentálnu hygienu pre dospelého stlačte 1. Pre bielenie zubov stlačte 2. Pre dentálnu hygienu pre dieťa stlačte 3. Pre inštruktáž čistenia zubov stlačte 4.",
+        "storeAs": "sluzba",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že si želáte {{selected}}?",
+        "choices": [
+          { "id": "hygiena-dospely", "label": "dentálnu hygienu pre dospelého", "voiceAliases": ["dentálna hygiena", "hygiena pre dospelého", "čistenie zubov"], "dtmf": "1", "nextNodeId": "preferencia-pracovnika" },
+          { "id": "bielenie", "label": "bielenie zubov", "voiceAliases": ["bielenie", "bielenie zubov", "vybieliť zuby"], "dtmf": "2", "nextNodeId": "preferencia-pracovnika" },
+          { "id": "hygiena-dieta", "label": "dentálnu hygienu pre dieťa", "voiceAliases": ["hygiena pre dieťa", "detská hygiena", "hygiena dieťa"], "dtmf": "3", "nextNodeId": "preferencia-pracovnika" },
+          { "id": "instruktaz", "label": "inštruktáž a individuálny nácvik čistenia zubov", "voiceAliases": ["inštruktáž", "nácvik čistenia", "ako si čistiť zuby"], "dtmf": "4", "nextNodeId": "preferencia-pracovnika" }
+        ]
+      },
+      {
+        "id": "preferencia-pracovnika",
+        "type": "question",
+        "bridge": "Ďakujem. V online rezervácii si pacient môže vybrať aj pracovníka, alebo ponechať najbližší voľný termín.",
+        "prompt": "Máte preferenciu konkrétneho pracovníka, alebo vám vyhovuje najbližší dostupný?",
+        "retryPrompt": "Pre konkrétneho pracovníka stlačte 1. Pre najbližší dostupný termín stlačte 2.",
+        "storeAs": "pracovnik",
+        "confirmSelection": false,
+        "choices": [
+          { "id": "konkretny", "label": "konkrétneho pracovníka", "voiceAliases": ["konkrétny pracovník", "mám preferenciu", "vybrať pracovníka"], "dtmf": "1", "nextNodeId": "volne-terminy" },
+          { "id": "bez-preferencie", "label": "najbližší dostupný termín bez preferencie pracovníka", "voiceAliases": ["bez preferencie", "najbližší", "je mi to jedno", "najbližší dostupný"], "dtmf": "2", "nextNodeId": "volne-terminy" }
+        ]
+      },
+      {
+        "id": "volne-terminy",
+        "type": "availability",
+        "bridge": "Ďakujem. Teraz prichádza hlavná časť ukážky: PriXi v reálnom nasadení zoberie do úvahy zvolenú službu aj pracovníka a načíta voľné termíny z existujúceho rezervačného systému.",
+        "prompt": "Pre túto ukážku mám pripravené tieto testovacie možnosti.",
+        "serviceVariable": "sluzba",
+        "storeAs": "termin",
+        "confirmSelection": true,
+        "confirmationPrompt": "Rozumela som správne, že vám vyhovuje {{selected}}?",
+        "nextNodeId": "rezervovane"
+      },
+      {
+        "id": "rezervovane",
+        "type": "end",
+        "text": "Ďakujem. Vaša ukážková rezervácia na {{sluzba}}, {{termin}}, je vytvorená. V reálnom nasadení PriXi zapíše termín do rezervačného systému Smart Dental; prípadnú platbu alebo zálohu následne prevezme ich existujúci proces. Pacientovi môže okamžite prísť potvrdzujúca SMS. Ďakujeme za vyskúšanie PriXi.",
+        "outcome": "mock_booking",
+        "smsText": "Smart Dental Bratislava: ukážková rezervácia na {{sluzba}}, {{termin}}, je potvrdená."
+      }
+    ]
+  }
+}
