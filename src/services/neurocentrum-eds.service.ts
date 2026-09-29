@@ -17,6 +17,7 @@ export interface NeurocentrumMessages {
 
 export interface NeurocentrumRuntimeConfig {
   clinicId: string;
+  assistantType?: string;
   enabled: boolean;
   timezone: string;
   availability: {
@@ -91,6 +92,7 @@ function normalizeConfig(data: any): NeurocentrumRuntimeConfig {
 
   return {
     clinicId: String(data?.clinicId ?? '').trim() || (() => { throw new Error('EDS voice configuration is missing clinicId'); })(),
+    assistantType: firstString(data?.assistantType),
     enabled: data?.enabled ?? data?.voiceBotEnabled ?? false,
     timezone: requiredString(data?.timezone, 'timezone'),
     availability: {
@@ -167,6 +169,30 @@ export class NeurocentrumEdsService {
       if (cached && now - cached.fetchedAt <= this.lastKnownGoodTtlMs) return cached.config;
       throw new Error(`Failed to load Neurocentrum configuration from EDS: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  async resolveByInboundPhoneNumber(phoneNumber: string): Promise<NeurocentrumRuntimeConfig | undefined> {
+    const key = phoneNumber.trim();
+    if (!key) return undefined;
+
+    const now = Date.now();
+    const cached = this.cache.get(key);
+    if (cached && now - cached.fetchedAt <= this.configCacheTtlMs) {
+      return cached.config.assistantType === 'neurocentrum' ? cached.config : undefined;
+    }
+
+    const response = await this.client.get('/api/voice/config', {
+      params: { phoneNumber: key },
+      timeout: positiveInteger(process.env.EDS_VOICE_API_TIMEOUT_MS, DEFAULT_API_TIMEOUT_MS),
+    });
+
+    if (String(response.data?.clinicId ?? '').trim().toLowerCase() === 'orphan') return undefined;
+
+    const config = normalizeConfig(response.data);
+    if (config.assistantType !== 'neurocentrum') return undefined;
+
+    this.cache.set(key, { config, fetchedAt: now });
+    return config;
   }
 
   async sendPatientRequest(event: NeurocentrumPatientRequestEvent): Promise<'created' | 'duplicate'> {

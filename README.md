@@ -120,8 +120,8 @@ from EDS, and submits a typed `patient_request.created` event after the caller
 confirms the summary. A caller requesting a first examination hears the
 clinic's approved in-person instructions and no patient request is created.
 
-Assign the dedicated Twilio DID and configure its voice webhook and terminal
-status callback:
+Assign the dedicated Twilio DID to the provider in EDS and configure its voice
+webhook and terminal status callback:
 
 ```text
 POST https://<voice-gateway-host>/voice/incoming
@@ -131,13 +131,13 @@ POST https://<voice-gateway-host>/voice/call-status
 Required production settings:
 
 ```bash
-NEUROCENTRUM_TWILIO_PHONE_NUMBER="+421..."
 PRIXI_API_URL="https://<eds-host>"
 PRIXI_API_KEY="<shared-voice-api-token>"
 ```
 
 `EDS_API_URL` and `EDS_VOICE_API_TOKEN` can override those shared values for
-this integration. The gateway calls `GET /api/voice/config?phoneNumber=...`
+this integration. The Twilio DID is stored in EDS rather than in the gateway
+environment. The gateway calls `GET /api/voice/config?phoneNumber=...`
 with Bearer authentication. A successful configuration is cached for 30
 seconds and remains an eligible last-known-good fallback for five minutes.
 Without a current or last-known-good configuration the gateway plays a

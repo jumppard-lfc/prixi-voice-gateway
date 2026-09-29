@@ -11,15 +11,19 @@ process.env.TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || 'test-auth-toke
 const appModule = require('../../src/app');
 const serviceModule = require('../../src/services/prixi.service');
 const sttModule = require('../../src/services/stt.service');
+const neurocentrumEdsModule = require('../../src/services/neurocentrum-eds.service');
 
 const app = appModule.default;
 const prixiService = serviceModule.prixiService;
 const sttService = sttModule.sttService;
+const neurocentrumEdsService = neurocentrumEdsModule.neurocentrumEdsService;
 const projectRoot = path.join(__dirname, '../..');
 
 const originalGetConfig = prixiService.getConfig.bind(prixiService);
 const originalSendEvent = prixiService.sendEvent.bind(prixiService);
 const originalTranscribeAudioUrl = sttService.transcribeAudioUrl.bind(sttService);
+const originalResolveNeurocentrum = neurocentrumEdsService.resolveByInboundPhoneNumber.bind(neurocentrumEdsService);
+const originalGetNeurocentrumConfig = neurocentrumEdsService.getConfig.bind(neurocentrumEdsService);
 
 function buildSignature(url, params) {
   return twilio.getExpectedTwilioSignature(process.env.TWILIO_AUTH_TOKEN, url, params);
@@ -52,6 +56,8 @@ test.after(async () => {
   prixiService.getConfig = originalGetConfig;
   prixiService.sendEvent = originalSendEvent;
   sttService.transcribeAudioUrl = originalTranscribeAudioUrl;
+  neurocentrumEdsService.resolveByInboundPhoneNumber = originalResolveNeurocentrum;
+  neurocentrumEdsService.getConfig = originalGetNeurocentrumConfig;
   await app.close();
 });
 
@@ -658,8 +664,62 @@ test('Pediatricky rezim pyta udaje dietata v celom IVR toku', async () => {
   }
 });
 
-test('Twilio cislo MUDr. Celkovej automaticky aktivuje pediatricky voice bot', async () => {
+test('EDS priradene Twilio cislo spusti Neurocentrum bez Render ENV premennej', async () => {
+  const config = {
+    clinicId: '42',
+    assistantType: 'neurocentrum',
+    enabled: true,
+    timezone: 'Europe/Bratislava',
+    availability: { status: 'open' },
+    maxConcurrentCalls: 3,
+    messages: {
+      greeting: 'Databázové uvítanie Neurocentra.',
+      existingPatientQuestion: 'Ste existujúcim pacientom?',
+      newPatient: 'Prvovyšetrenie osobne.',
+      vacation: 'Dovolenka.',
+      afterHours: 'Mimo hodín.',
+      busy: 'Obsadené.',
+      technical: 'Technická chyba.',
+      urgent: 'Volajte 155.',
+      completion: 'Zaznamenané.',
+    },
+  };
+  let resolvedNumber = null;
+  let loadedNumber = null;
+  neurocentrumEdsService.resolveByInboundPhoneNumber = async (phoneNumber) => {
+    resolvedNumber = phoneNumber;
+    return config;
+  };
+  neurocentrumEdsService.getConfig = async (phoneNumber) => {
+    loadedNumber = phoneNumber;
+    return config;
+  };
+
+  try {
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000003',
+      To: '+421900000444',
+      CallSid: 'CA99999999999999999999999999999975',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(resolvedNumber, '+421900000444');
+    assert.equal(loadedNumber, '+421900000444');
+    assert.match(response.body, /Databázové uvítanie Neurocentra/);
+    assert.match(response.body, /\/voice\/neurocentrum\/answer/);
+  } finally {
+    neurocentrumEdsService.resolveByInboundPhoneNumber = originalResolveNeurocentrum;
+    neurocentrumEdsService.getConfig = originalGetNeurocentrumConfig;
+  }
+});
+
+test('Twilio cislo MUDr. Celkovej automaticky aktivuje pediatricky voice bot bez EDS DID resolvera', async () => {
   let requestedPhoneNumber = null;
+  let resolverCalls = 0;
+  neurocentrumEdsService.resolveByInboundPhoneNumber = async () => {
+    resolverCalls += 1;
+    throw new Error('Existing production routes must not use the EDS DID resolver');
+  };
   prixiService.getConfig = async (phoneNumber) => {
     requestedPhoneNumber = phoneNumber;
     return {
@@ -679,10 +739,12 @@ test('Twilio cislo MUDr. Celkovej automaticky aktivuje pediatricky voice bot', a
 
     assert.equal(response.statusCode, 200);
     assert.equal(requestedPhoneNumber, '+420910927082');
+    assert.equal(resolverCalls, 0);
     assert.match(response.body, /pediatrickej ambulancie doktorky Čelkovej/);
     assert.match(response.body, /forwardedFrom=%2B420910927082/);
     assert.match(response.body, /pediatricMode=true/);
   } finally {
+    neurocentrumEdsService.resolveByInboundPhoneNumber = originalResolveNeurocentrum;
     prixiService.getConfig = async () => ({
       clinicId: 'test-clinic',
       voiceBotEnabled: false,

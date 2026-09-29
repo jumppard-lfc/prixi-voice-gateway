@@ -4,19 +4,20 @@ const twilio = require('twilio');
 
 process.env.NODE_ENV = 'test';
 process.env.TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || 'test-auth-token';
-process.env.NEUROCENTRUM_TWILIO_PHONE_NUMBER = '+420910999333';
 
 const app = require('../../src/app').default;
 const { neurocentrumEdsService } = require('../../src/services/neurocentrum-eds.service');
 const { neurocentrumSessionService } = require('../../src/services/neurocentrum-session.service');
 
 const originalGetConfig = neurocentrumEdsService.getConfig.bind(neurocentrumEdsService);
+const originalResolveByInboundPhoneNumber = neurocentrumEdsService.resolveByInboundPhoneNumber.bind(neurocentrumEdsService);
 const originalSendPatientRequest = neurocentrumEdsService.sendPatientRequest.bind(neurocentrumEdsService);
 let sentEvents = [];
 
 function runtimeConfig(overrides = {}) {
   return {
     clinicId: '42',
+    assistantType: 'neurocentrum',
     enabled: true,
     timezone: 'Europe/Bratislava',
     availability: { status: 'open' },
@@ -89,6 +90,7 @@ test.beforeEach(() => {
   sentEvents = [];
   neurocentrumSessionService.resetForTests();
   neurocentrumEdsService.resetForTests();
+  neurocentrumEdsService.resolveByInboundPhoneNumber = async () => runtimeConfig();
   neurocentrumEdsService.getConfig = async () => runtimeConfig();
   neurocentrumEdsService.sendPatientRequest = async event => {
     sentEvents.push(event);
@@ -98,6 +100,7 @@ test.beforeEach(() => {
 
 test.after(async () => {
   neurocentrumEdsService.getConfig = originalGetConfig;
+  neurocentrumEdsService.resolveByInboundPhoneNumber = originalResolveByInboundPhoneNumber;
   neurocentrumEdsService.sendPatientRequest = originalSendPatientRequest;
   await app.close();
 });
@@ -110,7 +113,7 @@ test('spoločný produkčný endpoint načíta EDS konfiguráciu a routuje Neuro
   };
   const response = await incoming('CA-NEURO-ROUTE-001');
   assert.equal(response.statusCode, 200);
-  assert.equal(requestedPhone, '+421948914896');
+  assert.equal(requestedPhone, '+420910999333');
   assert.match(response.body, /Neurocentrum Levice/);
   assert.match(response.body, /existujúcim pacientom/);
   assert.match(response.body, /action="\/voice\/neurocentrum\/answer"/);

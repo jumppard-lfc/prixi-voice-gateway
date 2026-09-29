@@ -3,9 +3,10 @@ const assert = require('node:assert/strict');
 
 const { NeurocentrumEdsService } = require('../../src/services/neurocentrum-eds.service');
 
-function configResponse() {
+function configResponse(overrides = {}) {
   return {
     clinicId: 42,
+    assistantType: 'neurocentrum',
     enabled: true,
     timezone: 'Europe/Bratislava',
     availability: { status: 'open' },
@@ -21,6 +22,7 @@ function configResponse() {
       urgent: 'Volajte 155.',
       success: 'Zaznamenané.',
     },
+    ...overrides,
   };
 }
 
@@ -61,6 +63,35 @@ test('pri krátkom výpadku config API sa použije posledná známa konfiguráci
   assert.deepEqual(await service.getConfig('+421948914896'), expected);
   if (previousCacheTtl === undefined) delete process.env.EDS_VOICE_CONFIG_CACHE_TTL_MS;
   else process.env.EDS_VOICE_CONFIG_CACHE_TTL_MS = previousCacheTtl;
+});
+
+test('Twilio DID sa vyrieši iba pre podporovaný databázový typ asistentky', async () => {
+  let assistantType = 'neurocentrum';
+  const client = {
+    get: async (_url, options) => ({
+      data: configResponse({
+        clinicId: options.params.phoneNumber === '+421900000111' ? 42 : 43,
+        assistantType,
+      }),
+    }),
+  };
+  const service = new NeurocentrumEdsService(client);
+
+  const resolved = await service.resolveByInboundPhoneNumber('+421900000111');
+  assert.equal(resolved.clinicId, '42');
+  assert.equal(resolved.assistantType, 'neurocentrum');
+
+  assistantType = 'unsupported-flow';
+  assert.equal(await service.resolveByInboundPhoneNumber('+421900000222'), undefined);
+});
+
+test('nepriradený Twilio DID sa nepovažuje za Neurocentrum route', async () => {
+  const client = {
+    get: async () => ({ data: { clinicId: 'orphan' } }),
+  };
+  const service = new NeurocentrumEdsService(client);
+
+  assert.equal(await service.resolveByInboundPhoneNumber('+421900000333'), undefined);
 });
 
 test('patient request event sa opakuje pri 5xx a používa CallSid ako idempotency key', async () => {
