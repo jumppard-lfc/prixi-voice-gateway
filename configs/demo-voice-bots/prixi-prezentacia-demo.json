@@ -35,7 +35,7 @@
       {
         "id": "uvod",
         "type": "question",
-        "prompt": "Dobrý deň, tu PriXi, digitálna ambulantná sestra. Som hlasová umelá inteligencia, ale sľubujem, že vás nebudem nútiť stláčať jednotku, dvojku ani mriežku. Chcete si ma vyskúšať ako pacient, alebo vás zaujíma, čo by som mohla robiť vo vašej ambulancii?",
+        "prompt": "Dobrý deň, tu PriXi, digitálna ambulantná sestra. Som hlasová umelá inteligencia, ale sľubujem že vás nebudem nútiť stláčať jednotku dvojku mriežku ani nič podobné. Chcete si ma vyskúšať ako pacient alebo vás zaujíma čo by som mohla robiť vo vašej ambulancii?",
         "retryPrompt": "Chcete si ma vyskúšať ako pacient, alebo sa porozprávať o vašej ambulancii? Pre pacienta stlačte jednotku, pre ambulanciu dvojku.",
         "storeAs": "mode",
         "confirmSelection": false,
@@ -47,7 +47,8 @@
               "ako pacient",
               "som pacient",
               "vyskúšať ako pacient",
-              "ukážka pre pacienta"
+              "ukážka pre pacienta",
+              "pacient"
             ],
             "dtmf": "1",
             "nextNodeId": "pacient-poziadavka"
@@ -58,6 +59,8 @@
             "voiceAliases": [
               "moja ambulancia",
               "pre ambulanciu",
+              "mojej ambulancii",
+              "vašej ambulancii",
               "zaujíma ma PriXi",
               "chcem vedieť viac",
               "som lekár",
