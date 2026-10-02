@@ -41,9 +41,9 @@
       {
         "id": "uvod",
         "type": "question",
-        "bridge": "Dobrý deň, tu PriXi, digitálna ambulantná sestra. Som hlasová umelá inteligencia, ale sľubujem, že vás nebudem nútiť stláčať jednotku, dvojku, mriežku ani nič podobné.",
-        "prompt": "Chcete si ma najprv vyskúšať ako pacient? Alebo vás zaujíma, čo by som mohla robiť vo vašej ambulancii?",
-        "retryPrompt": "Chcete si ma vyskúšať ako pacient, alebo sa porozprávať o vašej ambulancii? Pre pacienta stlačte jednotku, pre ambulanciu dvojku.",
+        "bridge": "Dobrý deň. Tu je PriXi. Vaša digitálna ambulantná sestra. Som hlasová umelá inteligencia. Sľubujem však že vás nebudem nútiť stláčať jednotku dvojku mriežku ani nič podobné.",
+        "prompt": "Chcete si ma najprv vyskúšať ako pacient? Alebo vás zaujíma čo by som mohla robiť vo vašej ambulancii?",
+        "retryPrompt": "Chcete si ma vyskúšať ako pacient? Alebo sa chcete porozprávať o vašej ambulancii? Pre pacienta stlačte jednotku. Pre ambulanciu dvojku.",
         "storeAs": "mode",
         "confirmSelection": false,
         "choices": [
@@ -81,9 +81,9 @@
       {
         "id": "pacient-poziadavka",
         "type": "question",
-        "bridge": "Na chvíľu si predstavme, že voláte do svojej ambulancie.",
-        "prompt": "Čo si chcete vyskúšať? Objednanie na kontrolu, žiadosť o recept, preloženie termínu, alebo ordinačné hodiny?",
-        "retryPrompt": "Môžete povedať kontrola, recept, preložiť termín alebo ordinačné hodiny. Prípadne stlačte jednotku až štvorku.",
+        "bridge": "Na chvíľu si predstavme že voláte do svojej ambulancie.",
+        "prompt": "Čo si chcete vyskúšať? Objednanie na kontrolu? Žiadosť o recept? Preloženie termínu? Alebo ordinačné hodiny?",
+        "retryPrompt": "Môžete povedať kontrola. Recept. Preložiť termín. Alebo ordinačné hodiny. Prípadne stlačte jednotku až štvorku.",
         "storeAs": "patientRequest",
         "confirmSelection": false,
         "choices": [
@@ -178,13 +178,13 @@
       {
         "id": "pacient-kontrola-vysledok",
         "type": "message",
-        "text": "Rozumiem, preferujete {{patientTime}}. V ostrej prevádzke by som ponúkla reálne voľné termíny, vybraný termín zapísala a poslala potvrdenie. Tu nič záväzne nevytváram, takže sa nemusíte báť, že zajtra skončíte u zubára.",
+        "text": "Rozumiem. Preferujete {{patientTime}}. V ostrej prevádzke by som ponúkla reálne voľné termíny. Vybraný termín by som zapísala a poslala potvrdenie. Tu nič záväzne nevytváram. Nemusíte sa teda báť že zajtra skončíte u zubára.",
         "nextNodeId": "pacient-zaujem"
       },
       {
         "id": "pacient-recept-info",
         "type": "message",
-        "text": "Pomohla by som vám pripraviť požiadavku na pravidelne predpisovaný liek, overila potrebné údaje a odovzdala ju ambulancii. O predpise však vždy rozhoduje lekár. Aj digitálna sestra vie, kde má končiť jej kompetencia.",
+        "text": "Pomohla by som vám pripraviť požiadavku na pravidelne predpisovaný liek. Overila by som potrebné údaje a odovzdala ju ambulancii. O predpise však vždy rozhoduje lekár. Aj digitálna sestra vie kde má končiť jej kompetencia.",
         "nextNodeId": "pacient-zaujem"
       },
       {
@@ -226,21 +226,21 @@
       {
         "id": "pacient-prelozit-vysledok",
         "type": "message",
-        "text": "Poznačila som si, že vám viac vyhovuje {{patientTime}}. V ostrej prevádzke by som ponúkla nové termíny a pôvodný uvoľnila až po vašom potvrdení.",
+        "text": "Poznačila som si že vám viac vyhovuje {{patientTime}}. V ostrej prevádzke by som ponúkla nové termíny. Pôvodný termín by som uvoľnila až po vašom potvrdení.",
         "nextNodeId": "pacient-zaujem"
       },
       {
         "id": "pacient-hodiny-info",
         "type": "message",
-        "text": "V reálnej ambulancii by som vám hneď povedala aktuálne ordinačné hodiny aj informáciu o dovolenke či zastupovaní. Bez toho, aby sestra musela po dvadsiaty raz zdvihnúť telefón s rovnakou odpoveďou.",
+        "text": "V reálnej ambulancii by som vám hneď povedala aktuálne ordinačné hodiny aj informáciu o dovolenke či zastupovaní. Sestra by tak nemusela po dvadsiaty raz zdvihnúť telefón s rovnakou odpoveďou.",
         "nextNodeId": "pacient-zaujem"
       },
       {
         "id": "pacient-zaujem",
         "type": "question",
         "bridge": "A práve takto by PriXi vybavila bežnú požiadavku bez prerušenia práce sestry.",
-        "prompt": "Chcete, aby sme vám ukázali, ako by to mohlo fungovať vo vašej ambulancii?",
-        "retryPrompt": "Ak máte záujem o ukážku pre vašu ambulanciu, povedzte áno. Ak nie, povedzte nie.",
+        "prompt": "Chcete aby sme vám ukázali ako by to mohlo fungovať vo vašej ambulancii?",
+        "retryPrompt": "Máte záujem o ukážku pre vašu ambulanciu? Povedzte áno alebo nie.",
         "storeAs": "interested",
         "confirmSelection": false,
         "choices": [
@@ -272,29 +272,27 @@
       {
         "id": "lead-meno",
         "type": "input",
-        "bridge": "Aby kolega vedel, koho má pozdraviť,",
+        "bridge": "Aby kolega vedel koho má pozdraviť.",
         "prompt": "Ako sa voláte?",
-        "retryPrompt": "Vaše meno som nezachytila. Povedzte ho, prosím, ešte raz.",
+        "retryPrompt": "Vaše meno som nezachytila. Povedzte ho prosím ešte raz.",
         "storeAs": "name",
-        "confirmInput": true,
-        "confirmationPrompt": "Zachytila som meno {{selected}}. Je to správne? Povedzte áno alebo nie.",
+        "confirmInput": false,
         "nextNodeId": "lead-ambulancia"
       },
       {
         "id": "lead-ambulancia",
         "type": "input",
         "prompt": "Ako sa volá vaša ambulancia alebo klinika?",
-        "retryPrompt": "Názov ambulancie som nezachytila. Skúste ho, prosím, povedať ešte raz.",
+        "retryPrompt": "Názov ambulancie som nezachytila. Skúste ho prosím povedať ešte raz.",
         "storeAs": "clinicName",
-        "confirmInput": true,
-        "confirmationPrompt": "Rozumela som názov {{selected}}. Je to správne?",
+        "confirmInput": false,
         "nextNodeId": "lead-typ"
       },
       {
         "id": "lead-typ",
         "type": "question",
-        "prompt": "O aký typ ambulancie ide? Napríklad všeobecná, pediatrická, gynekologická, zubná alebo špecializovaná?",
-        "retryPrompt": "Pre všeobecnú ambulanciu stlačte jednotku, pediatrickú dvojku, gynekologickú trojku, zubnú štvorku, špecializovanú päťku alebo inú šestku.",
+        "prompt": "O aký typ ambulancie ide? Je všeobecná? Pediatrická? Gynekologická? Zubná? Alebo špecializovaná?",
+        "retryPrompt": "Pre všeobecnú ambulanciu stlačte jednotku. Pre pediatrickú dvojku. Pre gynekologickú trojku. Pre zubnú štvorku. Pre špecializovanú päťku. Pre inú šestku.",
         "storeAs": "clinicType",
         "confirmSelection": false,
         "choices": [
@@ -378,7 +376,7 @@
         "id": "lead-typ-iny",
         "type": "input",
         "prompt": "Aké je zameranie vašej ambulancie?",
-        "retryPrompt": "Zameranie som nezachytila. Skúste ho, prosím, povedať ešte raz.",
+        "retryPrompt": "Zameranie som nezachytila. Skúste ho prosím povedať ešte raz.",
         "storeAs": "clinicType",
         "confirmInput": false,
         "nextNodeId": "lead-cas"
@@ -387,8 +385,8 @@
         "id": "lead-cas",
         "type": "question",
         "bridge": "Už len posledná krátka otázka.",
-        "prompt": "Kedy vám najviac vyhovuje, aby sa vám kolega ozval? Dopoludnia, popoludní, podvečer alebo kedykoľvek?",
-        "retryPrompt": "Pre dopoludnie stlačte jednotku, popoludnie dvojku, podvečer trojku alebo kedykoľvek štvorku.",
+        "prompt": "Kedy vám najviac vyhovuje aby sa vám kolega ozval? Dopoludnia? Popoludní? Podvečer? Alebo kedykoľvek?",
+        "retryPrompt": "Pre dopoludnie stlačte jednotku. Pre popoludnie dvojku. Pre podvečer trojku. Pre kedykoľvek štvorku.",
         "storeAs": "preferredContactTime",
         "confirmSelection": false,
         "choices": [
@@ -443,13 +441,13 @@
       {
         "id": "koniec-lead",
         "type": "end",
-        "text": "Ďakujem, {{name}}. Kolega sa vám ozve {{preferredContactTime}} na číslo, z ktorého voláte, a ukáže vám PriXi na situáciách z ambulancie {{clinicName}}. A keby som už dnes pracovala u vás, práve som vám ušetrila jeden telefonát. Prajem príjemný deň.",
+        "text": "Ďakujem {{name}}. Kolega sa vám ozve {{preferredContactTime}} na číslo z ktorého voláte. Ukáže vám PriXi na situáciách z ambulancie {{clinicName}}. A keby som už dnes pracovala u vás? Práve som vám ušetrila jeden telefonát. Prajem príjemný deň.",
         "outcome": "lead"
       },
       {
         "id": "koniec-bez-leadu",
         "type": "end",
-        "text": "Úplne v poriadku. Môžete si pozrieť prixi.sk alebo zavolať znova a vyskúšať inú situáciu. Sľubujem, že si to nevezmem osobne. Zatiaľ. Prajem príjemný deň.",
+        "text": "Úplne v poriadku. Môžete si pozrieť prixi.sk alebo zavolať znova a vyskúšať inú situáciu. Sľubujem že si to nevezmem osobne. Zatiaľ. Prajem príjemný deň.",
         "outcome": "complete"
       }
     ]
