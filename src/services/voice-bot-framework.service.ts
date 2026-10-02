@@ -169,6 +169,12 @@ export interface VoiceBotConfig {
     introduction?: string;
     closing?: string;
     pronunciations?: Record<string, VoiceBotSpeechPronunciation>;
+    /** Optional SSML tuning applied only to questions in this bot. */
+    questionProsody?: {
+      pitch?: string;
+      rate?: string;
+      pauseMs?: number;
+    };
   };
 }
 
@@ -299,6 +305,10 @@ export function validateVoiceBotConfig(config: Partial<VoiceBotConfig>): VoiceBo
     if (pronunciation?.alphabet !== 'ipa' && pronunciation?.alphabet !== 'x-sampa') {
       errors.push(`Výslovnosť pre „${spokenText}“ musí používať abecedu ipa alebo x-sampa.`);
     }
+  }
+  const questionProsody = config.copy?.questionProsody;
+  if (questionProsody?.pauseMs !== undefined && (!Number.isFinite(questionProsody.pauseMs) || questionProsody.pauseMs < 0 || questionProsody.pauseMs > 2_000)) {
+    errors.push('Pauza pred otázkou musí byť od 0 do 2000 milisekúnd.');
   }
 
   if (config.conversationTree) {

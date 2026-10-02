@@ -28,14 +28,21 @@
     "useDtmfFallback": true,
     "playPromptTone": false
   },
-  "copy": {},
+  "copy": {
+    "questionProsody": {
+      "pitch": "+5%",
+      "rate": "96%",
+      "pauseMs": 180
+    }
+  },
   "conversationTree": {
     "entryNodeId": "uvod",
     "nodes": [
       {
         "id": "uvod",
         "type": "question",
-        "prompt": "Dobrý deň, tu PriXi, digitálna ambulantná sestra. Som hlasová umelá inteligencia, ale sľubujem že vás nebudem nútiť stláčať jednotku dvojku mriežku ani nič podobné. Chcete si ma vyskúšať ako pacient alebo vás zaujíma čo by som mohla robiť vo vašej ambulancii?",
+        "bridge": "Dobrý deň, tu PriXi, digitálna ambulantná sestra. Som hlasová umelá inteligencia, ale sľubujem, že vás nebudem nútiť stláčať jednotku, dvojku, mriežku ani nič podobné.",
+        "prompt": "Chcete si ma najprv vyskúšať ako pacient? Alebo vás zaujíma, čo by som mohla robiť vo vašej ambulancii?",
         "retryPrompt": "Chcete si ma vyskúšať ako pacient, alebo sa porozprávať o vašej ambulancii? Pre pacienta stlačte jednotku, pre ambulanciu dvojku.",
         "storeAs": "mode",
         "confirmSelection": false,
@@ -75,7 +82,7 @@
         "id": "pacient-poziadavka",
         "type": "question",
         "bridge": "Na chvíľu si predstavme, že voláte do svojej ambulancie.",
-        "prompt": "Chcete sa objednať na kontrolu, požiadať o recept, preložiť termín alebo zistiť ordinačné hodiny?",
+        "prompt": "Čo si chcete vyskúšať? Objednanie na kontrolu, žiadosť o recept, preloženie termínu, alebo ordinačné hodiny?",
         "retryPrompt": "Môžete povedať kontrola, recept, preložiť termín alebo ordinačné hodiny. Prípadne stlačte jednotku až štvorku.",
         "storeAs": "patientRequest",
         "confirmSelection": false,
@@ -87,7 +94,10 @@
               "kontrola",
               "objednať sa",
               "chcem termín",
-              "preventívna prehliadka"
+              "preventívna prehliadka",
+              "objednať na kontrolu",
+              "objednať",
+              "kontrolu"
             ],
             "dtmf": "1",
             "nextNodeId": "pacient-kontrola-cas"
@@ -109,7 +119,9 @@
             "voiceAliases": [
               "preložiť termín",
               "zmeniť termín",
-              "preobjednať sa"
+              "preobjednať sa",
+              "preložiť",
+              "iný termín"
             ],
             "dtmf": "3",
             "nextNodeId": "pacient-prelozit-cas"
@@ -141,6 +153,7 @@
             "label": "dopoludnie",
             "voiceAliases": [
               "dopoludnia",
+              "dopoludnie",
               "doobeda",
               "ráno"
             ],
@@ -152,8 +165,10 @@
             "label": "popoludnie",
             "voiceAliases": [
               "popoludní",
+              "popoludnie",
               "poobede",
-              "večer"
+              "večer",
+              "neskôr"
             ],
             "dtmf": "2",
             "nextNodeId": "pacient-kontrola-vysledok"
@@ -186,6 +201,7 @@
             "label": "dopoludnie",
             "voiceAliases": [
               "dopoludnia",
+              "dopoludnie",
               "doobeda",
               "ráno"
             ],
@@ -197,8 +213,10 @@
             "label": "popoludnie",
             "voiceAliases": [
               "popoludní",
+              "popoludnie",
               "poobede",
-              "večer"
+              "večer",
+              "neskôr"
             ],
             "dtmf": "2",
             "nextNodeId": "pacient-prelozit-vysledok"
@@ -255,7 +273,7 @@
         "id": "lead-meno",
         "type": "input",
         "bridge": "Aby kolega vedel, koho má pozdraviť,",
-        "prompt": "povedzte mi, prosím, vaše meno.",
+        "prompt": "Ako sa voláte?",
         "retryPrompt": "Vaše meno som nezachytila. Povedzte ho, prosím, ešte raz.",
         "storeAs": "name",
         "confirmInput": true,
@@ -308,7 +326,8 @@
             "voiceAliases": [
               "gynekologická",
               "gynekológia",
-              "gynekológ"
+              "gynekológ",
+              "gynekologička"
             ],
             "dtmf": "3",
             "nextNodeId": "lead-cas"
@@ -320,7 +339,10 @@
               "zubná",
               "zubár",
               "stomatológia",
-              "dentálna klinika"
+              "dentálna klinika",
+              "stomatologická",
+              "stomatológ",
+              "stomatologička"
             ],
             "dtmf": "4",
             "nextNodeId": "lead-cas"
@@ -331,7 +353,8 @@
             "voiceAliases": [
               "špecializovaná",
               "odborná ambulancia",
-              "špecialista"
+              "špecialista",
+              "odborná"
             ],
             "dtmf": "5",
             "nextNodeId": "lead-typ-iny"
@@ -342,7 +365,9 @@
             "voiceAliases": [
               "iná",
               "iný typ",
-              "niečo iné"
+              "niečo iné",
+              "nič",
+              "žiadna"
             ],
             "dtmf": "6",
             "nextNodeId": "lead-typ-iny"
@@ -352,7 +377,7 @@
       {
         "id": "lead-typ-iny",
         "type": "input",
-        "prompt": "Povedzte mi, prosím, aké je zameranie vašej ambulancie.",
+        "prompt": "Aké je zameranie vašej ambulancie?",
         "retryPrompt": "Zameranie som nezachytila. Skúste ho, prosím, povedať ešte raz.",
         "storeAs": "clinicType",
         "confirmInput": false,
@@ -372,6 +397,7 @@
             "label": "dopoludnia",
             "voiceAliases": [
               "dopoludnia",
+              "dopoludnie",
               "doobeda",
               "ráno"
             ],
@@ -383,7 +409,9 @@
             "label": "popoludní",
             "voiceAliases": [
               "popoludní",
-              "poobede"
+              "popoludnie",
+              "poobede",
+              "neskôr"
             ],
             "dtmf": "2",
             "nextNodeId": "koniec-lead"

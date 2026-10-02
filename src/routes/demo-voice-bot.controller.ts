@@ -367,6 +367,24 @@ function addTreeAudioOrSpeech(target: any, text: string, audioUrl?: string, conf
   }
 }
 
+function addTreeQuestionSpeech(target: any, text: string, config: VoiceBotConfig): void {
+  const question = text.trim();
+  if (!question) return;
+  const tuning = config.copy.questionProsody;
+  if (!tuning) {
+    addTreeAudioOrSpeech(target, question, undefined, config);
+    return;
+  }
+
+  const say = target.say(sayOptions, '');
+  if (tuning.pauseMs) say.break({ time: `${tuning.pauseMs}ms` });
+  const prosody: Record<string, string> = {};
+  if (tuning.pitch) prosody.pitch = tuning.pitch;
+  if (tuning.rate) prosody.rate = tuning.rate;
+  if (Object.keys(prosody).length) say.prosody(prosody, question);
+  else say.s(question);
+}
+
 async function sendTreeDemoSms(session: TreeSession, node: VoiceBotTreeEndNode): Promise<boolean> {
   if (node.outcome !== 'mock_booking' || !session.config.conversation.sendConfirmationSms || process.env.DEMO_BOOKING_SMS_ENABLED !== 'true') return false;
   if (process.env.NODE_ENV === 'test') return true;
@@ -429,10 +447,16 @@ async function renderTreeInput(reply: FastifyReply, session: TreeSession, node: 
     ...(node.hints?.length ? { hints: node.hints.join(', ') } : {}),
   } as any);
   for (const preamble of preambles) addTreeAudioOrSpeech(gather, preamble.text, preamble.audioUrl, session.config);
-  const text = retry
-    ? interpolateTreeText(node.retryPrompt, session) || 'Prepáčte, odpoveď som nezachytila. Skúste ju, prosím, povedať ešte raz.'
-    : `${interpolateTreeText(node.bridge, session)} ${interpolateTreeText(node.prompt, session)}`.trim();
-  addTreeAudioOrSpeech(gather, text, retry ? undefined : node.audioUrl, session.config);
+  if (retry) {
+    addTreeAudioOrSpeech(gather, interpolateTreeText(node.retryPrompt, session) || 'Prepáčte, odpoveď som nezachytila. Skúste ju, prosím, povedať ešte raz.', undefined, session.config);
+  } else if (node.audioUrl) {
+    addTreeAudioOrSpeech(gather, '', node.audioUrl, session.config);
+  } else if (!session.config.copy.questionProsody) {
+    addTreeAudioOrSpeech(gather, `${interpolateTreeText(node.bridge, session)} ${interpolateTreeText(node.prompt, session)}`.trim(), undefined, session.config);
+  } else {
+    addTreeAudioOrSpeech(gather, interpolateTreeText(node.bridge, session), undefined, session.config);
+    addTreeQuestionSpeech(gather, interpolateTreeText(node.prompt, session), session.config);
+  }
   if (session.config.conversation.playPromptTone) gather.play(`${session.publicBaseUrl}/media/booking-prompt-tone.wav`);
   twiml.say(sayOptions, 'Odpoveď som nezachytila. Skúsme to, prosím, znova.');
   twiml.redirect(`/voice/demo/${session.config.id}/tree/retry`);
@@ -535,11 +559,18 @@ async function renderTree(reply: FastifyReply, session: TreeSession, prefix = ''
   const defaultRetryPrompt = `Zopakujem možnosti. ${question.choices.map((choice) => `pre ${choice.label} stlačte ${choice.dtmf}`).join('. ')}.`;
   const questionPrompt = retry
     ? interpolateTreeText(question.retryPrompt, session) || defaultRetryPrompt
-    : `${interpolateTreeText(question.bridge, session)} ${interpolateTreeText(question.prompt, session)}`;
+    : interpolateTreeText(question.prompt, session);
   // A full question recording often includes a greeting. On retry we always
   // use concise speech so that callers never hear the greeting again.
   if (retry) gather.say(sayOptions, `${fallback}${questionPrompt}`.trim());
-  else addTreeAudioOrSpeech(gather, `${fallback}${questionPrompt}`.trim(), question.audioUrl, session.config);
+  else if (question.audioUrl) addTreeAudioOrSpeech(gather, '', question.audioUrl, session.config);
+  else if (!session.config.copy.questionProsody) {
+    addTreeAudioOrSpeech(gather, `${fallback}${interpolateTreeText(question.bridge, session)} ${questionPrompt}`.trim(), undefined, session.config);
+  }
+  else {
+    addTreeAudioOrSpeech(gather, `${fallback}${interpolateTreeText(question.bridge, session)}`.trim(), undefined, session.config);
+    addTreeQuestionSpeech(gather, questionPrompt, session.config);
+  }
   if (session.config.conversation.playPromptTone) gather.play(`${session.publicBaseUrl}/media/booking-prompt-tone.wav`);
   twiml.say(sayOptions, 'Odpoveď som nezachytila. Skúsme to, prosím, znova.');
   twiml.redirect(`/voice/demo/${session.config.id}/tree/retry`);
@@ -551,7 +582,7 @@ async function renderTreeConfirmation(reply: FastifyReply, session: TreeSession,
   const twiml = new VoiceResponse();
   const gather = twiml.gather({ input: ['speech', 'dtmf'], action: `/voice/demo/${session.config.id}/tree/answer`, method: 'POST', timeout: 5, speechTimeout: 'auto', language: 'sk-SK', hints: 'áno, nie', numDigits: 1 } as any);
   const fallback = `Ďakujem. Rozumela som správne, že si prajete ${label}? Povedzte áno alebo stlačte jednotku. Pre nie stlačte dvojku.`;
-  gather.say(sayOptions, interpolateTreeText(confirmationPrompt, session, label) || fallback);
+  addTreeQuestionSpeech(gather, interpolateTreeText(confirmationPrompt, session, label) || fallback, session.config);
   if (session.config.conversation.playPromptTone) gather.play(`${session.publicBaseUrl}/media/booking-prompt-tone.wav`);
   twiml.say(sayOptions, 'Odpoveď som nezachytila. Skúsme to, prosím, znova.');
   twiml.redirect(`/voice/demo/${session.config.id}/tree/retry`);

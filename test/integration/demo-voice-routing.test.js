@@ -192,6 +192,7 @@ test('vlastný rozhodovací strom vedie hlasovú voľbu cez potvrdenie do správ
 test('prezentačný strom zachytí voľné hlasové údaje a vytvorí lead bez pýtania telefónu či emailu', async () => {
   const config = configFor('presentation-lead-demo', []);
   config.conversation.sendConfirmationSms = false;
+  config.copy.questionProsody = { pitch: '+5%', rate: '96%', pauseMs: 180 };
   config.conversationTree = {
     entryNodeId: 'meno',
     nodes: [
@@ -219,6 +220,8 @@ test('prezentačný strom zachytí voľné hlasové údaje a vytvorí lead bez p
   const callSid = 'CA90000000000000000000000000000014';
   const start = await signedPost('/voice/demo/presentation-lead-demo/start', { From: '+421900000125', CallSid: callSid });
   assert.match(start.body, /Ako sa voláte/);
+  assert.match(start.body, /<break time="180ms"\/?>/);
+  assert.match(start.body, /<prosody pitch="\+5%" rate="96%">Ako sa voláte\?<\/prosody>/);
   assert.doesNotMatch(start.body, /telefón|email/i);
 
   const confirmName = await signedPost('/voice/demo/presentation-lead-demo/tree/answer', { CallSid: callSid, SpeechResult: 'Jana Nováková' });
