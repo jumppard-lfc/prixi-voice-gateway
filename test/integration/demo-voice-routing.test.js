@@ -54,6 +54,12 @@ async function signedPost(endpoint, params) {
   });
 }
 
+function gatherAction(twiml) {
+  const match = twiml.match(/<Gather[^>]+action="([^"]+)"/);
+  assert.ok(match, 'TwiML musí obsahovať Gather action');
+  return match[1].replace(/&amp;/g, '&');
+}
+
 async function save(config) {
   const response = await app.inject({
     method: 'POST',
@@ -238,6 +244,34 @@ test('prezentačný strom zachytí voľné hlasové údaje a vytvorí lead bez p
   const events = bookingAuditService.get(callSid) || [];
   assert.equal(events.filter((event) => event.event === 'tree_input_collected').length, 2);
   assert.equal(events.some((event) => event.event === 'lead_collected'), true);
+});
+
+test('stav stromu prežije presmerovanie každého kroku na inú Render inštanciu', async () => {
+  const config = configFor('portable-tree-state-demo', []);
+  config.conversationTree = {
+    entryNodeId: 'uvod',
+    nodes: [
+      {
+        id: 'uvod', type: 'question', prompt: 'Pacient alebo ambulancia?', storeAs: 'mode', confirmSelection: false,
+        choices: [{ id: 'ambulancia', label: 'ambulancia', voiceAliases: ['v mojej ambulancii'], dtmf: '1', nextNodeId: 'meno' }],
+      },
+      { id: 'meno', type: 'input', prompt: 'Ako sa voláte?', storeAs: 'name', confirmInput: false, nextNodeId: 'klinika' },
+      { id: 'klinika', type: 'input', prompt: 'Ako sa volá klinika?', storeAs: 'clinicName', confirmInput: false, nextNodeId: 'koniec' },
+      { id: 'koniec', type: 'end', text: 'Ďakujem {{name}} z {{clinicName}}.', outcome: 'complete' },
+    ],
+  };
+  await save(config);
+
+  const start = await signedPost('/voice/demo/portable-tree-state-demo/start', { From: '+421900000125', CallSid: 'CA-PORTABLE-1' });
+  const afterChoice = await signedPost(gatherAction(start.body), { From: '+421900000125', CallSid: 'CA-PORTABLE-2', SpeechResult: 'v mojej ambulancii' });
+  assert.match(afterChoice.body, /Ako sa voláte/);
+  assert.doesNotMatch(afterChoice.body, /Platnosť hovoru vypršala/);
+
+  const afterName = await signedPost(gatherAction(afterChoice.body), { From: '+421900000125', CallSid: 'CA-PORTABLE-3', SpeechResult: 'Jana Nováková' });
+  assert.match(afterName.body, /Ako sa volá klinika/);
+  assert.doesNotMatch(gatherAction(afterName.body), /Jana|SmFuYQ/);
+  const completed = await signedPost(gatherAction(afterName.body), { From: '+421900000125', CallSid: 'CA-PORTABLE-4', SpeechResult: 'Medika Plus' });
+  assert.match(completed.body, /Ďakujem Jana Nováková z Medika Plus/);
 });
 
 test('eLHa dent rozpozná zubný šperk aj pri českom prepise od STT', async () => {
