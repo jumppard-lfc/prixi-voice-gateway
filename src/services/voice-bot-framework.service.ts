@@ -71,6 +71,22 @@ export interface VoiceBotTreeQuestionNode {
   choices: VoiceBotTreeChoice[];
 }
 
+/** A short free-form spoken answer, such as a lead name or clinic name. */
+export interface VoiceBotTreeInputNode {
+  id: string;
+  type: 'input';
+  bridge?: string;
+  prompt: string;
+  retryPrompt?: string;
+  audioUrl?: string;
+  storeAs: string;
+  confirmInput: boolean;
+  /** Optional wording. `{{selected}}` is replaced with the captured speech. */
+  confirmationPrompt?: string;
+  hints?: string[];
+  nextNodeId: string;
+}
+
 export interface VoiceBotTreeMessageNode {
   id: string;
   type: 'message';
@@ -108,12 +124,12 @@ export interface VoiceBotTreeEndNode {
   text: string;
   audioUrl?: string;
   /** `mock_booking` is demo-only: it logs the outcome and may trigger the demo SMS. */
-  outcome: 'complete' | 'handoff' | 'mock_booking';
+  outcome: 'complete' | 'handoff' | 'mock_booking' | 'lead';
   /** Used only for the mock booking confirmation SMS. */
   smsText?: string;
 }
 
-export type VoiceBotTreeNode = VoiceBotTreeQuestionNode | VoiceBotTreeMessageNode | VoiceBotTreeAvailabilityNode | VoiceBotTreeEndNode;
+export type VoiceBotTreeNode = VoiceBotTreeQuestionNode | VoiceBotTreeInputNode | VoiceBotTreeMessageNode | VoiceBotTreeAvailabilityNode | VoiceBotTreeEndNode;
 
 export interface VoiceBotConversationTree {
   entryNodeId: string;
@@ -197,7 +213,7 @@ export function buildFlowSummary(config: VoiceBotConfig): string[] {
   if (config.conversationTree) {
     return [
       'Transparentný úvod a vstupná otázka',
-      `${config.conversationTree.nodes.filter((node) => node.type === 'question').length} deterministických otázok s vlastnými vetvami`,
+      `${config.conversationTree.nodes.filter((node) => node.type === 'question' || node.type === 'input').length} otázok s vlastnými vetvami`,
       'Potvrdenie vybraných odpovedí a klávesnicový fallback po nepochopení',
       'Vlastné ukončenie každej vetvy',
     ];
@@ -329,6 +345,11 @@ function validateConversationTree(tree: VoiceBotConversationTree, errors: string
         }
         if (!nodeIds.has(choice.nextNodeId)) errors.push(`Odpoveď „${choice.label || choice.id}“ odkazuje na neznámy uzol „${choice.nextNodeId}“.`);
       }
+    } else if (node.type === 'input') {
+      if (!node.prompt.trim()) errors.push(`Hlasový vstup „${node.id}“ nemá text otázky.`);
+      if (!node.storeAs.trim()) errors.push(`Hlasový vstup „${node.id}“ potrebuje názov premennej.`);
+      if (!nodeIds.has(node.nextNodeId)) errors.push(`Hlasový vstup „${node.id}“ odkazuje na neznámy uzol „${node.nextNodeId}“.`);
+      if (node.hints?.some((hint) => !hint.trim())) errors.push(`Hlasový vstup „${node.id}“ obsahuje prázdnu pomôcku rozpoznávania.`);
     } else if (node.type === 'availability') {
       if (!node.serviceVariable?.trim()) errors.push(`Uzol voľných termínov „${node.id}“ potrebuje premennú služby.`);
       if (!node.storeAs?.trim()) errors.push(`Uzol voľných termínov „${node.id}“ potrebuje názov premennej termínu.`);
@@ -338,6 +359,7 @@ function validateConversationTree(tree: VoiceBotConversationTree, errors: string
       if (!nodeIds.has(node.nextNodeId)) errors.push(`Správa „${node.id}“ odkazuje na neznámy uzol „${node.nextNodeId}“.`);
     } else if (node.type === 'end') {
       if (!node.text.trim() && !node.audioUrl) errors.push(`Ukončenie „${node.id}“ potrebuje text alebo nahrávku.`);
+      if (!['complete', 'handoff', 'mock_booking', 'lead'].includes(node.outcome)) errors.push(`Ukončenie „${node.id}“ má neznámy výsledok.`);
     }
   }
   if (tree.entryNodeId && !nodeIds.has(tree.entryNodeId)) errors.push(`Úvodný uzol „${tree.entryNodeId}“ neexistuje.`);

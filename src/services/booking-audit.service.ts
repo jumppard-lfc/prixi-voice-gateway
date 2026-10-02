@@ -1,6 +1,8 @@
 export type BookingAuditEventName =
   | 'started'
   | 'tree_choice_selected'
+  | 'tree_input_collected'
+  | 'lead_collected'
   | 'service_selected'
   | 'practitioner_selected'
   | 'slots_offered'

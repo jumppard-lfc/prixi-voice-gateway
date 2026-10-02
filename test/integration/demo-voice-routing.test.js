@@ -14,6 +14,7 @@ process.env.VOICE_BOT_CONFIG_REPOSITORY_DIR = path.join(os.tmpdir(), `prixi-demo
 const app = require('../../src/app').default;
 const { prixiService } = require('../../src/services/prixi.service');
 const { validateVoiceBotConfig } = require('../../src/services/voice-bot-framework.service');
+const { bookingAuditService } = require('../../src/services/booking-audit.service');
 
 const configDirectory = process.env.VOICE_BOT_CONFIG_DIR;
 const repositoryConfigDirectory = process.env.VOICE_BOT_CONFIG_REPOSITORY_DIR;
@@ -186,6 +187,54 @@ test('vlastný rozhodovací strom vedie hlasovú voľbu cez potvrdenie do správ
 
   const completed = await signedPost('/voice/demo/tree-conversation-demo/tree/answer', { CallSid: callSid, SpeechResult: 'áno' });
   assert.match(completed.body, /Vaša požiadavka na vstupné vyšetrenie je potvrdená/);
+});
+
+test('prezentačný strom zachytí voľné hlasové údaje a vytvorí lead bez pýtania telefónu či emailu', async () => {
+  const config = configFor('presentation-lead-demo', []);
+  config.conversation.sendConfirmationSms = false;
+  config.conversationTree = {
+    entryNodeId: 'meno',
+    nodes: [
+      {
+        id: 'meno', type: 'input', prompt: 'Ako sa voláte?', storeAs: 'name', confirmInput: true,
+        confirmationPrompt: 'Zachytila som {{selected}}. Je to správne?', nextNodeId: 'ambulancia',
+      },
+      {
+        id: 'ambulancia', type: 'input', prompt: 'Ako sa volá ambulancia?', storeAs: 'clinicName', confirmInput: false,
+        nextNodeId: 'typ',
+      },
+      {
+        id: 'typ', type: 'question', prompt: 'Aký je typ ambulancie?', storeAs: 'clinicType', confirmSelection: false,
+        choices: [{ id: 'zubna', label: 'zubná ambulancia', voiceAliases: ['zubná'], dtmf: '1', nextNodeId: 'cas' }],
+      },
+      {
+        id: 'cas', type: 'question', prompt: 'Kedy vám máme zavolať?', storeAs: 'preferredContactTime', confirmSelection: false,
+        choices: [{ id: 'poobede', label: 'popoludní', voiceAliases: ['poobede'], dtmf: '1', nextNodeId: 'koniec' }],
+      },
+      { id: 'koniec', type: 'end', text: 'Ďakujem, {{name}} z {{clinicName}}.', outcome: 'lead' },
+    ],
+  };
+  await save(config);
+
+  const callSid = 'CA90000000000000000000000000000014';
+  const start = await signedPost('/voice/demo/presentation-lead-demo/start', { From: '+421900000125', CallSid: callSid });
+  assert.match(start.body, /Ako sa voláte/);
+  assert.doesNotMatch(start.body, /telefón|email/i);
+
+  const confirmName = await signedPost('/voice/demo/presentation-lead-demo/tree/answer', { CallSid: callSid, SpeechResult: 'Jana Nováková' });
+  assert.match(confirmName.body, /Zachytila som Jana Nováková/);
+  const clinic = await signedPost('/voice/demo/presentation-lead-demo/tree/answer', { CallSid: callSid, SpeechResult: 'áno' });
+  assert.match(clinic.body, /Ako sa volá ambulancia/);
+  const type = await signedPost('/voice/demo/presentation-lead-demo/tree/answer', { CallSid: callSid, SpeechResult: 'Medika Plus' });
+  assert.match(type.body, /Aký je typ ambulancie/);
+  const time = await signedPost('/voice/demo/presentation-lead-demo/tree/answer', { CallSid: callSid, SpeechResult: 'zubná' });
+  assert.match(time.body, /Kedy vám máme zavolať/);
+  const completed = await signedPost('/voice/demo/presentation-lead-demo/tree/answer', { CallSid: callSid, SpeechResult: 'poobede' });
+  assert.match(completed.body, /Ďakujem, Jana Nováková z Medika Plus/);
+
+  const events = bookingAuditService.get(callSid) || [];
+  assert.equal(events.filter((event) => event.event === 'tree_input_collected').length, 2);
+  assert.equal(events.some((event) => event.event === 'lead_collected'), true);
 });
 
 test('eLHa dent rozpozná zubný šperk aj pri českom prepise od STT', async () => {

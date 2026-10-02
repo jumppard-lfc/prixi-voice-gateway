@@ -63,6 +63,27 @@ The builder exposes this as **Dedikované Twilio číslo bota**. Existing produc
 
 Run verification with `npm test`.
 
+### PriXi presentation demo
+
+`configs/demo-voice-bots/prixi-prezentacia-demo.json` routes the flyer number
+`+420910929535` to a speech-first demo. A caller can try a short patient
+scenario or leave only their name, clinic name, clinic type and preferred
+callback time. The bot does not ask for a phone number or email; callback uses
+the incoming caller ID.
+
+Completed leads are always written as structured application logs. For durable
+delivery, configure an HTTPS endpoint before the event:
+
+```bash
+DEMO_LEAD_WEBHOOK_URL="https://<lead-receiver>"
+DEMO_LEAD_WEBHOOK_TOKEN="<optional-bearer-token>"
+```
+
+The payload contains `name`, `clinicName`, `clinicType`,
+`preferredContactTime`, `callerPhone`, `callSid`, `botId` and `capturedAt`.
+Configure the Twilio number's voice webhook as `POST /voice/incoming`; the
+normal dedicated-number router selects this demo configuration.
+
 ## MUDr. Peter Vadkerti production bot
 
 The Vadkerti neurology bot is a production intake flow, not a Builder demo.
