@@ -11,10 +11,8 @@ import { vadkertiVoiceBotRoutes } from './routes/vadkerti-voice-bot.controller';
 import { neurocentrumVoiceBotRoutes } from './routes/neurocentrum-voice-bot.controller';
 
 const KLOSTERMANN_GREETING_PATH = resolve(__dirname, 'assets/audio/klostermann-greeting-v5.wav');
-const DOBROVODSKA_GREETING_PATH = resolve(__dirname, 'assets/audio/dobrovodska-1-greeting.wav');
-const DOBROVODSKA_NAME_PATH = resolve(__dirname, 'assets/audio/dobrovodska-2-name.wav');
-const DOBROVODSKA_BIRTHYEAR_PATH = resolve(__dirname, 'assets/audio/dobrovodska-3-birthyear.wav');
-const DOBROVODSKA_COMPLETION_PATH = resolve(__dirname, 'assets/audio/dobrovodska-4-completion.wav');
+const DOBROVODSKA_GREETING_PATH = resolve(__dirname, 'assets/audio/dobrovodska-1-greeting-v2.wav');
+const DOBROVODSKA_COMPLETION_PATH = resolve(__dirname, 'assets/audio/dobrovodska-2-completion-v2.wav');
 const HMIRA_GREETING_PATH = resolve(__dirname, 'assets/audio/hmira-1-greeting-v1.wav');
 const HMIRA_COMPLETION_PATH = resolve(__dirname, 'assets/audio/hmira-2-completion-v1.wav');
 
@@ -89,7 +87,7 @@ app.get('/media/klostermann-greeting-v5.wav', async (_request, reply) => {
     .send(createReadStream(KLOSTERMANN_GREETING_PATH));
 });
 
-app.get('/media/dobrovodska-1-greeting.wav', async (_request, reply) => {
+app.get('/media/dobrovodska-1-greeting-v2.wav', async (_request, reply) => {
   const audioStats = statSync(DOBROVODSKA_GREETING_PATH);
   return reply
     .type('audio/wav')
@@ -98,25 +96,7 @@ app.get('/media/dobrovodska-1-greeting.wav', async (_request, reply) => {
     .send(createReadStream(DOBROVODSKA_GREETING_PATH));
 });
 
-app.get('/media/dobrovodska-2-name.wav', async (_request, reply) => {
-  const audioStats = statSync(DOBROVODSKA_NAME_PATH);
-  return reply
-    .type('audio/wav')
-    .header('Content-Length', audioStats.size)
-    .header('Cache-Control', 'public, max-age=31536000, immutable')
-    .send(createReadStream(DOBROVODSKA_NAME_PATH));
-});
-
-app.get('/media/dobrovodska-3-birthyear.wav', async (_request, reply) => {
-  const audioStats = statSync(DOBROVODSKA_BIRTHYEAR_PATH);
-  return reply
-    .type('audio/wav')
-    .header('Content-Length', audioStats.size)
-    .header('Cache-Control', 'public, max-age=31536000, immutable')
-    .send(createReadStream(DOBROVODSKA_BIRTHYEAR_PATH));
-});
-
-app.get('/media/dobrovodska-4-completion.wav', async (_request, reply) => {
+app.get('/media/dobrovodska-2-completion-v2.wav', async (_request, reply) => {
   const audioStats = statSync(DOBROVODSKA_COMPLETION_PATH);
   return reply
     .type('audio/wav')

@@ -568,7 +568,7 @@ test('Zlozenie pocas nahravania mena zachova problem aj meno a prazdny rok', asy
   }
 });
 
-test('Call status callback odosle problem pri zlozeni pocas hlasovej otazky iba raz', async () => {
+test('Dobrovodska po jednej odpovedi prehra zaver a odosle poziadavku iba raz', async () => {
   const sentEvents = [];
   prixiService.getConfig = async () => ({
     clinicId: '95',
@@ -591,8 +591,13 @@ test('Call status callback odosle problem pri zlozeni pocas hlasovej otazky iba 
     });
 
     assert.equal(problemResponse.statusCode, 200);
-    assert.match(problemResponse.body, /dobrovodska-2-name\.wav|vaše meno a priezvisko/);
-    assert.equal(sentEvents.length, 0);
+    assert.match(problemResponse.body, /dobrovodska-2-completion-v2\.wav/);
+    assert.match(problemResponse.body, /<Hangup\/>/);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(sentEvents.length, 1);
+    assert.equal(sentEvents[0].problemTranscript, 'Potrebujem výsledky vyšetrenia.');
+    assert.equal(sentEvents[0].nameTranscript, '');
+    assert.equal(sentEvents[0].birthYearTranscript, '');
 
     const statusParams = {
       From: '+421900000021',
@@ -605,11 +610,7 @@ test('Call status callback odosle problem pri zlozeni pocas hlasovej otazky iba 
 
     assert.equal(firstStatus.statusCode, 204);
     assert.equal(duplicateStatus.statusCode, 204);
-    await new Promise(resolve => setImmediate(resolve));
     assert.equal(sentEvents.length, 1);
-    assert.equal(sentEvents[0].problemTranscript, 'Potrebujem výsledky vyšetrenia.');
-    assert.equal(sentEvents[0].nameTranscript, '');
-    assert.equal(sentEvents[0].birthYearTranscript, '');
   } finally {
     prixiService.getConfig = async () => ({
       clinicId: 'test-clinic',
@@ -1143,7 +1144,7 @@ test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
   assert.equal(hmiraClinicConfig.clinicId, '151');
 });
 
-test('MUDr. Dobrovodska prehravanie nahratych audio suborov v TwiML a media endpointoch', async () => {
+test('MUDr. Dobrovodska pouziva dvojkrokovy audio flow', async () => {
   const originalGetConfig = prixiService.getConfig;
   const originalNow = Settings.now;
   prixiService.getConfig = async () => ({
@@ -1157,16 +1158,25 @@ test('MUDr. Dobrovodska prehravanie nahratych audio suborov v TwiML a media endp
   Settings.now = () => officeHoursTimestamp;
 
   try {
-    const greetingMedia = await app.inject({ method: 'GET', url: '/media/dobrovodska-1-greeting.wav' });
-    assert.equal(greetingMedia.statusCode, 200);
-    assert.equal(greetingMedia.headers['content-type'], 'audio/wav');
+    const [greetingMedia, completionMedia] = await Promise.all([
+      app.inject({ method: 'GET', url: '/media/dobrovodska-1-greeting-v2.wav' }),
+      app.inject({ method: 'GET', url: '/media/dobrovodska-2-completion-v2.wav' }),
+    ]);
+    for (const response of [greetingMedia, completionMedia]) {
+      assert.equal(response.statusCode, 200);
+      assert.equal(response.headers['content-type'], 'audio/wav');
+      assert.equal(response.headers['cache-control'], 'public, max-age=31536000, immutable');
+      assert.equal(response.rawPayload.subarray(0, 4).toString('ascii'), 'RIFF');
+    }
 
     const incomingRes = await signedVoicePost('/voice/incoming', {
       From: '+421900000088',
       To: '+421800232793',
     });
     assert.equal(incomingRes.statusCode, 200);
-    assert.match(incomingRes.body, /<Play>.*\/media\/dobrovodska-1-greeting\.wav<\/Play>/);
+    assert.match(incomingRes.body, /<Play>.*\/media\/dobrovodska-1-greeting-v2\.wav<\/Play>/);
+    assert.match(incomingRes.body, /<Record[^>]+\/voice\/record-problem/);
+    assert.doesNotMatch(incomingRes.body, /record-name|recording-complete/);
   } finally {
     prixiService.getConfig = originalGetConfig;
     Settings.now = originalNow;
