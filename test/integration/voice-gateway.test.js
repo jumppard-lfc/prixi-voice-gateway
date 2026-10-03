@@ -96,6 +96,21 @@ test('Klostermann audio je dostupne v Twilio-kompatibilnom WAV formate', async (
   assert.equal(response.rawPayload.subarray(0, 4).toString('ascii'), 'RIFF');
 });
 
+test('Hmira audio hlasky su dostupne v Twilio-kompatibilnom WAV formate', async () => {
+  const [greeting, completion] = await Promise.all([
+    app.inject({ method: 'GET', url: '/media/hmira-1-greeting-v1.wav' }),
+    app.inject({ method: 'GET', url: '/media/hmira-2-completion-v1.wav' }),
+  ]);
+
+  for (const response of [greeting, completion]) {
+    assert.equal(response.statusCode, 200);
+    assert.match(response.headers['content-type'], /^audio\/wav/);
+    assert.equal(response.headers['cache-control'], 'public, max-age=31536000, immutable');
+    assert.ok(response.rawPayload.length > 70_000);
+    assert.equal(response.rawPayload.subarray(0, 4).toString('ascii'), 'RIFF');
+  }
+});
+
 test('POST /voice/incoming s neplatnym podpisom vrati 403', async () => {
   const endpoint = '/voice/incoming';
   const params = {
@@ -1032,8 +1047,8 @@ test('Presmerovanie z cisla ambulancie MDDr. Hmiru aktivuje jeho zubarsky voice 
 
     assert.equal(response.statusCode, 200);
     assert.equal(requestedPhoneNumber, '+420910924407');
-    assert.match(response.body, /virtuálna sestra PriXi z ambulancie doktora Hmiru/);
-    assert.match(response.body, /Povedzte mi, prosím, svoje meno a s čím vám môžem pomôcť/);
+    assert.match(response.body, /<Play>.*\/media\/hmira-1-greeting-v1\.wav<\/Play>/);
+    assert.doesNotMatch(response.body, /virtuálna sestra PriXi/);
     assert.match(response.body, /timeout="3"/);
     assert.match(response.body, /forwardedFrom=%2B420910924407/);
     assert.match(response.body, /pediatricMode=false/);
@@ -1073,7 +1088,7 @@ test('Dedikovane Twilio cislo MDDr. Hmiru routuje a dokonci poziadavku iba pre j
 
     assert.equal(incoming.statusCode, 200);
     assert.equal(requestedPhoneNumber, '+420910924407');
-    assert.match(incoming.body, /ambulancie doktora Hmiru/);
+    assert.match(incoming.body, /<Play>.*\/media\/hmira-1-greeting-v1\.wav<\/Play>/);
     assert.doesNotMatch(incoming.body, /Novotného/);
     assert.match(incoming.body, /forwardedFrom=%2B420910924407/);
 
@@ -1085,9 +1100,9 @@ test('Dedikovane Twilio cislo MDDr. Hmiru routuje a dokonci poziadavku iba pre j
     });
 
     assert.equal(problem.statusCode, 200);
-    assert.match(problem.body, /Vašu požiadavku odovzdám doktorovi Hmirovi/);
+    assert.match(problem.body, /<Play>.*\/media\/hmira-2-completion-v1\.wav<\/Play>/);
     assert.doesNotMatch(problem.body, /Novotnému/);
-    assert.match(problem.body, /ozveme sa vám späť do 24 hodín/);
+    assert.doesNotMatch(problem.body, /<Say/);
     assert.doesNotMatch(problem.body, /record-name/);
     assert.match(problem.body, /<Hangup\/>/);
     await new Promise(resolve => setImmediate(resolve));

@@ -132,6 +132,11 @@ The gateway maps both the dedicated destination and carrier calls forwarded
 from `+421948834475` to the protected Twilio route and rejects any configuration
 that resolves it to a clinic other than `151`.
 
+The patient-facing greeting and completion use versioned, pre-generated audio
+files (`hmira-1-greeting-v1.wav` and `hmira-2-completion-v1.wav`) served by the
+gateway with immutable caching. Both files are mono 8 kHz G.711 mu-law WAVs;
+the original TTS copy remains as a fallback if an audio asset is unavailable.
+
 ### Production call status callback
 
 The production voicemail flow keeps a short-lived in-memory draft keyed by the

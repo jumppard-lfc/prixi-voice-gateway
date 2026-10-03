@@ -48,6 +48,8 @@ const DOBROVODSKA_GREETING_FILE = resolve(__dirname, '../assets/audio/dobrovodsk
 const DOBROVODSKA_NAME_FILE = resolve(__dirname, '../assets/audio/dobrovodska-2-name.wav');
 const DOBROVODSKA_BIRTHYEAR_FILE = resolve(__dirname, '../assets/audio/dobrovodska-3-birthyear.wav');
 const DOBROVODSKA_COMPLETION_FILE = resolve(__dirname, '../assets/audio/dobrovodska-4-completion.wav');
+const HMIRA_GREETING_FILE = resolve(__dirname, '../assets/audio/hmira-1-greeting-v1.wav');
+const HMIRA_COMPLETION_FILE = resolve(__dirname, '../assets/audio/hmira-2-completion-v1.wav');
 
 function getPublicBaseUrl(request: FastifyRequest): string {
   const forwardedProto = String(request.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
@@ -431,6 +433,8 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
       if (isDobrovodskaNumber && existsSync(DOBROVODSKA_GREETING_FILE)) {
         twiml.play(`${getPublicBaseUrl(request)}/media/dobrovodska-1-greeting.wav`);
+      } else if (isHmiraNumber && existsSync(HMIRA_GREETING_FILE)) {
+        twiml.play(`${getPublicBaseUrl(request)}/media/hmira-1-greeting-v1.wav`);
       } else {
         twiml.say(
           { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
@@ -492,10 +496,14 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         callCompleted: true,
         callEndedAt: new Date().toISOString(),
       }) || draft;
-      twiml.say(
-        { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
-        getDentalCompletion(forwardedFrom)
-      );
+      if (isHmiraRoute(forwardedFrom) && existsSync(HMIRA_COMPLETION_FILE)) {
+        twiml.play(`${getPublicBaseUrl(request)}/media/hmira-2-completion-v1.wav`);
+      } else {
+        twiml.say(
+          { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
+          getDentalCompletion(forwardedFrom)
+        );
+      }
       twiml.hangup();
       reply.type('text/xml').send(twiml.toString());
       if (completedDraft) dispatchDraft(completedDraft);
@@ -724,6 +732,8 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const isDobrovodskaNumber = isDobrovodskaRoute(forwardedFrom);
     if (isDobrovodskaNumber && existsSync(DOBROVODSKA_COMPLETION_FILE)) {
       twiml.play(`${getPublicBaseUrl(request)}/media/dobrovodska-4-completion.wav`);
+    } else if (isHmiraRoute(forwardedFrom) && existsSync(HMIRA_COMPLETION_FILE)) {
+      twiml.play(`${getPublicBaseUrl(request)}/media/hmira-2-completion-v1.wav`);
     } else {
       const completionMessage = pediatricMode
         ? 'Ďakujeme, vašu požiadavku sme zaznamenali. Ambulancia sa vám po jej spracovaní ozve na telefónne číslo, z ktorého voláte. Dovidenia.'
