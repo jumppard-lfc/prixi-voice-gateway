@@ -114,6 +114,24 @@ variable. Keep `PRIXI_MOCK_MODE=false` in production.
 The current version never reads or writes Curo. Future slot mappings are kept
 inactive in `src/config/vadkerti.config.ts` for a later reviewed connector.
 
+## MDDr. Milos Hmira production bot
+
+The Hmira dental bot uses the same short voicemail flow as the Novotny bot: it
+asks the caller for their name and request in one recording, transcribes it and
+submits it through the existing PriXi `/api/voice/event` integration. The
+clinic routing number is `+421948834475` and its protected Czech Twilio DID is
+`+420910924407`. Both numbers are pinned to PriXi clinic `151`. Configure these
+HTTP POST callbacks on that Twilio number:
+
+```text
+https://<voice-gateway-host>/voice/incoming
+https://<voice-gateway-host>/voice/call-status
+```
+
+The gateway maps both the dedicated destination and carrier calls forwarded
+from `+421948834475` to the protected Twilio route and rejects any configuration
+that resolves it to a clinic other than `151`.
+
 ### Production call status callback
 
 The production voicemail flow keeps a short-lived in-memory draft keyed by the

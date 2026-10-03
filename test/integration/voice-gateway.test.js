@@ -822,6 +822,40 @@ test('Poziadavka MUDr. Novotneho sa pri nespravnom clinicId neodosle inej ambula
   }
 });
 
+test('Poziadavka MDDr. Hmiru sa pri nespravnom clinicId neodosle inej ambulancii', async () => {
+  let sendEventCalls = 0;
+  prixiService.getConfig = async () => ({
+    clinicId: '112',
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+  });
+  prixiService.sendEvent = async () => {
+    sendEventCalls += 1;
+  };
+
+  try {
+    const endpoint = '/voice/recording-complete?problemUrl=https%3A%2F%2Fapi.twilio.test%2Fproblem&problemDuration=5&forwardedFrom=%2B420910924407&pediatricMode=false&dentalMode=true';
+    const response = await signedVoicePost(endpoint, {
+      From: '+421900000022',
+      To: '+420910924407',
+      CallSid: 'CA99999999999999999999999999999969',
+      RecordingUrl: 'https://api.twilio.test/birth-year',
+      RecordingDuration: '2',
+    });
+
+    assert.equal(response.statusCode, 200);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(sendEventCalls, 0);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+    prixiService.sendEvent = originalSendEvent;
+  }
+});
+
 test('Twilio cislo MUDr. Benovej Baloghovej aktivuje ortopedicky voice bot', async () => {
   let requestedPhoneNumber = null;
   prixiService.getConfig = async (phoneNumber) => {
@@ -976,12 +1010,109 @@ test('Predvolene Twilio cislo MUDr. Novotneho je +420910928021', async () => {
   }
 });
 
+test('Presmerovanie z cisla ambulancie MDDr. Hmiru aktivuje jeho zubarsky voice bot', async () => {
+  let requestedPhoneNumber = null;
+  prixiService.getConfig = async (phoneNumber) => {
+    requestedPhoneNumber = phoneNumber;
+    return {
+      clinicId: '151',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+      pediatricMode: true,
+    };
+  };
+
+  try {
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000020',
+      To: '+420910900001',
+      ForwardedFrom: '+421948834475',
+      CallSid: 'CA99999999999999999999999999999971',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(requestedPhoneNumber, '+420910924407');
+    assert.match(response.body, /virtuálna sestra PriXi z ambulancie doktora Hmiru/);
+    assert.match(response.body, /Povedzte mi, prosím, svoje meno a s čím vám môžem pomôcť/);
+    assert.match(response.body, /timeout="3"/);
+    assert.match(response.body, /forwardedFrom=%2B420910924407/);
+    assert.match(response.body, /pediatricMode=false/);
+    assert.match(response.body, /dentalMode=true/);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+  }
+});
+
+test('Dedikovane Twilio cislo MDDr. Hmiru routuje a dokonci poziadavku iba pre jeho ambulanciu', async () => {
+  sttService.transcribeAudioUrl = async () => 'Ján Novák, bolí ma zub.';
+  let requestedPhoneNumber = null;
+  let sentEvent = null;
+  prixiService.getConfig = async (phoneNumber) => {
+    requestedPhoneNumber = phoneNumber;
+    return {
+      clinicId: '151',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    };
+  };
+  prixiService.sendEvent = async (event) => {
+    sentEvent = event;
+  };
+
+  try {
+    const incoming = await signedVoicePost('/voice/incoming', {
+      From: '+421900000021',
+      To: '+420910924407',
+      ForwardedFrom: '+420910924239',
+      CallSid: 'CA99999999999999999999999999999970',
+    });
+
+    assert.equal(incoming.statusCode, 200);
+    assert.equal(requestedPhoneNumber, '+420910924407');
+    assert.match(incoming.body, /ambulancie doktora Hmiru/);
+    assert.doesNotMatch(incoming.body, /Novotného/);
+    assert.match(incoming.body, /forwardedFrom=%2B420910924407/);
+
+    const problem = await signedVoicePost('/voice/record-problem?forwardedFrom=%2B420910924407&pediatricMode=false&dentalMode=true', {
+      From: '+421900000021',
+      CallSid: 'CA99999999999999999999999999999970',
+      RecordingUrl: 'https://api.twilio.test/hmira-problem',
+      RecordingDuration: '12',
+    });
+
+    assert.equal(problem.statusCode, 200);
+    assert.match(problem.body, /Vašu požiadavku odovzdám doktorovi Hmirovi/);
+    assert.doesNotMatch(problem.body, /Novotnému/);
+    assert.match(problem.body, /ozveme sa vám späť do 24 hodín/);
+    assert.doesNotMatch(problem.body, /record-name/);
+    assert.match(problem.body, /<Hangup\/>/);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(sentEvent.clinicId, '151');
+    assert.equal(sentEvent.routingPhoneNumber, '+420910924407');
+    assert.equal(sentEvent.problemTranscript, 'Ján Novák, bolí ma zub.');
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+    prixiService.sendEvent = originalSendEvent;
+    sttService.transcribeAudioUrl = originalTranscribeAudioUrl;
+  }
+});
+
 test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
   const vadkertiTwilioConfig = await originalGetConfig('+420910922693');
   const vadkertiClinicConfig = await originalGetConfig('+421902647072');
   const celkovaConfig = await originalGetConfig('+420910927082');
   const benovaBaloghovaConfig = await originalGetConfig('+420910927739');
   const novotnyConfig = await originalGetConfig('+420910928021');
+  const hmiraTwilioConfig = await originalGetConfig('+420910924407');
+  const hmiraClinicConfig = await originalGetConfig('+421948834475');
 
   assert.equal(vadkertiTwilioConfig.clinicId, '146');
   assert.equal(vadkertiTwilioConfig.voiceBotEnabled, true);
@@ -992,6 +1123,9 @@ test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
   assert.equal(benovaBaloghovaConfig.pediatricMode, false);
   assert.equal(novotnyConfig.clinicId, '112');
   assert.equal(novotnyConfig.pediatricMode, false);
+  assert.equal(hmiraTwilioConfig.clinicId, '151');
+  assert.equal(hmiraTwilioConfig.pediatricMode, false);
+  assert.equal(hmiraClinicConfig.clinicId, '151');
 });
 
 test('MUDr. Dobrovodska prehravanie nahratych audio suborov v TwiML a media endpointoch', async () => {

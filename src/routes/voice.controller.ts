@@ -27,6 +27,9 @@ const BENOVA_BALOGHOVA_CLINIC_ID = '143';
 const KLOSTERMANN_PHONE_NUMBER = '+420910924239';
 const NOVOTNY_PHONE_NUMBER = '+420910928021';
 const NOVOTNY_CLINIC_ID = '112';
+const HMIRA_PHONE_NUMBER = '+420910924407';
+const HMIRA_ROUTING_PHONE_NUMBER = '+421948834475';
+const HMIRA_CLINIC_ID = '151';
 const DOBROVODSKA_ROUTING_PHONE_NUMBER = '+421911500609';
 const DOBROVODSKA_CLINIC_ID = '95';
 const PEKARCIK_VIPTEL_PHONE_NUMBER = '+421332289010';
@@ -66,11 +69,15 @@ const PEDIATRIC_GREETING = 'Dobrý deň, dovolali ste sa do pediatrickej ambulan
 const ORTHOPEDIC_GREETING = 'Dobrý deň, dovolali ste sa do ortopedickej ambulancie pani doktorky Miroslavy Beňovej Baloghovej. Po zaznení tónu nám, prosím, povedzte, s čím vám môžeme pomôcť. Po skončení stlačte ľubovoľné tlačidlo.';
 const NOVOTNY_DENTAL_GREETING = 'Prepáčte za zdržanie. Tu je virtuálna sestra PriXi z ambulancie doktora Novotného. Povedzte mi, prosím, svoje meno a s čím vám môžem pomôcť.';
 const NOVOTNY_DENTAL_COMPLETION = 'Rozumiem. Vašu požiadavku odovzdám doktorovi Novotnému a ozveme sa vám späť do 24 hodín. Ďakujem a dovidenia.';
+const HMIRA_DENTAL_GREETING = 'Prepáčte za zdržanie. Tu je virtuálna sestra PriXi z ambulancie doktora Hmiru. Povedzte mi, prosím, svoje meno a s čím vám môžem pomôcť.';
+const HMIRA_DENTAL_COMPLETION = 'Rozumiem. Vašu požiadavku odovzdám doktorovi Hmirovi a ozveme sa vám späť do 24 hodín. Ďakujem a dovidenia.';
 const PROTECTED_PRODUCTION_TWILIO_NUMBERS = new Set([
   CELKOVA_PHONE_NUMBER,
   BENOVA_BALOGHOVA_PHONE_NUMBER,
   KLOSTERMANN_PHONE_NUMBER,
   NOVOTNY_PHONE_NUMBER,
+  HMIRA_PHONE_NUMBER,
+  HMIRA_ROUTING_PHONE_NUMBER,
   PEKARCIK_VIPTEL_PHONE_NUMBER,
   PEKARCIK_ROUTING_PHONE_NUMBER,
   DOBROVODSKA_ROUTING_PHONE_NUMBER,
@@ -97,6 +104,15 @@ function normalizeSlovakPhoneAddress(value?: string): string {
   return address;
 }
 
+function isHmiraRoute(value?: string): boolean {
+  const normalizedValue = normalizeSlovakPhoneAddress(value);
+  return normalizedValue === HMIRA_PHONE_NUMBER || normalizedValue === HMIRA_ROUTING_PHONE_NUMBER;
+}
+
+function getDentalCompletion(routingPhoneNumber: string): string {
+  return isHmiraRoute(routingPhoneNumber) ? HMIRA_DENTAL_COMPLETION : NOVOTNY_DENTAL_COMPLETION;
+}
+
 function assertClinicRoutingIsolation(
   config: ClinicConfig,
   routingPhoneNumber: string,
@@ -117,6 +133,8 @@ function assertClinicRoutingIsolation(
     [CELKOVA_PHONE_NUMBER, CELKOVA_CLINIC_ID],
     [BENOVA_BALOGHOVA_PHONE_NUMBER, BENOVA_BALOGHOVA_CLINIC_ID],
     [novotnyVoiceBotPhoneNumber, NOVOTNY_CLINIC_ID],
+    [HMIRA_PHONE_NUMBER, HMIRA_CLINIC_ID],
+    [HMIRA_ROUTING_PHONE_NUMBER, HMIRA_CLINIC_ID],
   ]);
   const expectedClinicId = protectedRoutes.get(normalizedRoute);
   const protectedClinicIds = new Set(protectedRoutes.values());
@@ -214,15 +232,20 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const normalizedTo = normalizeSlovakPhoneAddress(body.To);
     const normalizedCarrierForwardedFrom = normalizeSlovakPhoneAddress(carrierForwardedFrom);
     const isPekarcikVipTelDestination = normalizedTo === PEKARCIK_VIPTEL_PHONE_NUMBER;
-    const isOtherDedicatedDestination = body.To === CELKOVA_PHONE_NUMBER
-      || body.To === BENOVA_BALOGHOVA_PHONE_NUMBER
-      || body.To === novotnyVoiceBotPhoneNumber;
+    const isHmiraDedicatedDestination = normalizedTo === HMIRA_PHONE_NUMBER;
+    const isOtherDedicatedDestination = normalizedTo === CELKOVA_PHONE_NUMBER
+      || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
+      || normalizedTo === normalizeSlovakPhoneAddress(novotnyVoiceBotPhoneNumber)
+      || isHmiraDedicatedDestination
+      || isHmiraRoute(body.To);
 
     const isExistingDedicatedDestination = isPekarcikVipTelDestination
       || normalizedTo === CELKOVA_PHONE_NUMBER
       || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
       || normalizedTo === KLOSTERMANN_PHONE_NUMBER
       || normalizedTo === normalizeSlovakPhoneAddress(novotnyVoiceBotPhoneNumber)
+      || isHmiraDedicatedDestination
+      || isHmiraRoute(body.To)
       || normalizedTo === NEUROCENTRUM_ROUTING_PHONE_NUMBER
       || isDobrovodskaRoute(body.To);
     const isNeurocentrumCall = (!isExistingDedicatedDestination && normalizedCarrierForwardedFrom === NEUROCENTRUM_ROUTING_PHONE_NUMBER)
@@ -336,6 +359,13 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       forwardedFrom = novotnyVoiceBotPhoneNumber;
       fastify.log.info({ from: fromNumber, to: body.To, carrierForwardedFrom }, 'Applied dedicated Twilio number routing for MUDr. Novotny');
     } else if (
+      isHmiraDedicatedDestination
+      || isHmiraRoute(body.To)
+      || isHmiraRoute(carrierForwardedFrom)
+    ) {
+      forwardedFrom = HMIRA_PHONE_NUMBER;
+      fastify.log.info({ from: fromNumber, to: body.To, carrierForwardedFrom }, 'Applied routing for MDDr. Milos Hmira');
+    } else if (
       isPekarcikVipTelDestination
       || normalizedCarrierForwardedFrom === PEKARCIK_VIPTEL_PHONE_NUMBER
       || normalizedCarrierForwardedFrom === PEKARCIK_ROUTING_PHONE_NUMBER
@@ -376,7 +406,8 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       const isCelkovaNumber = forwardedFrom === CELKOVA_PHONE_NUMBER;
       const isBenovaBaloghovaNumber = forwardedFrom === BENOVA_BALOGHOVA_PHONE_NUMBER;
       const isNovotnyNumber = Boolean(novotnyVoiceBotPhoneNumber) && forwardedFrom === novotnyVoiceBotPhoneNumber;
-      const isDedicatedVoiceBotNumber = isCelkovaNumber || isBenovaBaloghovaNumber || isNovotnyNumber;
+      const isHmiraNumber = isHmiraRoute(forwardedFrom);
+      const isDedicatedVoiceBotNumber = isCelkovaNumber || isBenovaBaloghovaNumber || isNovotnyNumber || isHmiraNumber;
 
       if (!isDedicatedVoiceBotNumber && !ivrService.shouldAllowCall(config, forwardedFrom)) {
         twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Toto číslo je momentálne nedostupné.');
@@ -385,10 +416,18 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       }
 
       const isDobrovodskaNumber = isDobrovodskaRoute(forwardedFrom) || isDobrovodskaRoute(body.To) || isDobrovodskaRoute(carrierForwardedFrom);
-      const pediatricMode = isCelkovaNumber || (!isBenovaBaloghovaNumber && !isNovotnyNumber && config.pediatricMode === true);
-      const dentalMode = isNovotnyNumber;
+      const pediatricMode = isCelkovaNumber || (!isBenovaBaloghovaNumber && !isNovotnyNumber && !isHmiraNumber && config.pediatricMode === true);
+      const dentalMode = isNovotnyNumber || isHmiraNumber;
       const greeting = config.greetingMessage
-        || (isBenovaBaloghovaNumber ? ORTHOPEDIC_GREETING : dentalMode ? NOVOTNY_DENTAL_GREETING : pediatricMode ? PEDIATRIC_GREETING : DEFAULT_GREETING);
+        || (isBenovaBaloghovaNumber
+          ? ORTHOPEDIC_GREETING
+          : isHmiraNumber
+            ? HMIRA_DENTAL_GREETING
+            : dentalMode
+              ? NOVOTNY_DENTAL_GREETING
+              : pediatricMode
+                ? PEDIATRIC_GREETING
+                : DEFAULT_GREETING);
 
       if (isDobrovodskaNumber && existsSync(DOBROVODSKA_GREETING_FILE)) {
         twiml.play(`${getPublicBaseUrl(request)}/media/dobrovodska-1-greeting.wav`);
@@ -455,7 +494,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       }) || draft;
       twiml.say(
         { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
-        NOVOTNY_DENTAL_COMPLETION
+        getDentalCompletion(forwardedFrom)
       );
       twiml.hangup();
       reply.type('text/xml').send(twiml.toString());
@@ -689,7 +728,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       const completionMessage = pediatricMode
         ? 'Ďakujeme, vašu požiadavku sme zaznamenali. Ambulancia sa vám po jej spracovaní ozve na telefónne číslo, z ktorého voláte. Dovidenia.'
         : dentalMode
-          ? NOVOTNY_DENTAL_COMPLETION
+          ? getDentalCompletion(forwardedFrom)
           : 'Rozumiem, vaša požiadavka je zaznamenaná, ambulancia sa vám po jej prijatí ozve. Ďakujeme a dovidenia.';
       twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, completionMessage);
     }
