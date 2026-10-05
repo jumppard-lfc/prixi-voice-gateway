@@ -207,7 +207,7 @@ export async function neurocentrumVoiceBotRoutes(fastify: FastifyInstance): Prom
         return simpleEnd(reply, session.config.messages.newPatient);
       }
       session.step = 'name';
-      return renderPrompt(reply, session);
+      return renderPrompt(reply, session, 'Ďakujem. ');
     }
 
     if (session.step === 'name') {
@@ -217,7 +217,7 @@ export async function neurocentrumVoiceBotRoutes(fastify: FastifyInstance): Prom
       session.patientName = answer;
       session.attempts = 0;
       session.step = 'date_of_birth';
-      return renderPrompt(reply, session);
+      return renderPrompt(reply, session, 'Ďakujem. ');
     }
 
     if (session.step === 'date_of_birth') {
@@ -229,7 +229,7 @@ export async function neurocentrumVoiceBotRoutes(fastify: FastifyInstance): Prom
       session.dateOfBirth = normalized;
       session.attempts = 0;
       session.step = 'request_type';
-      return renderPrompt(reply, session);
+      return renderPrompt(reply, session, 'Rozumiem. ');
     }
 
     if (session.step === 'request_type') {
@@ -245,7 +245,7 @@ export async function neurocentrumVoiceBotRoutes(fastify: FastifyInstance): Prom
       session.detail = answer;
       session.attempts = 0;
       session.step = 'confirmation';
-      return renderPrompt(reply, session);
+      return renderPrompt(reply, session, 'Ďakujem. Teraz vašu požiadavku zhrniem. ');
     }
 
     const confirmed = parseNeurocentrumYesNo(answer);

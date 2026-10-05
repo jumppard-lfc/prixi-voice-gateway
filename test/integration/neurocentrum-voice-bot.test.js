@@ -128,6 +128,30 @@ test('prvovyšetrenie použije hlášku z EDS a nevytvorí požiadavku', async (
   assert.equal(sentEvents.length, 0);
 });
 
+test('po rozpoznaných odpovediach použije krátke prirodzené potvrdenia', async () => {
+  const callSid = 'CA-NEURO-ACKS-001';
+  await incoming(callSid);
+
+  const existingPatient = await answer(callSid, 'áno');
+  assert.match(existingPatient.body, /Ďakujem/);
+  assert.match(existingPatient.body, /meno a priezvisko/);
+
+  const name = await answer(callSid, 'Ján Novák');
+  assert.match(name.body, /Ďakujem/);
+  assert.match(name.body, /dátum narodenia/);
+
+  const birthDate = await answer(callSid, '15. 3. 1980');
+  assert.match(birthDate.body, /Rozumiem/);
+  assert.match(birthDate.body, /potrebujete vybaviť/);
+
+  const requestType = await answer(callSid, 'recept');
+  assert.match(requestType.body, /Rozumiem, ide o predpis liekov/);
+
+  const detail = await answer(callSid, 'Tegretol 200 miligramov');
+  assert.match(detail.body, /Ďakujem\. Teraz vašu požiadavku zhrniem/);
+  assert.match(detail.body, /Zhrniem vašu požiadavku/);
+});
+
 test('požiadavka sa odošle do EDS až po potvrdení zhrnutia pacientom', async () => {
   const callSid = 'CA-NEURO-RX-001';
   const confirmation = await fillRequest(callSid);
