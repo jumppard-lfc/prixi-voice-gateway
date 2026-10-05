@@ -872,6 +872,41 @@ test('Poziadavka MDDr. Hmiru sa pri nespravnom clinicId neodosle inej ambulancii
   }
 });
 
+test('Poziadavka MUDr. Zdrahalovej sa pri nespravnom clinicId neodosle inej ambulancii', async () => {
+  let sendEventCalls = 0;
+  prixiService.getConfig = async () => ({
+    clinicId: '999',
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+    pediatricMode: true,
+  });
+  prixiService.sendEvent = async () => {
+    sendEventCalls += 1;
+  };
+
+  try {
+    const endpoint = '/voice/record-problem?forwardedFrom=%2B421911135193&pediatricMode=true&dentalMode=false';
+    const response = await signedVoicePost(endpoint, {
+      From: '+421900000152',
+      To: '+420910926126',
+      CallSid: 'CA99999999999999999999999999999152',
+      RecordingUrl: 'https://api.twilio.test/zdrahalova-wrong-clinic',
+      RecordingDuration: '5',
+    });
+
+    assert.equal(response.statusCode, 200);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(sendEventCalls, 0);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+    prixiService.sendEvent = originalSendEvent;
+  }
+});
+
 test('Twilio cislo MUDr. Benovej Baloghovej aktivuje ortopedicky voice bot', async () => {
   let requestedPhoneNumber = null;
   prixiService.getConfig = async (phoneNumber) => {
@@ -1121,6 +1156,82 @@ test('Dedikovane Twilio cislo MDDr. Hmiru routuje a dokonci poziadavku iba pre j
   }
 });
 
+test('MUDr. Zdrahalova sa opyta iba raz a po poziadavke hovor ukonci', async () => {
+  sttService.transcribeAudioUrl = async () => 'Ema Zelená, potrebujem predpísať lieky.';
+  let requestedPhoneNumber = null;
+  let sentEvent = null;
+  prixiService.getConfig = async (phoneNumber) => {
+    requestedPhoneNumber = phoneNumber;
+    return {
+      clinicId: '152',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+      pediatricMode: false,
+      greetingMessage: 'Toto je dlhá všeobecná hláška, ktorá sa pre túto ambulanciu nesmie použiť.',
+    };
+  };
+  prixiService.sendEvent = async (event) => {
+    sentEvent = event;
+  };
+
+  try {
+    const incoming = await signedVoicePost('/voice/incoming', {
+      From: '+421900000193',
+      To: '+420910926126',
+      ForwardedFrom: '+420910927082',
+      CallSid: 'CA99999999999999999999999999999193',
+    });
+
+    assert.equal(incoming.statusCode, 200);
+    assert.equal(requestedPhoneNumber, '+421911135193');
+    assert.match(incoming.body, /virtuálna sestra PriXi z ambulancie doktorky Zdráhalovej/);
+    assert.match(incoming.body, /meno dieťaťa a s čím vám môžeme pomôcť/);
+    assert.doesNotMatch(incoming.body, /dlhá všeobecná hláška/);
+    assert.doesNotMatch(incoming.body, /život ohrozujúci stav|ordinačné|rok narodenia/);
+    assert.match(incoming.body, /timeout="3"/);
+    assert.match(incoming.body, /forwardedFrom=%2B421911135193/);
+    assert.match(incoming.body, /pediatricMode=true/);
+
+    const forwardedIncoming = await signedVoicePost('/voice/incoming', {
+      From: '+421900000194',
+      To: '+420910920194',
+      ForwardedFrom: '+421911135193',
+      CallSid: 'CA99999999999999999999999999999194',
+    });
+
+    assert.equal(forwardedIncoming.statusCode, 200);
+    assert.equal(requestedPhoneNumber, '+421911135193');
+    assert.match(forwardedIncoming.body, /ambulancie doktorky Zdráhalovej/);
+    assert.match(forwardedIncoming.body, /forwardedFrom=%2B421911135193/);
+
+    const problem = await signedVoicePost('/voice/record-problem?forwardedFrom=%2B421911135193&pediatricMode=true&dentalMode=false', {
+      From: '+421900000193',
+      CallSid: 'CA99999999999999999999999999999193',
+      RecordingUrl: 'https://api.twilio.test/zdrahalova-problem',
+      RecordingDuration: '11',
+    });
+
+    assert.equal(problem.statusCode, 200);
+    assert.match(problem.body, /Vašu požiadavku odovzdám ambulancii doktorky Zdráhalovej/);
+    assert.doesNotMatch(problem.body, /record-name|recording-complete|rok narodenia/);
+    assert.match(problem.body, /<Hangup\/>/);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(sentEvent.clinicId, '152');
+    assert.equal(sentEvent.routingPhoneNumber, '+421911135193');
+    assert.equal(sentEvent.problemTranscript, 'Ema Zelená, potrebujem predpísať lieky.');
+    assert.equal(sentEvent.nameTranscript, '');
+    assert.equal(sentEvent.birthYearTranscript, '');
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+    prixiService.sendEvent = originalSendEvent;
+    sttService.transcribeAudioUrl = originalTranscribeAudioUrl;
+  }
+});
+
 test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
   const vadkertiTwilioConfig = await originalGetConfig('+420910922693');
   const vadkertiClinicConfig = await originalGetConfig('+421902647072');
@@ -1129,6 +1240,8 @@ test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
   const novotnyConfig = await originalGetConfig('+420910928021');
   const hmiraTwilioConfig = await originalGetConfig('+420910924407');
   const hmiraClinicConfig = await originalGetConfig('+421948834475');
+  const zdrahalovaTwilioConfig = await originalGetConfig('+420910926126');
+  const zdrahalovaClinicConfig = await originalGetConfig('+421911135193');
 
   assert.equal(vadkertiTwilioConfig.clinicId, '146');
   assert.equal(vadkertiTwilioConfig.voiceBotEnabled, true);
@@ -1142,6 +1255,9 @@ test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
   assert.equal(hmiraTwilioConfig.clinicId, '151');
   assert.equal(hmiraTwilioConfig.pediatricMode, false);
   assert.equal(hmiraClinicConfig.clinicId, '151');
+  assert.equal(zdrahalovaTwilioConfig.clinicId, '152');
+  assert.equal(zdrahalovaTwilioConfig.pediatricMode, true);
+  assert.equal(zdrahalovaClinicConfig.clinicId, '152');
 });
 
 test('MUDr. Dobrovodska pouziva dvojkrokovy audio flow', async () => {

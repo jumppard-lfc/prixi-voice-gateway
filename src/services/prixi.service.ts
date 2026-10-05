@@ -126,6 +126,15 @@ export class PrixiService {
       };
     }
 
+    if (phoneNumber === '+420910926126' || phoneNumber === '+421911135193') {
+      return {
+        clinicId: '152',
+        voiceBotEnabled: true,
+        timezone: 'Europe/Bratislava',
+        pediatricMode: true,
+      };
+    }
+
     if (this.mockMode) {
       return {
         clinicId: process.env.PRIXI_FALLBACK_CLINIC_ID || 'local-dev',

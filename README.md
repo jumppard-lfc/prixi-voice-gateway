@@ -63,6 +63,19 @@ The builder exposes this as **Dedikované Twilio číslo bota**. Existing produc
 
 Run verification with `npm test`.
 
+## MUDr. Zora Zdráhalová production bot
+
+The Zdráhalová pediatric bot uses the dedicated Twilio DID `+420910926126` and
+the clinic's public routing number `+421911135193`. The public number remains
+the stable PriXi configuration key and both numbers are pinned to clinic `152`.
+The bot asks the parent for the child's
+name and their request in one short recording, then confirms the handoff and
+ends the call. It deliberately does not add separate name, birth year,
+office-hours or service-list prompts.
+
+Configure the Twilio DID's incoming voice webhook and terminal status callback
+as `POST /voice/incoming` and `POST /voice/call-status`.
+
 ### PriXi presentation demo
 
 `configs/demo-voice-bots/prixi-prezentacia-demo.json` routes the flyer number
