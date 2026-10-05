@@ -1,0 +1,370 @@
+{
+  "version": 1,
+  "id": "prixi-salony-stupava-demo",
+  "clinic": {
+    "displayName": "PriXi pre salóny krásy",
+    "specialty": "virtuálna telefonická asistentka pre salóny krásy",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": {
+    "kind": "custom",
+    "mode": "demo_mock"
+  },
+  "services": [],
+  "practitioners": [],
+  "routing": {
+    "inboundTwilioNumbers": [
+      "+421800223160"
+    ]
+  },
+  "conversation": {
+    "confirmService": false,
+    "confirmDatePreference": false,
+    "confirmSlot": false,
+    "confirmName": false,
+    "requireTerms": false,
+    "sendConfirmationSms": false,
+    "useDtmfFallback": true,
+    "playPromptTone": false
+  },
+  "copy": {
+    "questionProsody": {
+      "pitch": "+5%",
+      "rate": "96%",
+      "pauseMs": 180
+    }
+  },
+  "conversationTree": {
+    "entryNodeId": "uvod",
+    "nodes": [
+      {
+        "id": "uvod",
+        "type": "question",
+        "bridge": "Dobrý deň. Dovolali ste sa PriXi, virtuálnej telefonickej asistentke pre salóny krásy. Toto je krátka nezáväzná ukážka a nič sa počas nej naozaj nerezervuje.",
+        "prompt": "Chcete si najprv vyskúšať, ako vybavím klienta salónu? Alebo vás rovno zaujíma, čo môžem robiť pre váš salón?",
+        "retryPrompt": "Pre ukážku hovoru klienta stlačte jednotku. Ak vás zaujíma PriXi pre váš salón, stlačte dvojku.",
+        "storeAs": "mode",
+        "confirmSelection": false,
+        "choices": [
+          {
+            "id": "klient",
+            "label": "vyskúšať PriXi ako klient",
+            "voiceAliases": [
+              "ako klient",
+              "vyskúšať ako klient",
+              "ukážka hovoru",
+              "chcem si to vyskúšať",
+              "klient"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "klient-poziadavka"
+          },
+          {
+            "id": "salon",
+            "label": "PriXi pre môj salón",
+            "voiceAliases": [
+              "pre môj salón",
+              "môj salón",
+              "zaujíma ma PriXi",
+              "chcem vedieť viac",
+              "pre prevádzku",
+              "urobiť pre mňa"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "lead-udaje"
+          }
+        ]
+      },
+      {
+        "id": "klient-poziadavka",
+        "type": "question",
+        "bridge": "Predstavte si, že voláte do svojho obľúbeného salónu.",
+        "prompt": "Chcete si rezervovať nový termín, zmeniť alebo zrušiť existujúci termín, opýtať sa na cenu či otváracie hodiny, alebo zanechať odkaz?",
+        "retryPrompt": "Pre nový termín stlačte jednotku. Pre zmenu alebo zrušenie termínu dvojku. Pre informácie trojku. Pre odkaz štvorku.",
+        "storeAs": "clientRequest",
+        "confirmSelection": false,
+        "choices": [
+          {
+            "id": "novy-termin",
+            "label": "rezervovať nový termín",
+            "voiceAliases": [
+              "nový termín",
+              "rezervovať termín",
+              "objednať sa",
+              "chcem termín"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "klient-sluzba"
+          },
+          {
+            "id": "zmena-terminu",
+            "label": "zmeniť alebo zrušiť termín",
+            "voiceAliases": [
+              "zmeniť termín",
+              "zrušiť termín",
+              "preložiť termín",
+              "presunúť termín"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "zmena-typ"
+          },
+          {
+            "id": "informacie",
+            "label": "opýtať sa na cenu alebo otváracie hodiny",
+            "voiceAliases": [
+              "cena",
+              "cenník",
+              "otváracie hodiny",
+              "kedy máte otvorené",
+              "informácie"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "informacie-vysledok"
+          },
+          {
+            "id": "odkaz",
+            "label": "zanechať odkaz",
+            "voiceAliases": [
+              "zanechať odkaz",
+              "nechať správu",
+              "odkaz",
+              "správa"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "odkaz-text"
+          }
+        ]
+      },
+      {
+        "id": "klient-sluzba",
+        "type": "question",
+        "prompt": "Na akú službu sa chcete objednať? Môžete povedať napríklad strih, manikúra, kozmetické ošetrenie alebo masáž.",
+        "retryPrompt": "Pre strih stlačte jednotku. Pre manikúru dvojku. Pre kozmetické ošetrenie trojku. Pre masáž štvorku.",
+        "storeAs": "service",
+        "confirmSelection": false,
+        "choices": [
+          {
+            "id": "strih",
+            "label": "strih",
+            "voiceAliases": [
+              "strihanie",
+              "účes",
+              "vlasy"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "klient-cas"
+          },
+          {
+            "id": "manikura",
+            "label": "manikúra",
+            "voiceAliases": [
+              "nechty",
+              "gélové nechty"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "klient-cas"
+          },
+          {
+            "id": "kozmetika",
+            "label": "kozmetické ošetrenie",
+            "voiceAliases": [
+              "kozmetika",
+              "ošetrenie pleti",
+              "pleť"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "klient-cas"
+          },
+          {
+            "id": "masaz",
+            "label": "masáž",
+            "voiceAliases": [
+              "masírovanie",
+              "relaxačná masáž"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "klient-cas"
+          }
+        ]
+      },
+      {
+        "id": "klient-cas",
+        "type": "question",
+        "prompt": "Vyhovuje vám termín skôr dopoludnia, popoludní alebo kedykoľvek?",
+        "retryPrompt": "Pre dopoludnie stlačte jednotku. Pre popoludnie dvojku. Pre kedykoľvek trojku.",
+        "storeAs": "timePreference",
+        "confirmSelection": false,
+        "choices": [
+          {
+            "id": "dopoludnia",
+            "label": "dopoludnia",
+            "voiceAliases": [
+              "dopoludnie",
+              "doobeda",
+              "ráno"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "popoludni",
+            "label": "popoludní",
+            "voiceAliases": [
+              "popoludnie",
+              "poobede",
+              "neskôr"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "volne-terminy"
+          },
+          {
+            "id": "kedykolvek",
+            "label": "kedykoľvek",
+            "voiceAliases": [
+              "hocikedy",
+              "je mi to jedno",
+              "najbližší termín"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "volne-terminy"
+          }
+        ]
+      },
+      {
+        "id": "volne-terminy",
+        "type": "availability",
+        "bridge": "V reálnej prevádzke by som teraz načítala dostupnosť priamo z rezervačného systému salónu.",
+        "prompt": "Pre ukážku mám tieto voľné termíny.",
+        "serviceVariable": "service",
+        "preferenceVariable": "timePreference",
+        "storeAs": "selectedSlot",
+        "confirmSelection": false,
+        "nextNodeId": "rezervacia-vysledok"
+      },
+      {
+        "id": "rezervacia-vysledok",
+        "type": "message",
+        "text": "Vybrali ste si službu {{service}}, {{selectedSlot}}. V skutočnom salóne by som rezerváciu zapísala a klientovi poslala potvrdenie. V tejto ukážke som nič záväzne nevytvorila.",
+        "nextNodeId": "zaujem"
+      },
+      {
+        "id": "zmena-typ",
+        "type": "question",
+        "bridge": "V reálnej prevádzke by som najprv bezpečne overila vašu existujúcu rezerváciu.",
+        "prompt": "Chcete termín zrušiť alebo ho presunúť?",
+        "retryPrompt": "Pre zrušenie termínu stlačte jednotku. Pre presunutie termínu dvojku.",
+        "storeAs": "changeRequest",
+        "confirmSelection": false,
+        "choices": [
+          {
+            "id": "zrusit",
+            "label": "zrušiť termín",
+            "voiceAliases": [
+              "zrušiť",
+              "stornovať",
+              "neprídem"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "zmena-vysledok"
+          },
+          {
+            "id": "presunut",
+            "label": "presunúť termín",
+            "voiceAliases": [
+              "presunúť",
+              "preložiť",
+              "zmeniť"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "zmena-vysledok"
+          }
+        ]
+      },
+      {
+        "id": "zmena-vysledok",
+        "type": "message",
+        "text": "Rozumiem. V ostrej prevádzke by som požiadavku bezpečne spracovala a pôvodný termín uvoľnila až po potvrdení klienta. Salón tak nemusí kvôli každej zmene prerušovať svoju prácu.",
+        "nextNodeId": "zaujem"
+      },
+      {
+        "id": "informacie-vysledok",
+        "type": "message",
+        "text": "V reálnom salóne by som odpovedala podľa jeho aktuálneho cenníka, otváracích hodín a ďalších pokynov. Ak by som odpoveď nepoznala, otázku by som prepísala do textu a odovzdala salónu.",
+        "nextNodeId": "zaujem"
+      },
+      {
+        "id": "odkaz-text",
+        "type": "input",
+        "prompt": "Povedzte mi krátko, čo potrebujete odkázať salónu.",
+        "retryPrompt": "Odkaz som nezachytila. Skúste ho prosím povedať ešte raz.",
+        "storeAs": "clientMessage",
+        "confirmInput": false,
+        "nextNodeId": "odkaz-vysledok"
+      },
+      {
+        "id": "odkaz-vysledok",
+        "type": "message",
+        "text": "Vašu požiadavku som zachytila. V reálnej prevádzke by som ju teraz poslala salónu v textovej podobe spolu s vaším telefónnym číslom.",
+        "nextNodeId": "zaujem"
+      },
+      {
+        "id": "zaujem",
+        "type": "question",
+        "bridge": "A práve takto by som vybavila bežný telefonát, zatiaľ čo vy sa venujete klientke.",
+        "prompt": "Chcete, aby sme vám ukázali, ako by PriXi mohla fungovať vo vašom salóne?",
+        "retryPrompt": "Ak máte záujem o ukážku pre váš salón, povedzte áno alebo stlačte jednotku. Pre nie stlačte dvojku.",
+        "storeAs": "interested",
+        "confirmSelection": false,
+        "choices": [
+          {
+            "id": "ano",
+            "label": "áno",
+            "voiceAliases": [
+              "mám záujem",
+              "chcem ukážku",
+              "určite",
+              "môžete sa ozvať"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "lead-udaje"
+          },
+          {
+            "id": "nie",
+            "label": "nie",
+            "voiceAliases": [
+              "nemám záujem",
+              "ďakujem nie",
+              "nechcem"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "koniec-bez-leadu"
+          }
+        ]
+      },
+      {
+        "id": "lead-udaje",
+        "type": "input",
+        "bridge": "Výborne. Matej sa vám môže ozvať na číslo, z ktorého voláte.",
+        "prompt": "Povedzte mi, prosím, svoje meno, názov prevádzky a či vám viac vyhovuje dopoludnie, popoludnie alebo podvečer.",
+        "retryPrompt": "Údaje som nezachytila. Povedzte prosím svoje meno, názov prevádzky a vhodný čas na zavolanie.",
+        "storeAs": "leadDetails",
+        "confirmInput": false,
+        "captureLeadDraft": true,
+        "nextNodeId": "koniec-lead"
+      },
+      {
+        "id": "koniec-lead",
+        "type": "end",
+        "text": "Ďakujem. Matej sa vám ozve v čase, ktorý ste uviedli, na číslo, z ktorého voláte. A keby som už dnes pracovala u vás? Práve som vám ušetrila jeden telefonát. Prajem príjemný deň.",
+        "outcome": "lead"
+      },
+      {
+        "id": "koniec-bez-leadu",
+        "type": "end",
+        "text": "Úplne v poriadku. Viac informácií nájdete na prixi.sk. Môžete tiež zavolať znova a vyskúšať inú situáciu. Prajem príjemný deň.",
+        "outcome": "complete"
+      }
+    ]
+  }
+}

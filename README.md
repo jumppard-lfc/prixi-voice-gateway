@@ -97,6 +97,24 @@ The payload contains `name`, `clinicName`, `clinicType`,
 Configure the Twilio number's voice webhook as `POST /voice/incoming`; the
 normal dedicated-number router selects this demo configuration.
 
+### PriXi salons demo
+
+`configs/demo-voice-bots/prixi-salony-stupava-demo.json` routes the Slovak
+flyer number `+421800223160` to a salon-focused demo. The caller may try a
+mock booking, appointment change, common-information request, or a transcribed
+message. Interested salon owners leave their name, business name, and preferred
+callback time in one free-form answer without a confirmation step.
+
+The lead input uses Twilio speech partial-result callbacks. Each provisional
+transcript is written as `[PriXi Demo Lead Draft]`; a normal completion or the
+terminal call-status callback writes `[PriXi Demo Lead]`. Configure the number
+with both webhooks:
+
+```text
+Voice webhook:         POST https://<voice-gateway-host>/voice/incoming
+Call status callback:  POST https://<voice-gateway-host>/voice/call-status
+```
+
 ## MUDr. Peter Vadkerti production bot
 
 The Vadkerti neurology bot is a production intake flow, not a Builder demo.

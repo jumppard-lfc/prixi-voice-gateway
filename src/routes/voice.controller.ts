@@ -17,6 +17,7 @@ import { vadkertiBotConfig } from '../config/vadkerti.config';
 import { finalizeAbandonedNeurocentrumCall, startNeurocentrumVoiceBot } from './neurocentrum-voice-bot.controller';
 import { neurocentrumBotConfig } from '../config/neurocentrum.config';
 import { neurocentrumEdsService } from '../services/neurocentrum-eds.service';
+import { finalizeAbandonedDemoCall } from './demo-voice-bot.controller';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
@@ -796,5 +797,6 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
     finalizeAbandonedVadkertiCall(fastify, body.CallSid, new Date().toISOString());
     finalizeAbandonedNeurocentrumCall(body.CallSid);
+    finalizeAbandonedDemoCall(body.CallSid, body.CallStatus);
   });
 }

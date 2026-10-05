@@ -3,7 +3,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:
 import twilio from 'twilio';
 import { bulkGateSmsService } from '../services/bulkgate-sms.service';
 import { bookingAuditService } from '../services/booking-audit.service';
-import { demoLeadService } from '../services/demo-lead.service';
+import { DemoLead, demoLeadService } from '../services/demo-lead.service';
 import { parseDatePreference, parseName, parseSlotChoice, parseYesNo } from '../services/booking-nlu.service';
 import { voiceBotConfigStore } from '../services/voice-bot-config.store';
 import {
@@ -65,6 +65,21 @@ interface TreeSession {
 }
 
 const treeSessions = new Map<string, TreeSession>();
+
+interface PartialLeadDraft {
+  lead: DemoLead;
+  latestTranscript?: string;
+  expiresAt: number;
+}
+
+const partialLeadDrafts = new Map<string, PartialLeadDraft>();
+
+function prunePartialLeadDrafts(): void {
+  const now = Date.now();
+  for (const [callSid, draft] of partialLeadDrafts) {
+    if (draft.expiresAt <= now) partialLeadDrafts.delete(callSid);
+  }
+}
 
 interface TreePreamble { text: string; audioUrl?: string; }
 
@@ -304,6 +319,11 @@ function treeRetryUrl(session: TreeSession): string {
   return `/voice/demo/${session.config.id}/tree/retry?state=${portableTreeState(session)}`;
 }
 
+function treePartialResultUrl(session: TreeSession): string {
+  const path = `/voice/demo/${session.config.id}/tree/partial?state=${portableTreeState(session)}`;
+  return `${session.publicBaseUrl}${path}`;
+}
+
 function readPortableTreeState(value: unknown): PortableTreeState | undefined {
   if (typeof value !== 'string' || value.length < 2 || value.length > 8_000) return undefined;
   try {
@@ -372,6 +392,29 @@ function interpolateTreeText(value: string | undefined, session: TreeSession, se
     if (key === 'selected') return selected;
     return session.answers[key]?.label || '';
   });
+}
+
+function treeAnswerLabels(session: TreeSession): Record<string, string> {
+  return Object.fromEntries(Object.entries(session.answers).map(([key, answer]) => [key, answer.label]));
+}
+
+function buildTreeLead(
+  session: TreeSession,
+  overrides: Partial<DemoLead> = {},
+): DemoLead {
+  return {
+    botId: session.config.id,
+    callSid: session.callSid,
+    callerPhone: session.phone,
+    capturedAt: new Date().toISOString(),
+    name: session.answers.name?.label,
+    clinicName: session.answers.clinicName?.label,
+    clinicType: session.answers.clinicType?.label,
+    preferredContactTime: session.answers.preferredContactTime?.label,
+    leadDetails: session.answers.leadDetails?.label,
+    answers: treeAnswerLabels(session),
+    ...overrides,
+  };
 }
 
 function parseTreeChoice(value: string, node: VoiceBotTreeQuestionNode): VoiceBotTreeChoice | undefined {
@@ -535,6 +578,10 @@ async function renderTreeInput(reply: FastifyReply, session: TreeSession, node: 
     timeout: 5,
     speechTimeout: 'auto',
     language: 'sk-SK',
+    ...(node.captureLeadDraft ? {
+      partialResultCallback: treePartialResultUrl(session),
+      partialResultCallbackMethod: 'POST',
+    } : {}),
     ...(node.hints?.length ? { hints: node.hints.join(', ') } : {}),
   } as any);
   for (const preamble of preambles) addTreeAudioOrSpeech(gather, preamble.text, preamble.audioUrl, session.config);
@@ -597,16 +644,7 @@ async function renderTree(reply: FastifyReply, session: TreeSession, prefix = ''
       }
     }
     if (end.outcome === 'lead') {
-      const lead = {
-        botId: session.config.id,
-        callSid: session.callSid,
-        callerPhone: session.phone,
-        capturedAt: new Date().toISOString(),
-        name: session.answers.name?.label,
-        clinicName: session.answers.clinicName?.label,
-        clinicType: session.answers.clinicType?.label,
-        preferredContactTime: session.answers.preferredContactTime?.label,
-      };
+      const lead = buildTreeLead(session, { status: 'complete' });
       // Do not make the caller wait for a CRM/webhook round-trip before hearing
       // the closing. The structured log is written synchronously by submit().
       demoLeadService.submit(lead).then((delivery) => {
@@ -615,6 +653,7 @@ async function renderTree(reply: FastifyReply, session: TreeSession, prefix = ''
         bookingAuditService.record(session.callSid, 'failed', { message: error instanceof Error ? error.message : String(error) });
         console.error('Failed to deliver PriXi demo lead', { callSid: session.callSid, error });
       });
+      partialLeadDrafts.delete(session.callSid);
     }
     addTreeAudioOrSpeech(twiml, interpolateTreeText(end.text, session), end.audioUrl, session.config);
     twiml.hangup();
@@ -894,6 +933,30 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
     return renderTree(reply, session, 'Prepáčte, nerozumela som. ', true);
   });
 
+  fastify.post('/demo/:botId/tree/partial', async (request, reply) => {
+    const session = await resolveTreeSession(request);
+    const body = request.body as Record<string, string>;
+    const node = session ? treeNode(session) : undefined;
+    const transcript = String(body.UnstableSpeechResult || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+
+    reply.code(204).send();
+
+    if (!session || node?.type !== 'input' || !node.captureLeadDraft || transcript.length < 2) return;
+
+    const lead = buildTreeLead(session, {
+      leadDetails: transcript,
+      status: 'draft',
+      lastStep: node.id,
+    });
+    prunePartialLeadDrafts();
+    partialLeadDrafts.set(session.callSid, {
+      lead,
+      latestTranscript: transcript,
+      expiresAt: Date.now() + SESSION_TTL_MS,
+    });
+    demoLeadService.captureDraft({ ...lead, transcriptStatus: 'unstable' });
+  });
+
   fastify.post('/demo/:botId/tree/answer', async (request, reply) => {
     const body = request.body as Record<string, string>;
     const session = await resolveTreeSession(request);
@@ -959,5 +1022,38 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
     }
     commitTreeChoice(session, node, choice);
     return renderTree(reply, session, 'Ďakujem. ');
+  });
+}
+
+/**
+ * Finalizes a best-effort lead when Twilio reports that the caller hung up
+ * before the conversation reached its normal lead end node.
+ */
+export function finalizeAbandonedDemoCall(callSid: string, callStatus: string): void {
+  prunePartialLeadDrafts();
+  const session = treeSessions.get(callSid);
+  const node = session ? treeNode(session) : undefined;
+  const savedDraft = partialLeadDrafts.get(callSid);
+  const isInsideLeadCapture = node?.type === 'input' && node.captureLeadDraft;
+
+  treeSessions.delete(callSid);
+  partialLeadDrafts.delete(callSid);
+
+  if (!savedDraft && (!session || !isInsideLeadCapture)) return;
+
+  const lead = savedDraft?.lead || buildTreeLead(session!, {
+    status: 'abandoned',
+    lastStep: node?.id,
+  });
+  lead.status = 'abandoned';
+  lead.callStatus = callStatus;
+  lead.capturedAt = new Date().toISOString();
+  if (savedDraft?.latestTranscript) lead.leadDetails = savedDraft.latestTranscript;
+
+  demoLeadService.submit(lead).then((delivery) => {
+    bookingAuditService.record(callSid, 'lead_collected', { delivery, status: 'abandoned' });
+  }).catch((error) => {
+    bookingAuditService.record(callSid, 'failed', { message: error instanceof Error ? error.message : String(error) });
+    console.error('Failed to deliver abandoned PriXi demo lead', { callSid, error });
   });
 }

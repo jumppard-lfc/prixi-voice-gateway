@@ -15,6 +15,7 @@ const app = require('../../src/app').default;
 const { prixiService } = require('../../src/services/prixi.service');
 const { validateVoiceBotConfig } = require('../../src/services/voice-bot-framework.service');
 const { bookingAuditService } = require('../../src/services/booking-audit.service');
+const { demoLeadService } = require('../../src/services/demo-lead.service');
 
 const configDirectory = process.env.VOICE_BOT_CONFIG_DIR;
 const repositoryConfigDirectory = process.env.VOICE_BOT_CONFIG_REPOSITORY_DIR;
@@ -57,6 +58,12 @@ async function signedPost(endpoint, params) {
 function gatherAction(twiml) {
   const match = twiml.match(/<Gather[^>]+action="([^"]+)"/);
   assert.ok(match, 'TwiML musí obsahovať Gather action');
+  return match[1].replace(/&amp;/g, '&');
+}
+
+function gatherAttribute(twiml, attribute) {
+  const match = twiml.match(new RegExp(`<Gather[^>]+${attribute}="([^"]+)"`));
+  assert.ok(match, `Gather musí obsahovať atribút ${attribute}`);
   return match[1].replace(/&amp;/g, '&');
 }
 
@@ -244,6 +251,112 @@ test('prezentačný strom zachytí voľné hlasové údaje a vytvorí lead bez p
   const events = bookingAuditService.get(callSid) || [];
   assert.equal(events.filter((event) => event.event === 'tree_input_collected').length, 2);
   assert.equal(events.some((event) => event.event === 'lead_collected'), true);
+});
+
+test('salónové demo je platné a smeruje slovenské letákové číslo', async () => {
+  const config = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/prixi-salony-stupava-demo.json'), 'utf8'));
+  const validation = validateVoiceBotConfig(config);
+  assert.equal(validation.valid, true, validation.errors.join(' '));
+  await save(config);
+
+  const params = { From: '+421900000125', To: '+421800223160', CallSid: 'CA-SALON-ROUTING-1' };
+  const response = await signedPost('/voice/incoming', params);
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /<Redirect>\/voice\/demo\/prixi-salony-stupava-demo\/start<\/Redirect>/);
+});
+
+test('salónové demo zachráni priebežný lead po zložení počas poslednej odpovede', async () => {
+  const config = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/prixi-salony-stupava-demo.json'), 'utf8'));
+  config.id = 'salon-abandoned-lead-demo';
+  config.routing.inboundTwilioNumbers = [];
+  await save(config);
+
+  const submitted = [];
+  const drafts = [];
+  const originalSubmit = demoLeadService.submit.bind(demoLeadService);
+  const originalCaptureDraft = demoLeadService.captureDraft.bind(demoLeadService);
+  demoLeadService.submit = async (lead) => {
+    submitted.push(lead);
+    return 'log';
+  };
+  demoLeadService.captureDraft = (lead) => drafts.push(lead);
+
+  try {
+    const callSid = 'CA-SALON-ABANDONED-1';
+    const start = await signedPost(`/voice/demo/${config.id}/start`, { From: '+421900000125', CallSid: callSid });
+    const leadQuestion = await signedPost(gatherAction(start.body), { From: '+421900000125', CallSid: callSid, Digits: '2' });
+    assert.match(leadQuestion.body, /svoje meno, názov prevádzky/);
+
+    const partialAbsoluteUrl = gatherAttribute(leadQuestion.body, 'partialResultCallback');
+    const partialUrl = new URL(partialAbsoluteUrl);
+    const partial = await signedPost(`${partialUrl.pathname}${partialUrl.search}`, {
+      From: '+421900000125',
+      CallSid: callSid,
+      UnstableSpeechResult: 'Jana Nováková, salón Bella, najlepšie popoludní',
+    });
+    assert.equal(partial.statusCode, 204);
+    assert.equal(drafts.length, 1);
+    assert.equal(drafts[0].status, 'draft');
+    assert.equal(drafts[0].leadDetails, 'Jana Nováková, salón Bella, najlepšie popoludní');
+    assert.equal(drafts[0].transcriptStatus, 'unstable');
+
+    const status = await signedPost('/voice/call-status', {
+      From: '+421900000125',
+      To: '+421800223160',
+      CallSid: callSid,
+      CallStatus: 'completed',
+    });
+    assert.equal(status.statusCode, 204);
+    assert.equal(submitted.length, 1);
+    assert.equal(submitted[0].status, 'abandoned');
+    assert.equal(submitted[0].leadDetails, 'Jana Nováková, salón Bella, najlepšie popoludní');
+    assert.equal(submitted[0].callerPhone, '+421900000125');
+  } finally {
+    demoLeadService.submit = originalSubmit;
+    demoLeadService.captureDraft = originalCaptureDraft;
+  }
+});
+
+test('dokončený salónový lead sa uloží bez potvrdenia a status callback ho neduplikuje', async () => {
+  const config = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/prixi-salony-stupava-demo.json'), 'utf8'));
+  config.id = 'salon-complete-lead-demo';
+  config.routing.inboundTwilioNumbers = [];
+  await save(config);
+
+  const submitted = [];
+  const originalSubmit = demoLeadService.submit.bind(demoLeadService);
+  demoLeadService.submit = async (lead) => {
+    submitted.push(lead);
+    return 'log';
+  };
+
+  try {
+    const callSid = 'CA-SALON-COMPLETE-1';
+    const start = await signedPost(`/voice/demo/${config.id}/start`, { From: '+421900000126', CallSid: callSid });
+    const leadQuestion = await signedPost(gatherAction(start.body), { From: '+421900000126', CallSid: callSid, Digits: '2' });
+    const completed = await signedPost(gatherAction(leadQuestion.body), {
+      From: '+421900000126',
+      CallSid: callSid,
+      SpeechResult: 'Peter Horváth, Barber Stupava, dopoludnia',
+    });
+
+    assert.match(completed.body, /Matej sa vám ozve v čase/);
+    assert.doesNotMatch(completed.body, /Je to správne/);
+    assert.equal(submitted.length, 1);
+    assert.equal(submitted[0].status, 'complete');
+    assert.equal(submitted[0].leadDetails, 'Peter Horváth, Barber Stupava, dopoludnia');
+
+    await signedPost('/voice/call-status', {
+      From: '+421900000126',
+      To: '+421800223160',
+      CallSid: callSid,
+      CallStatus: 'completed',
+    });
+    assert.equal(submitted.length, 1);
+  } finally {
+    demoLeadService.submit = originalSubmit;
+  }
 });
 
 test('stav stromu prežije presmerovanie každého kroku na inú Render inštanciu', async () => {

@@ -9,6 +9,11 @@ export interface DemoLead {
   clinicName?: string;
   clinicType?: string;
   preferredContactTime?: string;
+  leadDetails?: string;
+  status?: 'draft' | 'complete' | 'abandoned';
+  lastStep?: string;
+  callStatus?: string;
+  answers?: Record<string, string>;
 }
 
 /**
@@ -16,6 +21,10 @@ export interface DemoLead {
  * always emitted as a short-term operational fallback for the event demo.
  */
 export class DemoLeadService {
+  captureDraft(lead: DemoLead & { transcriptStatus: 'unstable' }): void {
+    console.info('[PriXi Demo Lead Draft]', JSON.stringify(lead));
+  }
+
   async submit(lead: DemoLead): Promise<'webhook' | 'log'> {
     const webhookUrl = process.env.DEMO_LEAD_WEBHOOK_URL?.trim();
     console.info('[PriXi Demo Lead]', JSON.stringify(lead));

@@ -84,6 +84,12 @@ export interface VoiceBotTreeInputNode {
   /** Optional wording. `{{selected}}` is replaced with the captured speech. */
   confirmationPrompt?: string;
   hints?: string[];
+  /**
+   * Streams best-effort partial speech results into a recoverable lead draft.
+   * Use only for an explicit lead-capture question, not for ordinary free-form
+   * inputs elsewhere in the demo.
+   */
+  captureLeadDraft?: boolean;
   nextNodeId: string;
 }
 
@@ -360,6 +366,7 @@ function validateConversationTree(tree: VoiceBotConversationTree, errors: string
       if (!node.storeAs.trim()) errors.push(`Hlasový vstup „${node.id}“ potrebuje názov premennej.`);
       if (!nodeIds.has(node.nextNodeId)) errors.push(`Hlasový vstup „${node.id}“ odkazuje na neznámy uzol „${node.nextNodeId}“.`);
       if (node.hints?.some((hint) => !hint.trim())) errors.push(`Hlasový vstup „${node.id}“ obsahuje prázdnu pomôcku rozpoznávania.`);
+      if (node.captureLeadDraft && node.confirmInput) errors.push(`Leadový vstup „${node.id}“ nemôže vyžadovať dodatočné potvrdenie.`);
     } else if (node.type === 'availability') {
       if (!node.serviceVariable?.trim()) errors.push(`Uzol voľných termínov „${node.id}“ potrebuje premennú služby.`);
       if (!node.storeAs?.trim()) errors.push(`Uzol voľných termínov „${node.id}“ potrebuje názov premennej termínu.`);
