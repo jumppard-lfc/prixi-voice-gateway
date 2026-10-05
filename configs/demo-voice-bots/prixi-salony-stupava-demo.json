@@ -41,7 +41,7 @@
       {
         "id": "uvod",
         "type": "question",
-        "bridge": "Dobrý deň. Dovolali ste sa PriXi, virtuálnej telefonickej asistentke pre salóny krásy. Toto je krátka nezáväzná ukážka a nič sa počas nej naozaj nerezervuje.",
+        "bridge": "Dobrý deň. Dovolali ste sa PriXi, virtuálnej telefonickej asistentke pre salóny krásy. Toto je krátka nezáväzná ukážka a nič sa počas nej reálne nerezervuje.",
         "prompt": "Chcete si najprv vyskúšať, ako vybavím klienta salónu? Alebo vás rovno zaujíma, čo môžem robiť pre váš salón?",
         "retryPrompt": "Pre ukážku hovoru klienta stlačte jednotku. Ak vás zaujíma PriXi pre váš salón, stlačte dvojku.",
         "storeAs": "mode",
