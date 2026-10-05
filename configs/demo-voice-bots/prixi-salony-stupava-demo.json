@@ -346,7 +346,7 @@
       {
         "id": "lead-udaje",
         "type": "input",
-        "bridge": "Výborne. Matej sa vám môže ozvať na číslo, z ktorého voláte.",
+        "bridge": "Výborne. Z PriXi sa vám ozveme na číslo, z ktorého voláte.",
         "prompt": "Povedzte mi, prosím, svoje meno, názov prevádzky a či vám viac vyhovuje dopoludnie, popoludnie alebo podvečer.",
         "retryPrompt": "Údaje som nezachytila. Povedzte prosím svoje meno, názov prevádzky a vhodný čas na zavolanie.",
         "storeAs": "leadDetails",
@@ -357,7 +357,7 @@
       {
         "id": "koniec-lead",
         "type": "end",
-        "text": "Ďakujem. Matej sa vám ozve v čase, ktorý ste uviedli, na číslo, z ktorého voláte. A keby som už dnes pracovala u vás? Práve som vám ušetrila jeden telefonát. Prajem príjemný deň.",
+        "text": "Ďakujem. Z PriXi sa vám ozveme v čase, ktorý ste uviedli, na číslo, z ktorého voláte. A keby som už dnes pracovala u vás? Práve som vám ušetrila jeden telefonát. Prajem príjemný deň.",
         "outcome": "lead"
       },
       {

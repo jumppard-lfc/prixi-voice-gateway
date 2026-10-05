@@ -576,7 +576,10 @@ async function renderTreeInput(reply: FastifyReply, session: TreeSession, node: 
     action: treeActionUrl(session),
     method: 'POST',
     timeout: 5,
-    speechTimeout: 'auto',
+    // The lead answer contains a name, business name, and callback time. Give
+    // callers room for natural pauses between those three pieces instead of
+    // treating the first short pause as the end of their sentence.
+    speechTimeout: node.captureLeadDraft ? 3 : 'auto',
     language: 'sk-SK',
     ...(node.captureLeadDraft ? {
       partialResultCallback: treePartialResultUrl(session),

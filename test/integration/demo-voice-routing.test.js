@@ -287,6 +287,8 @@ test('salónové demo zachráni priebežný lead po zložení počas poslednej o
     const start = await signedPost(`/voice/demo/${config.id}/start`, { From: '+421900000125', CallSid: callSid });
     const leadQuestion = await signedPost(gatherAction(start.body), { From: '+421900000125', CallSid: callSid, Digits: '2' });
     assert.match(leadQuestion.body, /svoje meno, názov prevádzky/);
+    assert.match(leadQuestion.body, /speechTimeout="3"/);
+    assert.match(leadQuestion.body, /Z PriXi sa vám ozveme/);
 
     const partialAbsoluteUrl = gatherAttribute(leadQuestion.body, 'partialResultCallback');
     const partialUrl = new URL(partialAbsoluteUrl);
@@ -341,7 +343,7 @@ test('dokončený salónový lead sa uloží bez potvrdenia a status callback ho
       SpeechResult: 'Peter Horváth, Barber Stupava, dopoludnia',
     });
 
-    assert.match(completed.body, /Matej sa vám ozve v čase/);
+    assert.match(completed.body, /Z PriXi sa vám ozveme v čase/);
     assert.doesNotMatch(completed.body, /Je to správne/);
     assert.equal(submitted.length, 1);
     assert.equal(submitted[0].status, 'complete');
