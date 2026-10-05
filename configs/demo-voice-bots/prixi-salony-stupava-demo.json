@@ -55,7 +55,8 @@
               "vyskúšať ako klient",
               "ukážka hovoru",
               "chcem si to vyskúšať",
-              "klient"
+              "klient",
+              "vyskúšať"
             ],
             "dtmf": "1",
             "nextNodeId": "klient-poziadavka"
