@@ -347,7 +347,7 @@
         "id": "lead-udaje",
         "type": "input",
         "bridge": "Výborne. Z PriXi sa vám ozveme na číslo, z ktorého voláte.",
-        "prompt": "Povedzte mi, prosím, svoje meno, názov prevádzky a či vám viac vyhovuje dopoludnie, popoludnie alebo podvečer.",
+        "prompt": "Ešte mi prosím povedzte svoje meno, názov prevádzky a či sa vám máme ozvať počas dopoludnia, popoludní alebo podvečer.",
         "retryPrompt": "Údaje som nezachytila. Povedzte prosím svoje meno, názov prevádzky a vhodný čas na zavolanie.",
         "storeAs": "leadDetails",
         "confirmInput": false,
