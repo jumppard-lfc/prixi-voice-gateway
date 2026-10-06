@@ -114,7 +114,7 @@ test('spoločný produkčný endpoint načíta EDS konfiguráciu a routuje Neuro
   const response = await incoming('CA-NEURO-ROUTE-001');
   assert.equal(response.statusCode, 200);
   assert.equal(requestedPhone, '+420910999333');
-  assert.match(response.body, /<sub alias="Néurocentrum">Neurocentrum<\/sub>/);
+  assert.match(response.body, /<Say language="cs-CZ" voice="Google.cs-CZ-Wavenet-B">Neurocentrum<\/Say>/);
   assert.match(response.body, / Levice/);
   assert.match(response.body, /existujúcim pacientom/);
   assert.match(response.body, /action="\/voice\/neurocentrum\/answer"/);

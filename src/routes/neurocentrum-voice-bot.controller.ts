@@ -13,7 +13,7 @@ import { NeurocentrumSession, neurocentrumSessionService } from '../services/neu
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 const sayOptions: Record<string, any> = { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-B' };
-const NEUROCENTRUM_SPOKEN_ALIAS = 'Néurocentrum';
+const clinicNameSayOptions: Record<string, any> = { language: 'cs-CZ', voice: 'Google.cs-CZ-Wavenet-B' };
 const NO_CONFIG_MESSAGE = 'Momentálne máme technický problém a vašu požiadavku nevieme bezpečne zaznamenať. Skúste, prosím, zavolať neskôr.';
 
 const requestTypeLabels: Record<NeurocentrumRequestType, string> = {
@@ -43,8 +43,7 @@ function sayWithClinicPronunciation(
 
     if (match.index > 0) target.say(sayOptions, remainder.slice(0, match.index));
     const writtenName = match[0];
-    const say = target.say(sayOptions, '');
-    say.sub({ alias: NEUROCENTRUM_SPOKEN_ALIAS }, writtenName);
+    target.say(clinicNameSayOptions, writtenName);
     remainder = remainder.slice(match.index + writtenName.length);
   }
 }
