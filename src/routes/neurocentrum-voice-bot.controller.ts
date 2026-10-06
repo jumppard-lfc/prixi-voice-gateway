@@ -34,11 +34,6 @@ function simpleEnd(reply: FastifyReply, message: string): FastifyReply {
   return reply.type('text/xml').send(twiml.toString());
 }
 
-function confirmationPrompt(session: NeurocentrumSession): string {
-  const type = requestTypeLabels[session.requestType!];
-  return `Zhrniem vašu požiadavku. Pacient ${session.patientName}, dátum narodenia ${session.dateOfBirth}, požiadavka ${type}: ${session.detail}. Sú tieto údaje správne? Odpovedzte áno alebo nie.`;
-}
-
 function promptFor(session: NeurocentrumSession): string {
   switch (session.step) {
     case 'existing_patient': return session.config.messages.existingPatientQuestion;
@@ -49,14 +44,13 @@ function promptFor(session: NeurocentrumSession): string {
       if (session.requestType === 'prescription') return 'Povedzte, prosím, názvy liekov a počet balení, ktoré potrebujete predpísať.';
       if (session.requestType === 'follow_up') return 'Stručne povedzte, o akú kontrolu ide, prípadne aké obdobie vám vyhovuje.';
       return 'Povedzte, prosím, o výsledok akého vyšetrenia ide, napríklad MRI, CT, EMG alebo EEG.';
-    case 'confirmation': return confirmationPrompt(session);
   }
 }
 
 function renderPrompt(reply: FastifyReply, session: NeurocentrumSession, prefix = ''): FastifyReply {
   neurocentrumSessionService.save(session);
   const twiml = new VoiceResponse();
-  const yesNo = session.step === 'existing_patient' || session.step === 'confirmation';
+  const yesNo = session.step === 'existing_patient';
   const requestType = session.step === 'request_type';
   const gather = twiml.gather({
     input: ['speech', 'dtmf'],
@@ -246,21 +240,10 @@ export async function neurocentrumVoiceBotRoutes(fastify: FastifyInstance): Prom
     if (session.step === 'detail') {
       session.detail = answer;
       session.attempts = 0;
-      session.step = 'confirmation';
-      return renderPrompt(reply, session, 'Ďakujem. Teraz vašu požiadavku zhrniem. ');
+      return completeCall(fastify, reply, session);
     }
 
-    const confirmed = parseNeurocentrumYesNo(answer);
-    if (confirmed === undefined) return renderPrompt(reply, session, 'Odpovedzte, prosím, áno alebo nie. ');
-    if (!confirmed) {
-      session.patientName = undefined;
-      session.dateOfBirth = undefined;
-      session.requestType = undefined;
-      session.detail = undefined;
-      session.attempts = 0;
-      session.step = 'name';
-      return renderPrompt(reply, session, 'Dobre, zadajme údaje ešte raz. ');
-    }
-    return completeCall(fastify, reply, session);
+    neurocentrumSessionService.delete(session.callSid);
+    return simpleEnd(reply, session.config.messages.technical);
   });
 }

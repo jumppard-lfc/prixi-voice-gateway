@@ -1,7 +1,7 @@
 import { NeurocentrumRequestType } from '../config/neurocentrum.config';
 import { NeurocentrumRuntimeConfig } from './neurocentrum-eds.service';
 
-export type NeurocentrumStep = 'existing_patient' | 'name' | 'date_of_birth' | 'request_type' | 'detail' | 'confirmation';
+export type NeurocentrumStep = 'existing_patient' | 'name' | 'date_of_birth' | 'request_type' | 'detail';
 
 export interface NeurocentrumSession {
   callSid: string;

@@ -79,7 +79,7 @@ async function fillRequest(callSid) {
   await answer(callSid, 'Ján Novák');
   await answer(callSid, '15. 3. 1980');
   await answer(callSid, 'recept');
-  return answer(callSid, 'Tegretol 200 miligramov, jeden ráno a jeden večer');
+  return answer(callSid, 'Tegretol 200 miligramov, dve balenia');
 }
 
 test.before(async () => {
@@ -151,19 +151,15 @@ test('po rozpoznaných odpovediach použije krátke prirodzené potvrdenia', asy
   assert.doesNotMatch(requestType.body, /dávkovanie/);
 
   const detail = await answer(callSid, 'Tegretol 200 miligramov, dve balenia');
-  assert.match(detail.body, /Ďakujem\. Teraz vašu požiadavku zhrniem/);
-  assert.match(detail.body, /Zhrniem vašu požiadavku/);
+  assert.match(detail.body, /Vašu požiadavku sme zaznamenali/);
+  assert.doesNotMatch(detail.body, /Zhrniem vašu požiadavku/);
 });
 
-test('požiadavka sa odošle do EDS až po potvrdení zhrnutia pacientom', async () => {
+test('požiadavka sa odošle do EDS hneď po nadiktovaní detailu', async () => {
   const callSid = 'CA-NEURO-RX-001';
-  const confirmation = await fillRequest(callSid);
-  assert.match(confirmation.body, /Zhrniem vašu požiadavku/);
-  assert.match(confirmation.body, /Sú tieto údaje správne/);
-  assert.equal(sentEvents.length, 0);
-
-  const completed = await answer(callSid, 'áno');
+  const completed = await fillRequest(callSid);
   assert.match(completed.body, /Vašu požiadavku sme zaznamenali/);
+  assert.doesNotMatch(completed.body, /Sú tieto údaje správne/);
   assert.equal(sentEvents.length, 1);
   assert.deepEqual(sentEvents[0], {
     event: 'patient_request.created',
@@ -183,18 +179,9 @@ test('požiadavka sa odošle do EDS až po potvrdení zhrnutia pacientom', async
     },
     request: {
       type: 'prescription',
-      detail: 'Tegretol 200 miligramov, jeden ráno a jeden večer',
+      detail: 'Tegretol 200 miligramov, dve balenia',
     },
   });
-});
-
-test('zamietnuté zhrnutie reštartuje zber a nič neodošle', async () => {
-  const callSid = 'CA-NEURO-CORRECT-001';
-  await fillRequest(callSid);
-  const response = await answer(callSid, 'nie');
-  assert.match(response.body, /zadajme údaje ešte raz/);
-  assert.match(response.body, /meno a priezvisko/);
-  assert.equal(sentEvents.length, 0);
 });
 
 test('dovolenka a čas mimo ordinačných hodín sa vyhodnocujú podľa EDS availability', async t => {
@@ -222,8 +209,7 @@ test('bez dostupnej EDS konfigurácie sa hovor bezpečne ukončí', async () => 
 test('pri zlyhaní EDS event API bot nepotvrdí prijatie požiadavky', async () => {
   neurocentrumEdsService.sendPatientRequest = async () => { throw new Error('EDS unavailable'); };
   const callSid = 'CA-NEURO-EVENT-FAIL-001';
-  await fillRequest(callSid);
-  const response = await answer(callSid, 'áno');
+  const response = await fillRequest(callSid);
   assert.match(response.body, /nepodarilo zaznamenať/);
   assert.doesNotMatch(response.body, /Vašu požiadavku sme zaznamenali/);
 });
@@ -234,8 +220,7 @@ test('duplicitný CallSid z EDS sa považuje za úspešne uloženú požiadavku'
     return 'duplicate';
   };
   const callSid = 'CA-NEURO-DUPLICATE-001';
-  await fillRequest(callSid);
-  const response = await answer(callSid, 'áno');
+  const response = await fillRequest(callSid);
   assert.match(response.body, /Vašu požiadavku sme zaznamenali/);
   assert.equal(sentEvents.length, 1);
 });
