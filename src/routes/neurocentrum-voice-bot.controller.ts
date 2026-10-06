@@ -13,7 +13,7 @@ import { NeurocentrumSession, neurocentrumSessionService } from '../services/neu
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 const sayOptions: Record<string, any> = { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-B' };
-const clinicNameSayOptions: Record<string, any> = { language: 'cs-CZ', voice: 'Google.cs-CZ-Wavenet-B' };
+const greetingSayOptions: Record<string, any> = { language: 'cs-CZ', voice: 'Google.cs-CZ-Wavenet-B' };
 const NO_CONFIG_MESSAGE = 'Momentálne máme technický problém a vašu požiadavku nevieme bezpečne zaznamenať. Skúste, prosím, zavolať neskôr.';
 
 const requestTypeLabels: Record<NeurocentrumRequestType, string> = {
@@ -27,30 +27,9 @@ function answerFrom(request: FastifyRequest): string {
   return (body.SpeechResult || body.Digits || '').trim();
 }
 
-function sayWithClinicPronunciation(
-  target: { say: (options: any, message?: string) => any },
-  message: string
-): void {
-  let remainder = message;
-  const clinicNamePattern = /Neurocentrum/iu;
-
-  while (remainder) {
-    const match = clinicNamePattern.exec(remainder);
-    if (!match || match.index === undefined) {
-      target.say(sayOptions, remainder);
-      return;
-    }
-
-    if (match.index > 0) target.say(sayOptions, remainder.slice(0, match.index));
-    const writtenName = match[0];
-    target.say(clinicNameSayOptions, writtenName);
-    remainder = remainder.slice(match.index + writtenName.length);
-  }
-}
-
 function simpleEnd(reply: FastifyReply, message: string): FastifyReply {
   const twiml = new VoiceResponse();
-  sayWithClinicPronunciation(twiml, message);
+  twiml.say(sayOptions, message);
   twiml.hangup();
   return reply.type('text/xml').send(twiml.toString());
 }
@@ -89,7 +68,7 @@ function renderPrompt(reply: FastifyReply, session: NeurocentrumSession, prefix 
     ...(yesNo || requestType ? { numDigits: 1 } : {}),
     hints: yesNo ? 'áno, nie' : requestType ? 'recept, kontrola, výsledky' : '',
   } as any);
-  sayWithClinicPronunciation(gather, `${prefix}${promptFor(session)}`.trim());
+  gather.say(sayOptions, `${prefix}${promptFor(session)}`.trim());
   twiml.redirect('/voice/neurocentrum/prompt');
   return reply.type('text/xml').send(twiml.toString());
 }
@@ -186,7 +165,8 @@ export async function startNeurocentrumVoiceBot(
     numDigits: 1,
     hints: 'áno, nie',
   } as any);
-  sayWithClinicPronunciation(gather, `${config.messages.greeting} ${config.messages.existingPatientQuestion}`);
+  gather.say(greetingSayOptions, config.messages.greeting);
+  gather.say(sayOptions, config.messages.existingPatientQuestion);
   twiml.redirect('/voice/neurocentrum/prompt');
   return reply.type('text/xml').send(twiml.toString());
 }
