@@ -13,6 +13,7 @@ import { NeurocentrumSession, neurocentrumSessionService } from '../services/neu
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 const sayOptions: Record<string, any> = { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-B' };
+const NEUROCENTRUM_SPOKEN_ALIAS = 'Néurocentrum';
 const NO_CONFIG_MESSAGE = 'Momentálne máme technický problém a vašu požiadavku nevieme bezpečne zaznamenať. Skúste, prosím, zavolať neskôr.';
 
 const requestTypeLabels: Record<NeurocentrumRequestType, string> = {
@@ -26,9 +27,31 @@ function answerFrom(request: FastifyRequest): string {
   return (body.SpeechResult || body.Digits || '').trim();
 }
 
+function sayWithClinicPronunciation(
+  target: { say: (options: any, message?: string) => any },
+  message: string
+): void {
+  let remainder = message;
+  const clinicNamePattern = /Neurocentrum/iu;
+
+  while (remainder) {
+    const match = clinicNamePattern.exec(remainder);
+    if (!match || match.index === undefined) {
+      target.say(sayOptions, remainder);
+      return;
+    }
+
+    if (match.index > 0) target.say(sayOptions, remainder.slice(0, match.index));
+    const writtenName = match[0];
+    const say = target.say(sayOptions, '');
+    say.sub({ alias: NEUROCENTRUM_SPOKEN_ALIAS }, writtenName);
+    remainder = remainder.slice(match.index + writtenName.length);
+  }
+}
+
 function simpleEnd(reply: FastifyReply, message: string): FastifyReply {
   const twiml = new VoiceResponse();
-  twiml.say(sayOptions, message);
+  sayWithClinicPronunciation(twiml, message);
   twiml.hangup();
   return reply.type('text/xml').send(twiml.toString());
 }
@@ -45,7 +68,7 @@ function promptFor(session: NeurocentrumSession): string {
     case 'date_of_birth': return 'Povedzte, prosím, celý dátum narodenia pacienta, napríklad pätnásteho marca 1980.';
     case 'request_type': return 'Čo potrebujete vybaviť? Pre predpis liekov povedzte recept alebo stlačte jednotku. Pre objednanie na kontrolu povedzte kontrola alebo stlačte dvojku. Pre výsledky vyšetrení povedzte výsledky alebo stlačte trojku.';
     case 'detail':
-      if (session.requestType === 'prescription') return 'Povedzte, prosím, názvy liekov a dávkovanie, ktoré potrebujete predpísať.';
+      if (session.requestType === 'prescription') return 'Povedzte, prosím, názvy liekov a počet balení, ktoré potrebujete predpísať.';
       if (session.requestType === 'follow_up') return 'Stručne povedzte, o akú kontrolu ide, prípadne aké obdobie vám vyhovuje.';
       return 'Povedzte, prosím, o výsledok akého vyšetrenia ide, napríklad MRI, CT, EMG alebo EEG.';
     case 'confirmation': return confirmationPrompt(session);
@@ -67,7 +90,7 @@ function renderPrompt(reply: FastifyReply, session: NeurocentrumSession, prefix 
     ...(yesNo || requestType ? { numDigits: 1 } : {}),
     hints: yesNo ? 'áno, nie' : requestType ? 'recept, kontrola, výsledky' : '',
   } as any);
-  gather.say(sayOptions, `${prefix}${promptFor(session)}`.trim());
+  sayWithClinicPronunciation(gather, `${prefix}${promptFor(session)}`.trim());
   twiml.redirect('/voice/neurocentrum/prompt');
   return reply.type('text/xml').send(twiml.toString());
 }
@@ -164,7 +187,7 @@ export async function startNeurocentrumVoiceBot(
     numDigits: 1,
     hints: 'áno, nie',
   } as any);
-  gather.say(sayOptions, `${config.messages.greeting} ${config.messages.existingPatientQuestion}`);
+  sayWithClinicPronunciation(gather, `${config.messages.greeting} ${config.messages.existingPatientQuestion}`);
   twiml.redirect('/voice/neurocentrum/prompt');
   return reply.type('text/xml').send(twiml.toString());
 }

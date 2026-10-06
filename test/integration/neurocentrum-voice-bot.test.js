@@ -114,7 +114,8 @@ test('spoločný produkčný endpoint načíta EDS konfiguráciu a routuje Neuro
   const response = await incoming('CA-NEURO-ROUTE-001');
   assert.equal(response.statusCode, 200);
   assert.equal(requestedPhone, '+420910999333');
-  assert.match(response.body, /Neurocentrum Levice/);
+  assert.match(response.body, /<sub alias="Néurocentrum">Neurocentrum<\/sub>/);
+  assert.match(response.body, / Levice/);
   assert.match(response.body, /existujúcim pacientom/);
   assert.match(response.body, /action="\/voice\/neurocentrum\/answer"/);
 });
@@ -146,8 +147,10 @@ test('po rozpoznaných odpovediach použije krátke prirodzené potvrdenia', asy
 
   const requestType = await answer(callSid, 'recept');
   assert.match(requestType.body, /Rozumiem, ide o predpis liekov/);
+  assert.match(requestType.body, /názvy liekov a počet balení/);
+  assert.doesNotMatch(requestType.body, /dávkovanie/);
 
-  const detail = await answer(callSid, 'Tegretol 200 miligramov');
+  const detail = await answer(callSid, 'Tegretol 200 miligramov, dve balenia');
   assert.match(detail.body, /Ďakujem\. Teraz vašu požiadavku zhrniem/);
   assert.match(detail.body, /Zhrniem vašu požiadavku/);
 });
