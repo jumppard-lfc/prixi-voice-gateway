@@ -729,6 +729,49 @@ test('EDS priradene Twilio cislo spusti Neurocentrum bez Render ENV premennej', 
   }
 });
 
+test('presmerovanie z ambulantneho cisla Neurocentra nacita konfiguraciu pod cielovym Twilio DID', async () => {
+  const config = {
+    clinicId: '147',
+    assistantType: 'neurocentrum',
+    enabled: true,
+    timezone: 'Europe/Bratislava',
+    availability: { status: 'open' },
+    maxConcurrentCalls: 3,
+    messages: {
+      greeting: 'Databázové uvítanie Neurocentra.',
+      existingPatientQuestion: 'Ste existujúcim pacientom?',
+      newPatient: 'Prvovyšetrenie osobne.',
+      vacation: 'Dovolenka.',
+      afterHours: 'Mimo hodín.',
+      busy: 'Obsadené.',
+      technical: 'Technická chyba.',
+      urgent: 'Volajte 155.',
+      completion: 'Zaznamenané.',
+    },
+  };
+  let loadedNumber = null;
+  neurocentrumEdsService.getConfig = async (phoneNumber) => {
+    loadedNumber = phoneNumber;
+    return config;
+  };
+
+  try {
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000003',
+      To: '+420910925371',
+      ForwardedFrom: '+421948914896',
+      CallSid: 'CA99999999999999999999999999999976',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(loadedNumber, '+420910925371');
+    assert.match(response.body, /Databázové uvítanie Neurocentra/);
+    assert.match(response.body, /\/voice\/neurocentrum\/answer/);
+  } finally {
+    neurocentrumEdsService.getConfig = originalGetNeurocentrumConfig;
+  }
+});
+
 test('Twilio cislo MUDr. Celkovej automaticky aktivuje pediatricky voice bot bez EDS DID resolvera', async () => {
   let requestedPhoneNumber = null;
   let resolverCalls = 0;

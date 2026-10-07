@@ -233,6 +233,10 @@ export async function neurocentrumVoiceBotRoutes(fastify: FastifyInstance): Prom
       if (!requestType) return renderPrompt(reply, session, 'Vyberte, prosím, recept, kontrolu alebo výsledky. ');
       session.requestType = requestType;
       session.attempts = 0;
+      if (requestType === 'follow_up') {
+        session.detail = 'Pacient žiada o objednanie na kontrolu.';
+        return completeCall(fastify, reply, session);
+      }
       session.step = 'detail';
       return renderPrompt(reply, session, `Rozumiem, ide o ${requestTypeLabels[requestType]}. `);
     }

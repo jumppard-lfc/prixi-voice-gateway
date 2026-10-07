@@ -271,7 +271,9 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
     if (isNeurocentrumCall) {
       fastify.log.info({ from: fromNumber, to: body.To, forwardedFrom: carrierForwardedFrom }, 'Routing call to Neurocentrum production voice bot');
-      return startNeurocentrumVoiceBot(fastify, reply, body, NEUROCENTRUM_ROUTING_PHONE_NUMBER);
+      // ForwardedFrom identifies the clinic line, while EDS stores the voice
+      // assistant configuration under the destination Twilio DID.
+      return startNeurocentrumVoiceBot(fastify, reply, body, normalizedTo || NEUROCENTRUM_ROUTING_PHONE_NUMBER);
     }
 
     const isVadkertiDedicatedDestination = normalizedTo === VADKERTI_TWILIO_PHONE_NUMBER;

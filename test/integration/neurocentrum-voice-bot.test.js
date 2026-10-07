@@ -184,6 +184,23 @@ test('požiadavka sa odošle do EDS hneď po nadiktovaní detailu', async () => 
   });
 });
 
+test('pri kontrole sa požiadavka odošle bez otázky na dôvod alebo obdobie', async () => {
+  const callSid = 'CA-NEURO-FOLLOW-UP-001';
+  await incoming(callSid);
+  await answer(callSid, 'áno');
+  await answer(callSid, 'Ján Novák');
+  await answer(callSid, '15. 3. 1980');
+
+  const completed = await answer(callSid, 'kontrola');
+
+  assert.match(completed.body, /Vašu požiadavku sme zaznamenali/);
+  assert.doesNotMatch(completed.body, /o akú kontrolu ide/);
+  assert.doesNotMatch(completed.body, /aké obdobie vám vyhovuje/);
+  assert.equal(sentEvents.length, 1);
+  assert.equal(sentEvents[0].request.type, 'follow_up');
+  assert.equal(sentEvents[0].request.detail, 'Pacient žiada o objednanie na kontrolu.');
+});
+
 test('dovolenka a čas mimo ordinačných hodín sa vyhodnocujú podľa EDS availability', async t => {
   await t.test('dovolenka', async () => {
     neurocentrumEdsService.getConfig = async () => runtimeConfig({ availability: { status: 'vacation', message: 'Dovolenka do 5. októbra.' } });
