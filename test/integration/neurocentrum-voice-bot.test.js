@@ -147,12 +147,48 @@ test('po rozpoznaných odpovediach použije krátke prirodzené potvrdenia', asy
 
   const requestType = await answer(callSid, 'recept');
   assert.match(requestType.body, /Rozumiem, ide o predpis liekov/);
-  assert.match(requestType.body, /názvy liekov a počet balení/);
+  assert.match(requestType.body, /Uveďte, prosím, názov liekov a počet balení/);
   assert.doesNotMatch(requestType.body, /dávkovanie/);
 
   const detail = await answer(callSid, 'Tegretol 200 miligramov, dve balenia');
   assert.match(detail.body, /Vašu požiadavku sme zaznamenali/);
+  assert.match(detail.body, /Do dvoch dní vám bude predpísaný elektronický recept/);
   assert.doesNotMatch(detail.body, /Zhrniem vašu požiadavku/);
+});
+
+test('neúplný recept si raz vyžiada názov lieku a počet balení znova', async () => {
+  const callSid = 'CA-NEURO-RX-RETRY-001';
+  await incoming(callSid);
+  await answer(callSid, 'áno');
+  await answer(callSid, 'Ján Novák');
+  await answer(callSid, '15. 3. 1980');
+  await answer(callSid, 'recept');
+
+  const retry = await answer(callSid, 'Potrebujem predpísať lieky');
+  assert.match(retry.body, /Nezachytila som názov lieku a počet balení/);
+  assert.match(retry.body, /Uveďte, prosím, názov liekov a počet balení/);
+  assert.equal(sentEvents.length, 0);
+
+  const completed = await answer(callSid, 'Tegretol 200 miligramov, dve balenia');
+  assert.match(completed.body, /Do dvoch dní vám bude predpísaný elektronický recept/);
+  assert.equal(sentEvents.length, 1);
+  assert.equal(sentEvents[0].request.detail, 'Tegretol 200 miligramov, dve balenia');
+});
+
+test('po druhom neúplnom pokuse sa recept odošle aj bez rozpoznaného lieku', async () => {
+  const callSid = 'CA-NEURO-RX-FALLBACK-001';
+  await incoming(callSid);
+  await answer(callSid, 'áno');
+  await answer(callSid, 'Ján Novák');
+  await answer(callSid, '15. 3. 1980');
+  await answer(callSid, 'recept');
+  await answer(callSid, 'Potrebujem predpísať lieky');
+
+  const completed = await answer(callSid, 'Neviem názov');
+  assert.match(completed.body, /Vašu požiadavku sme zaznamenali/);
+  assert.match(completed.body, /Do dvoch dní vám bude predpísaný elektronický recept/);
+  assert.equal(sentEvents.length, 1);
+  assert.equal(sentEvents[0].request.detail, 'Neviem názov');
 });
 
 test('požiadavka sa odošle do EDS hneď po nadiktovaní detailu', async () => {

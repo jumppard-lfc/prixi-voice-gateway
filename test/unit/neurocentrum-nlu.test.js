@@ -2,11 +2,20 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  isNeurocentrumPrescriptionDetailComplete,
   isNeurocentrumUrgent,
   normalizeNeurocentrumDateOfBirth,
   parseNeurocentrumRequestType,
   parseNeurocentrumYesNo,
 } = require('../../src/services/neurocentrum-nlu.service');
+
+test('Neurocentrum pri recepte rozpozná názov lieku spolu s počtom balení', () => {
+  assert.equal(isNeurocentrumPrescriptionDetailComplete('Tegretol 200 miligramov, dve balenia'), true);
+  assert.equal(isNeurocentrumPrescriptionDetailComplete('Madopar 125, 2 balenia a Neurol, jedno balenie'), true);
+  assert.equal(isNeurocentrumPrescriptionDetailComplete('Potrebujem predpísať lieky'), false);
+  assert.equal(isNeurocentrumPrescriptionDetailComplete('Dve balenia liekov'), false);
+  assert.equal(isNeurocentrumPrescriptionDetailComplete('Neviem názov'), false);
+});
 
 test('Neurocentrum rozpozná odpovede áno a nie vrátane DTMF', () => {
   assert.equal(parseNeurocentrumYesNo('Áno, som pacientka'), true);

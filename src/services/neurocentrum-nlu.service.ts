@@ -26,6 +26,27 @@ export function parseNeurocentrumRequestType(value: string): NeurocentrumRequest
   return undefined;
 }
 
+const prescriptionPackageCountPattern = /\b(?:\d+|jeden|jedno|jednu|dva|dve|tri|styri|pat|sest|sedem|osem|devat|desat)\s*(?:balen(?:ie|ia|i)|krabick(?:a|y|u)|kus(?:y|ov)?)\b/;
+const prescriptionDetailStopWords = new Set([
+  'a', 'aj', 'chcem', 'dakujem', 'do', 'este', 'iste', 'liek', 'lieky', 'liekov',
+  'mi', 'na', 'nazov', 'nazvy', 'neviem', 'pacient', 'pacientka', 'po', 'pocet', 'potrebujem',
+  'predpis', 'predpisat', 'prosim', 'recept', 'to', 'ten', 'tento', 'tieto', 'znova',
+  'chce', 'chcel', 'chcela', 'dajte',
+  'balenie', 'balenia', 'baleni', 'krabicka', 'krabicky', 'krabicku', 'kus', 'kusy', 'kusov',
+  'mg', 'miligram', 'miligramov', 'gram', 'gramov', 'tableta', 'tablety', 'tabliet',
+  'jeden', 'jedno', 'jednu', 'dva', 'dve', 'tri', 'styri', 'pat', 'sest', 'sedem',
+  'osem', 'devat', 'desat',
+]);
+
+export function isNeurocentrumPrescriptionDetailComplete(value: string): boolean {
+  const text = normalizeNeurocentrumSpeech(value);
+  if (!prescriptionPackageCountPattern.test(text)) return false;
+
+  return text
+    .split(' ')
+    .some(token => /\p{L}/u.test(token) && token.length >= 3 && !prescriptionDetailStopWords.has(token));
+}
+
 export function isNeurocentrumUrgent(value: string): boolean {
   const text = normalizeNeurocentrumSpeech(value);
   return /(bezvedom|nedycha|dusim|dusenie|ochrnut|ochrnul|nahla slabost|ovisnuty kutik|porucha reci|nevie rozpravat|mozgova prihoda|mrtvica|silna nahla bolest hlavy|najhorsia bolest hlavy|prebiehajuci zachvat|status epileptic)/.test(text);

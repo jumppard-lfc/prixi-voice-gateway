@@ -4,6 +4,7 @@ import twilio from 'twilio';
 import { NeurocentrumRequestType } from '../config/neurocentrum.config';
 import { neurocentrumEdsService, NeurocentrumPatientRequestEvent } from '../services/neurocentrum-eds.service';
 import {
+  isNeurocentrumPrescriptionDetailComplete,
   isNeurocentrumUrgent,
   normalizeNeurocentrumDateOfBirth,
   parseNeurocentrumRequestType,
@@ -41,7 +42,7 @@ function promptFor(session: NeurocentrumSession): string {
     case 'date_of_birth': return 'Povedzte, prosím, celý dátum narodenia pacienta, napríklad pätnásteho marca 1980.';
     case 'request_type': return 'Čo potrebujete vybaviť? Pre predpis liekov povedzte recept alebo stlačte jednotku. Pre objednanie na kontrolu povedzte kontrola alebo stlačte dvojku. Pre výsledky vyšetrení povedzte výsledky alebo stlačte trojku.';
     case 'detail':
-      if (session.requestType === 'prescription') return 'Povedzte, prosím, názvy liekov a počet balení, ktoré potrebujete predpísať.';
+      if (session.requestType === 'prescription') return 'Uveďte, prosím, názov liekov a počet balení.';
       if (session.requestType === 'follow_up') return 'Stručne povedzte, o akú kontrolu ide, prípadne aké obdobie vám vyhovuje.';
       return 'Povedzte, prosím, o výsledok akého vyšetrenia ide, napríklad MRI, CT, EMG alebo EEG.';
   }
@@ -111,7 +112,10 @@ async function completeCall(
   try {
     const result = await neurocentrumEdsService.sendPatientRequest(buildPatientRequestEvent(session));
     fastify.log.info({ callSid: session.callSid, clinicId: session.config.clinicId, requestType: session.requestType, result }, 'Neurocentrum request stored in EDS');
-    return simpleEnd(reply, session.config.messages.completion);
+    const completionMessage = session.requestType === 'prescription'
+      ? `${session.config.messages.completion} Do dvoch dní vám bude predpísaný elektronický recept.`
+      : session.config.messages.completion;
+    return simpleEnd(reply, completionMessage);
   } catch (error) {
     fastify.log.error({ err: error, callSid: session.callSid, clinicId: session.config.clinicId }, 'Failed to store Neurocentrum request in EDS');
     return simpleEnd(reply, session.config.messages.technical);
@@ -243,6 +247,14 @@ export async function neurocentrumVoiceBotRoutes(fastify: FastifyInstance): Prom
 
     if (session.step === 'detail') {
       session.detail = answer;
+      if (
+        session.requestType === 'prescription'
+        && !isNeurocentrumPrescriptionDetailComplete(answer)
+        && session.attempts === 0
+      ) {
+        session.attempts = 1;
+        return renderPrompt(reply, session, 'Nezachytila som názov lieku a počet balení. ');
+      }
       session.attempts = 0;
       return completeCall(fastify, reply, session);
     }
