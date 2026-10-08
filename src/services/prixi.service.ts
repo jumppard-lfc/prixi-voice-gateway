@@ -135,6 +135,21 @@ export class PrixiService {
       };
     }
 
+    if (
+      phoneNumber === '+420910925584'
+      || phoneNumber === '+421524314169'
+      || phoneNumber === '+421524314171'
+      || phoneNumber === '+421524314172'
+      || phoneNumber === '+421524314174'
+    ) {
+      return {
+        clinicId: '154',
+        voiceBotEnabled: true,
+        timezone: 'Europe/Bratislava',
+        pediatricMode: false,
+      };
+    }
+
     if (this.mockMode) {
       return {
         clinicId: process.env.PRIXI_FALLBACK_CLINIC_ID || 'local-dev',

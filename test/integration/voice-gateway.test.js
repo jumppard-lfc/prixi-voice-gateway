@@ -1275,6 +1275,96 @@ test('MUDr. Zdrahalova sa opyta iba raz a po poziadavke hovor ukonci', async () 
   }
 });
 
+test('Oddelenie klinickej onkologie v Poprade sa opyta iba raz a poziadavku odovzda uctu 154', async () => {
+  sttService.transcribeAudioUrl = async () => 'Ján Novák, potrebujem sa poradiť o termíne kontroly.';
+  let requestedPhoneNumber = null;
+  let sentEvent = null;
+  prixiService.getConfig = async (phoneNumber) => {
+    requestedPhoneNumber = phoneNumber;
+    return {
+      clinicId: '154',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    };
+  };
+  prixiService.sendEvent = async (event) => {
+    sentEvent = event;
+  };
+
+  try {
+    const incoming = await signedVoicePost('/voice/incoming', {
+      From: '+421900000024',
+      To: '+420910925584',
+      ForwardedFrom: '+421524314169',
+      CallSid: 'CA99999999999999999999999999999967',
+    });
+
+    assert.equal(incoming.statusCode, 200);
+    assert.equal(requestedPhoneNumber, '+420910925584');
+    assert.match(incoming.body, /virtuálna sestra PriXi z oddelenia klinickej onkológie v Poprade/);
+    assert.match(incoming.body, /svoje meno a s čím vám môžeme pomôcť/);
+    assert.match(incoming.body, /timeout="3"/);
+    assert.match(incoming.body, /forwardedFrom=%2B420910925584/);
+    assert.match(incoming.body, /pediatricMode=false/);
+    assert.match(incoming.body, /dentalMode=false/);
+
+    const problem = await signedVoicePost('/voice/record-problem?forwardedFrom=%2B420910925584&pediatricMode=false&dentalMode=false', {
+      From: '+421900000024',
+      CallSid: 'CA99999999999999999999999999999967',
+      RecordingUrl: 'https://api.twilio.test/poprad-oncology-problem',
+      RecordingDuration: '14',
+    });
+
+    assert.equal(problem.statusCode, 200);
+    assert.match(problem.body, /Vašu požiadavku odovzdám oddeleniu klinickej onkológie/);
+    assert.doesNotMatch(problem.body, /record-name|recording-complete/);
+    assert.match(problem.body, /<Hangup\/>/);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(sentEvent.clinicId, '154');
+    assert.equal(sentEvent.routingPhoneNumber, '+420910925584');
+    assert.equal(sentEvent.problemTranscript, 'Ján Novák, potrebujem sa poradiť o termíne kontroly.');
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+    prixiService.sendEvent = originalSendEvent;
+    sttService.transcribeAudioUrl = originalTranscribeAudioUrl;
+  }
+});
+
+test('Zdielana pevna linka onkologie routuje na rovnaky PriXi ucet 154', async () => {
+  let requestedPhoneNumber = null;
+  prixiService.getConfig = async (phoneNumber) => {
+    requestedPhoneNumber = phoneNumber;
+    return {
+      clinicId: '154',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    };
+  };
+
+  try {
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000025',
+      To: '+421524314174',
+      CallSid: 'CA99999999999999999999999999999966',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(requestedPhoneNumber, '+420910925584');
+    assert.match(response.body, /oddelenia klinickej onkológie v Poprade/);
+    assert.match(response.body, /forwardedFrom=%2B420910925584/);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+  }
+});
+
 test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
   const vadkertiTwilioConfig = await originalGetConfig('+420910922693');
   const vadkertiClinicConfig = await originalGetConfig('+421902647072');
@@ -1285,6 +1375,8 @@ test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
   const hmiraClinicConfig = await originalGetConfig('+421948834475');
   const zdrahalovaTwilioConfig = await originalGetConfig('+420910926126');
   const zdrahalovaClinicConfig = await originalGetConfig('+421911135193');
+  const popradOncologyTwilioConfig = await originalGetConfig('+420910925584');
+  const popradOncologySharedLineConfig = await originalGetConfig('+421524314169');
 
   assert.equal(vadkertiTwilioConfig.clinicId, '146');
   assert.equal(vadkertiTwilioConfig.voiceBotEnabled, true);
@@ -1301,6 +1393,9 @@ test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
   assert.equal(zdrahalovaTwilioConfig.clinicId, '152');
   assert.equal(zdrahalovaTwilioConfig.pediatricMode, true);
   assert.equal(zdrahalovaClinicConfig.clinicId, '152');
+  assert.equal(popradOncologyTwilioConfig.clinicId, '154');
+  assert.equal(popradOncologyTwilioConfig.voiceBotEnabled, true);
+  assert.equal(popradOncologySharedLineConfig.clinicId, '154');
 });
 
 test('MUDr. Dobrovodska pouziva dvojkrokovy audio flow', async () => {
