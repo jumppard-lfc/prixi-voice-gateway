@@ -18,6 +18,8 @@ import { finalizeAbandonedNeurocentrumCall, startNeurocentrumVoiceBot } from './
 import { neurocentrumBotConfig } from '../config/neurocentrum.config';
 import { neurocentrumEdsService } from '../services/neurocentrum-eds.service';
 import { finalizeAbandonedDemoCall } from './demo-voice-bot.controller';
+import { finalizeAbandonedElisseaCall, startElisseaVoiceBot } from './elissea-voice-bot.controller';
+import { elisseaBotConfig } from '../config/elissea.config';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
@@ -50,6 +52,8 @@ const PEKARCIK_CLINIC_ID = '64';
 const VADKERTI_TWILIO_PHONE_NUMBER = vadkertiBotConfig.clinic.inboundTwilioNumber;
 const VADKERTI_ROUTING_PHONE_NUMBER = '+421902647072';
 const NEUROCENTRUM_ROUTING_PHONE_NUMBER = neurocentrumBotConfig.clinic.routingPhoneNumber;
+const ELISSEA_TWILIO_PHONE_NUMBER = elisseaBotConfig.clinic.inboundTwilioNumber;
+const ELISSEA_CLINIC_ID = elisseaBotConfig.clinic.clinicId;
 const UNRESOLVED_CLINIC_IDS = new Set(['', 'orphan', 'fallback', 'local-dev']);
 const KLOSTERMANN_SK_GREETING = 'Dobrý deň, dovolali ste sa do Ortodoncia Klostermann. Aby ste nemuseli čakať, posielame Vám SMS správu s odkazom na objednanie. Ďakujeme.';
 const KLOSTERMANN_EN_GREETING = 'Hello, you have reached Klostermann Orthodontics. So that you don’t have to wait, we will send you an SMS with a link to order. Thank you.';
@@ -104,6 +108,7 @@ const PROTECTED_PRODUCTION_TWILIO_NUMBERS = new Set([
   VADKERTI_TWILIO_PHONE_NUMBER,
   VADKERTI_ROUTING_PHONE_NUMBER,
   NEUROCENTRUM_ROUTING_PHONE_NUMBER,
+  ELISSEA_TWILIO_PHONE_NUMBER,
   '+421800232793',
 ].filter(Boolean));
 
@@ -170,6 +175,7 @@ function assertClinicRoutingIsolation(
     [ZDRAHALOVA_PHONE_NUMBER, ZDRAHALOVA_CLINIC_ID],
     [ZDRAHALOVA_ROUTING_PHONE_NUMBER, ZDRAHALOVA_CLINIC_ID],
     [POPRAD_ONCOLOGY_PHONE_NUMBER, POPRAD_ONCOLOGY_CLINIC_ID],
+    [ELISSEA_TWILIO_PHONE_NUMBER, ELISSEA_CLINIC_ID],
     ...Array.from(POPRAD_ONCOLOGY_ROUTING_PHONE_NUMBERS, phoneNumber => [phoneNumber, POPRAD_ONCOLOGY_CLINIC_ID] as [string, string]),
   ]);
   const expectedClinicId = protectedRoutes.get(normalizedRoute);
@@ -271,6 +277,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const isHmiraDedicatedDestination = normalizedTo === HMIRA_PHONE_NUMBER;
     const isPopradOncologyDestination = isPopradOncologyRoute(body.To);
     const isOtherDedicatedDestination = normalizedTo === CELKOVA_PHONE_NUMBER
+      || normalizedTo === ELISSEA_TWILIO_PHONE_NUMBER
       || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
       || normalizedTo === normalizeSlovakPhoneAddress(novotnyVoiceBotPhoneNumber)
       || isZdrahalovaRoute(body.To)
@@ -279,6 +286,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       || isPopradOncologyDestination;
 
     const isExistingDedicatedDestination = isPekarcikVipTelDestination
+      || normalizedTo === ELISSEA_TWILIO_PHONE_NUMBER
       || normalizedTo === CELKOVA_PHONE_NUMBER
       || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
       || normalizedTo === KLOSTERMANN_PHONE_NUMBER
@@ -291,6 +299,11 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       || isDobrovodskaRoute(body.To);
     const isNeurocentrumCall = (!isExistingDedicatedDestination && normalizedCarrierForwardedFrom === NEUROCENTRUM_ROUTING_PHONE_NUMBER)
       || normalizedTo === NEUROCENTRUM_ROUTING_PHONE_NUMBER;
+
+    if (normalizedTo === ELISSEA_TWILIO_PHONE_NUMBER) {
+      fastify.log.info({ from: fromNumber, to: body.To }, 'Routing call to Elissea Clinic production voice bot');
+      return startElisseaVoiceBot(fastify, reply, body);
+    }
 
     if (isNeurocentrumCall) {
       fastify.log.info({ from: fromNumber, to: body.To, forwardedFrom: carrierForwardedFrom }, 'Routing call to Neurocentrum production voice bot');
@@ -837,5 +850,6 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     finalizeAbandonedVadkertiCall(fastify, body.CallSid, new Date().toISOString());
     finalizeAbandonedNeurocentrumCall(body.CallSid);
     finalizeAbandonedDemoCall(body.CallSid, body.CallStatus);
+    finalizeAbandonedElisseaCall(fastify, body.CallSid, new Date().toISOString());
   });
 }

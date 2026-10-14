@@ -2,6 +2,7 @@ import axios, { AxiosInstance } from 'axios';
 import { ClinicConfig, PrixiEvent } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { vadkertiBotConfig } from '../config/vadkerti.config';
+import { elisseaBotConfig } from '../config/elissea.config';
 
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -78,6 +79,15 @@ export class PrixiService {
    * Provides a fallback configuration if the API call fails or times out.
    */
   async getConfig(phoneNumber: string): Promise<ClinicConfig> {
+    if (phoneNumber === elisseaBotConfig.clinic.inboundTwilioNumber) {
+      return {
+        clinicId: elisseaBotConfig.clinic.clinicId,
+        voiceBotEnabled: true,
+        timezone: elisseaBotConfig.clinic.timezone,
+        pediatricMode: false,
+      };
+    }
+
     if (
       phoneNumber === vadkertiBotConfig.clinic.inboundTwilioNumber
       || phoneNumber === vadkertiBotConfig.clinic.routingPhoneNumber
