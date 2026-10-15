@@ -157,6 +157,8 @@ export interface VoiceBotRouting {
  */
 export interface VoiceBotPrixiRequestCapture {
   clinicId: string;
+  /** Optional clinic override for a dedicated inbound Twilio number sharing this exact flow. */
+  clinicIdsByInboundTwilioNumber?: Record<string, string>;
   requestVariable: string;
   timePreferenceVariable?: string;
   /** Submit as soon as this node is reached; the end node remains a fallback. */
@@ -283,6 +285,24 @@ export function validateVoiceBotConfig(config: Partial<VoiceBotConfig>): VoiceBo
     const capture = config.prixiRequestCapture;
     if (!/^\d+$/.test(capture.clinicId?.trim() || '')) {
       errors.push('PriXi clinic ID pre demo požiadavky musí byť číselné.');
+    }
+    const clinicIdOverrides = Object.entries(capture.clinicIdsByInboundTwilioNumber || {});
+    const normalizedOverrideNumbers = new Set<string>();
+    for (const [number, clinicId] of clinicIdOverrides) {
+      const normalizedNumber = normalizeTwilioNumber(number);
+      if (!/^\+[1-9]\d{6,14}$/.test(normalizedNumber)) {
+        errors.push(`Twilio číslo pre PriXi clinic ID „${number}“ nie je v platnom medzinárodnom formáte.`);
+      }
+      if (!/^\d+$/.test(clinicId?.trim() || '')) {
+        errors.push(`PriXi clinic ID pre Twilio číslo „${number}“ musí byť číselné.`);
+      }
+      if (!normalizedInboundNumbers.includes(normalizedNumber)) {
+        errors.push(`Twilio číslo „${number}“ s vlastným PriXi clinic ID musí byť aj v routing.inboundTwilioNumbers.`);
+      }
+      if (normalizedOverrideNumbers.has(normalizedNumber)) {
+        errors.push(`Twilio číslo „${number}“ má PriXi clinic ID uvedené viackrát.`);
+      }
+      normalizedOverrideNumbers.add(normalizedNumber);
     }
     if (!capture.requestVariable?.trim()) {
       errors.push('Zápis demo požiadavky do PriXi potrebuje premennú typu požiadavky.');

@@ -253,19 +253,20 @@ test('prezentačný strom zachytí voľné hlasové údaje a vytvorí lead bez p
   assert.equal(events.some((event) => event.event === 'lead_collected'), true);
 });
 
-test('slovenské aj české prezentačné číslo smerujú na univerzálny ambulantný bot', async () => {
+test('všetky prezentačné čísla smerujú na rovnaký univerzálny ambulantný bot', async () => {
   const presentationConfig = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/prixi-prezentacia-demo.json'), 'utf8'));
   const salonConfig = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/prixi-salony-stupava-demo.json'), 'utf8'));
   const presentationValidation = validateVoiceBotConfig(presentationConfig);
   const salonValidation = validateVoiceBotConfig(salonConfig);
   assert.equal(presentationValidation.valid, true, presentationValidation.errors.join(' '));
   assert.equal(salonValidation.valid, true, salonValidation.errors.join(' '));
-  assert.deepEqual(presentationConfig.routing.inboundTwilioNumbers, ['+420910929535', '+421800223160']);
+  assert.deepEqual(presentationConfig.routing.inboundTwilioNumbers, ['+420910929535', '+421800223160', '+420910925438']);
+  assert.equal(presentationConfig.prixiRequestCapture.clinicIdsByInboundTwilioNumber['+420910925438'], '157');
   assert.deepEqual(salonConfig.routing.inboundTwilioNumbers, []);
   await save(presentationConfig);
   await save(salonConfig);
 
-  for (const [index, to] of ['+421800223160', '+420910929535'].entries()) {
+  for (const [index, to] of ['+421800223160', '+420910929535', '+420910925438'].entries()) {
     const response = await signedPost('/voice/incoming', {
       From: '+421900000125',
       To: to,
@@ -274,6 +275,37 @@ test('slovenské aj české prezentačné číslo smerujú na univerzálny ambul
 
     assert.equal(response.statusCode, 200);
     assert.match(response.body, /<Redirect>\/voice\/demo\/prixi-prezentacia-demo\/start<\/Redirect>/);
+  }
+});
+
+test('Hudecovo číslo používa rovnaký pacientsky flow a zapisuje demo požiadavku do kliniky 157', async () => {
+  const config = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/prixi-prezentacia-demo.json'), 'utf8'));
+  await save(config);
+  const sentEvents = [];
+  const originalSendEvent = prixiService.sendEvent;
+  prixiService.sendEvent = async (event) => sentEvents.push(event);
+
+  try {
+    const callSid = 'CA-HUDEC-PRIXI-REQUEST-157';
+    const common = { From: '+421900000157', To: '+420910925438', CallSid: callSid };
+    const routed = await signedPost('/voice/incoming', common);
+    assert.match(routed.body, /<Redirect>\/voice\/demo\/prixi-prezentacia-demo\/start<\/Redirect>/);
+
+    let response = await signedPost(`/voice/demo/${config.id}/start`, common);
+    assert.match(response.body, /Vaša digitálna ambulantná sestra/);
+    response = await signedPost(gatherAction(response.body), { ...common, Digits: '1' });
+    response = await signedPost(gatherAction(response.body), { ...common, Digits: '1' });
+    response = await signedPost(gatherAction(response.body), { ...common, Digits: '2' });
+    await new Promise(resolve => setImmediate(resolve));
+
+    assert.match(response.body, /Chcete aby sme vám ukázali/);
+    assert.equal(sentEvents.length, 1);
+    assert.equal(sentEvents[0].clinicId, '157');
+    assert.equal(sentEvents[0].routingPhoneNumber, '+420910925438');
+    assert.match(sentEvents[0].problemTranscript, /Kategória: objednať sa na kontrolu/);
+    assert.match(sentEvents[0].problemTranscript, /Preferovaný čas: popoludnie/);
+  } finally {
+    prixiService.sendEvent = originalSendEvent;
   }
 });
 

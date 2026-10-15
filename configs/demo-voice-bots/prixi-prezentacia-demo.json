@@ -16,11 +16,15 @@
   "routing": {
     "inboundTwilioNumbers": [
       "+420910929535",
-      "+421800223160"
+      "+421800223160",
+      "+420910925438"
     ]
   },
   "prixiRequestCapture": {
     "clinicId": "110",
+    "clinicIdsByInboundTwilioNumber": {
+      "+420910925438": "157"
+    },
     "requestVariable": "patientRequest",
     "timePreferenceVariable": "patientTime",
     "dispatchAtNodeId": "pacient-zaujem"

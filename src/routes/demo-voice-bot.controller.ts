@@ -9,6 +9,7 @@ import { prixiService } from '../services/prixi.service';
 import { voiceBotConfigStore } from '../services/voice-bot-config.store';
 import {
   buildIntroduction,
+  normalizeTwilioNumber,
   VoiceBotConfig,
   VoiceBotPractitionerDefinition,
   VoiceBotServiceDefinition,
@@ -440,13 +441,18 @@ function dispatchTreePrixiRequest(session: TreeSession): boolean {
   const request = capture ? session.answers[capture.requestVariable]?.label : undefined;
   if (!capture || !request) return false;
 
+  const normalizedRoutingNumber = normalizeTwilioNumber(session.routingPhoneNumber);
+  const clinicId = Object.entries(capture.clinicIdsByInboundTwilioNumber || {})
+    .find(([number]) => normalizeTwilioNumber(number) === normalizedRoutingNumber)?.[1]
+    || capture.clinicId;
+
   const endedAt = new Date().toISOString();
   const timePreference = capture.timePreferenceVariable
     ? session.answers[capture.timePreferenceVariable]?.label
     : undefined;
   const event: VoicemailRecordedEvent = {
     event: 'voicemail_recorded',
-    clinicId: capture.clinicId,
+    clinicId,
     phone: session.phone,
     routingPhoneNumber: session.routingPhoneNumber,
     durationSeconds: Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(session.startedAt)) / 1000)),
@@ -473,7 +479,7 @@ function dispatchTreePrixiRequest(session: TreeSession): boolean {
   prixiService.sendEvent(event, 3, eventKey)
     .then(() => {
       completeVoiceEvent(eventKey);
-      bookingAuditService.record(session.callSid, 'prixi_request_created', { clinicId: capture.clinicId });
+      bookingAuditService.record(session.callSid, 'prixi_request_created', { clinicId });
     })
     .catch((error) => {
       failVoiceEvent(eventKey);
