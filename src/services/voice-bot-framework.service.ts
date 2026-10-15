@@ -159,6 +159,8 @@ export interface VoiceBotPrixiRequestCapture {
   clinicId: string;
   requestVariable: string;
   timePreferenceVariable?: string;
+  /** Submit as soon as this node is reached; the end node remains a fallback. */
+  dispatchAtNodeId?: string;
 }
 
 export interface VoiceBotConfig {
@@ -294,6 +296,9 @@ export function validateVoiceBotConfig(config: Partial<VoiceBotConfig>): VoiceBo
     }
     if (capture.timePreferenceVariable && !storedVariables.has(capture.timePreferenceVariable)) {
       errors.push(`Premenná preferovaného času „${capture.timePreferenceVariable}“ sa v rozhodovacom strome neukladá.`);
+    }
+    if (capture.dispatchAtNodeId && !config.conversationTree?.nodes.some((node) => node.id === capture.dispatchAtNodeId)) {
+      errors.push(`Uzol skorého zápisu PriXi požiadavky „${capture.dispatchAtNodeId}“ v rozhodovacom strome neexistuje.`);
     }
   }
   if (!config.provider || !BOOKING_PROVIDERS.includes(config.provider.kind as BookingProviderKind)) {

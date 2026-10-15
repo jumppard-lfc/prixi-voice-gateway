@@ -277,7 +277,7 @@ test('slovenské aj české prezentačné číslo smerujú na univerzálny ambul
   }
 });
 
-test('pacientska vetva univerzálneho dema zapíše demo požiadavku do PriXi kliniky 110', async () => {
+test('pacientska vetva zapíše požiadavku do kliniky 110 ešte pred záverečnou otázkou a prežije zloženie', async () => {
   const config = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/prixi-prezentacia-demo.json'), 'utf8'));
   await save(config);
   const sentEvents = [];
@@ -291,10 +291,9 @@ test('pacientska vetva univerzálneho dema zapíše demo požiadavku do PriXi kl
     response = await signedPost(gatherAction(response.body), { ...common, Digits: '1' });
     response = await signedPost(gatherAction(response.body), { ...common, Digits: '1' });
     response = await signedPost(gatherAction(response.body), { ...common, Digits: '2' });
-    response = await signedPost(gatherAction(response.body), { ...common, Digits: '2' });
     await new Promise(resolve => setImmediate(resolve));
 
-    assert.match(response.body, /Prajem príjemný deň/);
+    assert.match(response.body, /Chcete aby sme vám ukázali/);
     assert.equal(sentEvents.length, 1);
     assert.equal(sentEvents[0].event, 'voicemail_recorded');
     assert.equal(sentEvents[0].clinicId, '110');
@@ -303,6 +302,14 @@ test('pacientska vetva univerzálneho dema zapíše demo požiadavku do PriXi kl
     assert.match(sentEvents[0].problemTranscript, /Kategória: objednať sa na kontrolu/);
     assert.match(sentEvents[0].problemTranscript, /Preferovaný čas: popoludnie/);
     assert.match(sentEvents[0].problemTranscript, /nejde o reálnu rezerváciu/);
+
+    const status = await signedPost('/voice/call-status', {
+      ...common,
+      CallStatus: 'completed',
+    });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(status.statusCode, 204);
+    assert.equal(sentEvents.length, 1);
   } finally {
     prixiService.sendEvent = originalSendEvent;
   }

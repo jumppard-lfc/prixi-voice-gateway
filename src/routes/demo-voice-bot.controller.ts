@@ -691,6 +691,14 @@ async function renderTree(reply: FastifyReply, session: TreeSession, prefix = ''
     return reply.type('text/xml').send(twiml.toString());
   }
 
+  // Persist the patient request as soon as the configured post-scenario node
+  // is reached. A caller may naturally hang up after hearing the demo result,
+  // before answering the later sales question. The end-node dispatch below is
+  // retained as a fallback and is deduplicated by the CallSid event key.
+  if (session.config.prixiRequestCapture?.dispatchAtNodeId === node.id) {
+    dispatchTreePrixiRequest(session);
+  }
+
   const startsWithThanks = (value: string): boolean => /^dakujem(?:\s|\.|,|!|$)/.test(normalize(value));
   const nextBridge = node.type === 'question' || node.type === 'input' || node.type === 'availability'
     ? interpolateTreeText(node.bridge, session)

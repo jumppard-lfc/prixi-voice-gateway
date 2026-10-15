@@ -22,7 +22,8 @@
   "prixiRequestCapture": {
     "clinicId": "110",
     "requestVariable": "patientRequest",
-    "timePreferenceVariable": "patientTime"
+    "timePreferenceVariable": "patientTime",
+    "dispatchAtNodeId": "pacient-zaujem"
   },
   "conversation": {
     "confirmService": false,
