@@ -15,7 +15,8 @@
   "practitioners": [],
   "routing": {
     "inboundTwilioNumbers": [
-      "+420910929535"
+      "+420910929535",
+      "+421800223160"
     ]
   },
   "conversation": {

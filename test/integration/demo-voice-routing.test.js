@@ -253,17 +253,28 @@ test('prezentačný strom zachytí voľné hlasové údaje a vytvorí lead bez p
   assert.equal(events.some((event) => event.event === 'lead_collected'), true);
 });
 
-test('salónové demo je platné a smeruje slovenské letákové číslo', async () => {
-  const config = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/prixi-salony-stupava-demo.json'), 'utf8'));
-  const validation = validateVoiceBotConfig(config);
-  assert.equal(validation.valid, true, validation.errors.join(' '));
-  await save(config);
+test('slovenské aj české prezentačné číslo smerujú na univerzálny ambulantný bot', async () => {
+  const presentationConfig = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/prixi-prezentacia-demo.json'), 'utf8'));
+  const salonConfig = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/prixi-salony-stupava-demo.json'), 'utf8'));
+  const presentationValidation = validateVoiceBotConfig(presentationConfig);
+  const salonValidation = validateVoiceBotConfig(salonConfig);
+  assert.equal(presentationValidation.valid, true, presentationValidation.errors.join(' '));
+  assert.equal(salonValidation.valid, true, salonValidation.errors.join(' '));
+  assert.deepEqual(presentationConfig.routing.inboundTwilioNumbers, ['+420910929535', '+421800223160']);
+  assert.deepEqual(salonConfig.routing.inboundTwilioNumbers, []);
+  await save(presentationConfig);
+  await save(salonConfig);
 
-  const params = { From: '+421900000125', To: '+421800223160', CallSid: 'CA-SALON-ROUTING-1' };
-  const response = await signedPost('/voice/incoming', params);
+  for (const [index, to] of ['+421800223160', '+420910929535'].entries()) {
+    const response = await signedPost('/voice/incoming', {
+      From: '+421900000125',
+      To: to,
+      CallSid: `CA-PRESENTATION-ROUTING-${index + 1}`,
+    });
 
-  assert.equal(response.statusCode, 200);
-  assert.match(response.body, /<Redirect>\/voice\/demo\/prixi-salony-stupava-demo\/start<\/Redirect>/);
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body, /<Redirect>\/voice\/demo\/prixi-prezentacia-demo\/start<\/Redirect>/);
+  }
 });
 
 test('salónové demo zachráni priebežný lead po zložení počas poslednej odpovede', async () => {

@@ -14,9 +14,7 @@
   "services": [],
   "practitioners": [],
   "routing": {
-    "inboundTwilioNumbers": [
-      "+421800223160"
-    ]
+    "inboundTwilioNumbers": []
   },
   "conversation": {
     "confirmService": false,
