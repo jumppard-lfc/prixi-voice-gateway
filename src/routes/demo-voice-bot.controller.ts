@@ -5,6 +5,7 @@ import { bulkGateSmsService } from '../services/bulkgate-sms.service';
 import { bookingAuditService } from '../services/booking-audit.service';
 import { DemoLead, demoLeadService } from '../services/demo-lead.service';
 import { parseDatePreference, parseName, parseSlotChoice, parseYesNo } from '../services/booking-nlu.service';
+import { prixiService } from '../services/prixi.service';
 import { voiceBotConfigStore } from '../services/voice-bot-config.store';
 import {
   buildIntroduction,
@@ -19,7 +20,8 @@ import {
   VoiceBotTreeNode,
   VoiceBotTreeQuestionNode,
 } from '../services/voice-bot-framework.service';
-import { DatePreference, OfferedSlot } from '../types';
+import { DatePreference, OfferedSlot, VoicemailRecordedEvent } from '../types';
+import { claimVoiceEvent, completeVoiceEvent, createVoiceEventKey, failVoiceEvent } from '../utils/voice-event-ledger';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 const SESSION_TTL_MS = 20 * 60 * 1000;
@@ -54,6 +56,8 @@ const sessions = new Map<string, DemoSession>();
 interface TreeSession {
   callSid: string;
   phone: string;
+  routingPhoneNumber: string;
+  startedAt: string;
   config: VoiceBotConfig;
   publicBaseUrl: string;
   nodeId: string;
@@ -86,6 +90,8 @@ interface TreePreamble { text: string; audioUrl?: string; }
 interface PortableTreeState {
   nodeId: string;
   phone: string;
+  routingPhoneNumber?: string;
+  startedAt?: string;
   answers: TreeSession['answers'];
   pendingConfirmation?: TreeSession['pendingConfirmation'];
 }
@@ -267,10 +273,12 @@ async function sendDemoConfirmationSms(session: DemoSession): Promise<boolean> {
   return true;
 }
 
-function createTreeSession(callSid: string, phone: string, config: VoiceBotConfig, baseUrl: string): TreeSession {
+function createTreeSession(callSid: string, phone: string, config: VoiceBotConfig, baseUrl: string, routingPhoneNumber = ''): TreeSession {
   const session: TreeSession = {
     callSid,
     phone,
+    routingPhoneNumber: routingPhoneNumber || config.routing?.inboundTwilioNumbers[0] || '',
+    startedAt: new Date().toISOString(),
     config,
     publicBaseUrl: baseUrl,
     nodeId: config.conversationTree!.entryNodeId,
@@ -299,6 +307,8 @@ function portableTreeState(session: TreeSession): string {
   const state: PortableTreeState = {
     nodeId: session.nodeId,
     phone: session.phone,
+    routingPhoneNumber: session.routingPhoneNumber,
+    startedAt: session.startedAt,
     answers: session.answers,
     pendingConfirmation: session.pendingConfirmation,
   };
@@ -358,7 +368,14 @@ function readPortableTreeState(value: unknown): PortableTreeState | undefined {
         nextNodeId: pending.nextNodeId,
         kind: pending.kind,
       } : undefined;
-    return { nodeId: raw.nodeId, phone: raw.phone.slice(0, 40), answers, pendingConfirmation };
+    return {
+      nodeId: raw.nodeId,
+      phone: raw.phone.slice(0, 40),
+      routingPhoneNumber: typeof raw.routingPhoneNumber === 'string' ? raw.routingPhoneNumber.slice(0, 40) : undefined,
+      startedAt: typeof raw.startedAt === 'string' && Number.isFinite(Date.parse(raw.startedAt)) ? raw.startedAt : undefined,
+      answers,
+      pendingConfirmation,
+    };
   } catch {
     return undefined;
   }
@@ -375,8 +392,9 @@ async function resolveTreeSession(request: FastifyRequest): Promise<TreeSession 
   if (state.pendingConfirmation && (!config.conversationTree.nodes.some((node) => node.id === state.pendingConfirmation!.nodeId)
     || !config.conversationTree.nodes.some((node) => node.id === state.pendingConfirmation!.nextNodeId))) return undefined;
 
-  const session = createTreeSession(body.CallSid, body.From || state.phone, config, publicBaseUrl(request));
+  const session = createTreeSession(body.CallSid, body.From || state.phone, config, publicBaseUrl(request), body.To || state.routingPhoneNumber);
   session.nodeId = state.nodeId;
+  session.startedAt = state.startedAt || session.startedAt;
   session.answers = state.answers;
   session.pendingConfirmation = state.pendingConfirmation;
   saveTreeSession(session);
@@ -415,6 +433,54 @@ function buildTreeLead(
     answers: treeAnswerLabels(session),
     ...overrides,
   };
+}
+
+function dispatchTreePrixiRequest(session: TreeSession): boolean {
+  const capture = session.config.prixiRequestCapture;
+  const request = capture ? session.answers[capture.requestVariable]?.label : undefined;
+  if (!capture || !request) return false;
+
+  const endedAt = new Date().toISOString();
+  const timePreference = capture.timePreferenceVariable
+    ? session.answers[capture.timePreferenceVariable]?.label
+    : undefined;
+  const event: VoicemailRecordedEvent = {
+    event: 'voicemail_recorded',
+    clinicId: capture.clinicId,
+    phone: session.phone,
+    routingPhoneNumber: session.routingPhoneNumber,
+    durationSeconds: Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(session.startedAt)) / 1000)),
+    callStartedAt: session.startedAt,
+    callEndedAt: endedAt,
+    providerCallId: session.callSid,
+    nameUrl: '',
+    birthYearUrl: '',
+    problemUrl: '',
+    nameTranscript: session.answers.name?.label || '',
+    birthYearTranscript: '',
+    problemTranscript: [
+      '[PriXi univerzálne ambulantné live demo]',
+      'Stav hovoru: dokončený',
+      'Demo požiadavka: áno – nejde o reálnu rezerváciu ani požiadavku pacienta',
+      `Kategória: ${request}`,
+      ...(timePreference ? [`Preferovaný čas: ${timePreference}`] : []),
+      `Telefón volajúceho: ${session.phone}`,
+    ].join('\n'),
+  };
+  const eventKey = createVoiceEventKey('voicemail_recorded', session.callSid);
+  if (!claimVoiceEvent(eventKey)) return false;
+
+  prixiService.sendEvent(event, 3, eventKey)
+    .then(() => {
+      completeVoiceEvent(eventKey);
+      bookingAuditService.record(session.callSid, 'prixi_request_created', { clinicId: capture.clinicId });
+    })
+    .catch((error) => {
+      failVoiceEvent(eventKey);
+      bookingAuditService.record(session.callSid, 'failed', { message: error instanceof Error ? error.message : String(error) });
+      console.error('Failed to create PriXi request from demo patient flow', { callSid: session.callSid, error });
+    });
+  return true;
 }
 
 function parseTreeChoice(value: string, node: VoiceBotTreeQuestionNode): VoiceBotTreeChoice | undefined {
@@ -658,6 +724,7 @@ async function renderTree(reply: FastifyReply, session: TreeSession, prefix = ''
       });
       partialLeadDrafts.delete(session.callSid);
     }
+    dispatchTreePrixiRequest(session);
     addTreeAudioOrSpeech(twiml, interpolateTreeText(end.text, session), end.audioUrl, session.config);
     twiml.hangup();
     bookingAuditService.record(session.callSid, 'completed', { outcome: end.outcome, smsDelivered, mode: 'conversation_tree' });
@@ -744,7 +811,7 @@ export async function demoVoiceBotRoutes(fastify: FastifyInstance): Promise<void
     }
     const body = request.body as Record<string, string>;
     if (config.conversationTree) {
-      const session = createTreeSession(body.CallSid, body.From, config, publicBaseUrl(request));
+      const session = createTreeSession(body.CallSid, body.From, config, publicBaseUrl(request), body.To);
       bookingAuditService.record(session.callSid, 'started', { botId: config.id, phone: session.phone, mode: 'conversation_tree' });
       // A tree owns its complete opening, including the greeting and kickoff
       // question. This keeps its script fully visible in the Builder.

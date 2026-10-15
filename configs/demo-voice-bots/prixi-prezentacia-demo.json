@@ -19,6 +19,11 @@
       "+421800223160"
     ]
   },
+  "prixiRequestCapture": {
+    "clinicId": "110",
+    "requestVariable": "patientRequest",
+    "timePreferenceVariable": "patientTime"
+  },
   "conversation": {
     "confirmService": false,
     "confirmDatePreference": false,

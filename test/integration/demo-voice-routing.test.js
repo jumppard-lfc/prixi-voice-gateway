@@ -277,6 +277,65 @@ test('slovenské aj české prezentačné číslo smerujú na univerzálny ambul
   }
 });
 
+test('pacientska vetva univerzálneho dema zapíše demo požiadavku do PriXi kliniky 110', async () => {
+  const config = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/prixi-prezentacia-demo.json'), 'utf8'));
+  await save(config);
+  const sentEvents = [];
+  const originalSendEvent = prixiService.sendEvent;
+  prixiService.sendEvent = async (event) => sentEvents.push(event);
+
+  try {
+    const callSid = 'CA-PRESENTATION-PRIXI-REQUEST-1';
+    const common = { From: '+421900000125', To: '+421800223160', CallSid: callSid };
+    let response = await signedPost(`/voice/demo/${config.id}/start`, common);
+    response = await signedPost(gatherAction(response.body), { ...common, Digits: '1' });
+    response = await signedPost(gatherAction(response.body), { ...common, Digits: '1' });
+    response = await signedPost(gatherAction(response.body), { ...common, Digits: '2' });
+    response = await signedPost(gatherAction(response.body), { ...common, Digits: '2' });
+    await new Promise(resolve => setImmediate(resolve));
+
+    assert.match(response.body, /Prajem príjemný deň/);
+    assert.equal(sentEvents.length, 1);
+    assert.equal(sentEvents[0].event, 'voicemail_recorded');
+    assert.equal(sentEvents[0].clinicId, '110');
+    assert.equal(sentEvents[0].phone, '+421900000125');
+    assert.equal(sentEvents[0].routingPhoneNumber, '+421800223160');
+    assert.match(sentEvents[0].problemTranscript, /Kategória: objednať sa na kontrolu/);
+    assert.match(sentEvents[0].problemTranscript, /Preferovaný čas: popoludnie/);
+    assert.match(sentEvents[0].problemTranscript, /nejde o reálnu rezerváciu/);
+  } finally {
+    prixiService.sendEvent = originalSendEvent;
+  }
+});
+
+test('obchodná lead vetva univerzálneho dema nevytvorí pacientsku požiadavku v PriXi', async () => {
+  const config = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/prixi-prezentacia-demo.json'), 'utf8'));
+  await save(config);
+  const sentEvents = [];
+  const originalSendEvent = prixiService.sendEvent;
+  const originalSubmit = demoLeadService.submit.bind(demoLeadService);
+  prixiService.sendEvent = async (event) => sentEvents.push(event);
+  demoLeadService.submit = async () => 'log';
+
+  try {
+    const callSid = 'CA-PRESENTATION-SALES-LEAD-1';
+    const common = { From: '+421900000126', To: '+421800223160', CallSid: callSid };
+    let response = await signedPost(`/voice/demo/${config.id}/start`, common);
+    response = await signedPost(gatherAction(response.body), { ...common, Digits: '2' });
+    response = await signedPost(gatherAction(response.body), { ...common, SpeechResult: 'Jana Nováková' });
+    response = await signedPost(gatherAction(response.body), { ...common, SpeechResult: 'Medika Plus' });
+    response = await signedPost(gatherAction(response.body), { ...common, Digits: '1' });
+    response = await signedPost(gatherAction(response.body), { ...common, Digits: '4' });
+    await new Promise(resolve => setImmediate(resolve));
+
+    assert.match(response.body, /Kolega sa vám ozve/);
+    assert.equal(sentEvents.length, 0);
+  } finally {
+    prixiService.sendEvent = originalSendEvent;
+    demoLeadService.submit = originalSubmit;
+  }
+});
+
 test('salónové demo zachráni priebežný lead po zložení počas poslednej odpovede', async () => {
   const config = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/prixi-salony-stupava-demo.json'), 'utf8'));
   config.id = 'salon-abandoned-lead-demo';

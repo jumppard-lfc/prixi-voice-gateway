@@ -3,6 +3,7 @@ export type BookingAuditEventName =
   | 'tree_choice_selected'
   | 'tree_input_collected'
   | 'lead_collected'
+  | 'prixi_request_created'
   | 'service_selected'
   | 'practitioner_selected'
   | 'slots_offered'

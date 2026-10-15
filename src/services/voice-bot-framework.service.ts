@@ -150,6 +150,17 @@ export interface VoiceBotRouting {
   inboundTwilioNumbers: string[];
 }
 
+/**
+ * Explicit opt-in for mirroring a completed demo patient scenario into PriXi.
+ * The configured answer variable acts as the guard: sales-lead-only branches
+ * that never collect it are not submitted as clinic requests.
+ */
+export interface VoiceBotPrixiRequestCapture {
+  clinicId: string;
+  requestVariable: string;
+  timePreferenceVariable?: string;
+}
+
 export interface VoiceBotConfig {
   version: 1;
   id: string;
@@ -168,6 +179,7 @@ export interface VoiceBotConfig {
   services: VoiceBotServiceDefinition[];
   practitioners?: VoiceBotPractitionerDefinition[];
   routing?: VoiceBotRouting;
+  prixiRequestCapture?: VoiceBotPrixiRequestCapture;
   conversation: ConversationPolicy;
   /** When present, this replaces the built-in booking flow for this bot only. */
   conversationTree?: VoiceBotConversationTree;
@@ -264,6 +276,25 @@ export function validateVoiceBotConfig(config: Partial<VoiceBotConfig>): VoiceBo
   }
   if (new Set(normalizedInboundNumbers).size !== normalizedInboundNumbers.length) {
     errors.push('Rovnaké Twilio číslo nemôže byť pri jednom botovi uvedené viackrát.');
+  }
+  if (config.prixiRequestCapture) {
+    const capture = config.prixiRequestCapture;
+    if (!/^\d+$/.test(capture.clinicId?.trim() || '')) {
+      errors.push('PriXi clinic ID pre demo požiadavky musí byť číselné.');
+    }
+    if (!capture.requestVariable?.trim()) {
+      errors.push('Zápis demo požiadavky do PriXi potrebuje premennú typu požiadavky.');
+    }
+    const storedVariables = new Set((config.conversationTree?.nodes || [])
+      .filter((node): node is VoiceBotTreeQuestionNode | VoiceBotTreeInputNode | VoiceBotTreeAvailabilityNode => node.type === 'question' || node.type === 'input' || node.type === 'availability')
+      .map((node) => node.storeAs)
+      .filter((value): value is string => Boolean(value)));
+    if (capture.requestVariable && !storedVariables.has(capture.requestVariable)) {
+      errors.push(`Premenná PriXi požiadavky „${capture.requestVariable}“ sa v rozhodovacom strome neukladá.`);
+    }
+    if (capture.timePreferenceVariable && !storedVariables.has(capture.timePreferenceVariable)) {
+      errors.push(`Premenná preferovaného času „${capture.timePreferenceVariable}“ sa v rozhodovacom strome neukladá.`);
+    }
   }
   if (!config.provider || !BOOKING_PROVIDERS.includes(config.provider.kind as BookingProviderKind)) {
     errors.push('Vyberte podporovaného booking providera.');
