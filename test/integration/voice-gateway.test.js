@@ -1377,6 +1377,7 @@ test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
   const zdrahalovaClinicConfig = await originalGetConfig('+421911135193');
   const popradOncologyTwilioConfig = await originalGetConfig('+420910925584');
   const popradOncologySharedLineConfig = await originalGetConfig('+421524314169');
+  const kollarTwilioConfig = await originalGetConfig('+420910922076');
 
   assert.equal(vadkertiTwilioConfig.clinicId, '146');
   assert.equal(vadkertiTwilioConfig.voiceBotEnabled, true);
@@ -1396,6 +1397,8 @@ test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
   assert.equal(popradOncologyTwilioConfig.clinicId, '154');
   assert.equal(popradOncologyTwilioConfig.voiceBotEnabled, true);
   assert.equal(popradOncologySharedLineConfig.clinicId, '154');
+  assert.equal(kollarTwilioConfig.clinicId, '155');
+  assert.equal(kollarTwilioConfig.voiceBotEnabled, true);
 });
 
 test('MUDr. Dobrovodska pouziva dvojkrokovy audio flow', async () => {

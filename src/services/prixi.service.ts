@@ -3,6 +3,7 @@ import { ClinicConfig, PrixiEvent } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { vadkertiBotConfig } from '../config/vadkerti.config';
 import { elisseaBotConfig } from '../config/elissea.config';
+import { kollarBotConfig } from '../config/kollar.config';
 
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -79,6 +80,15 @@ export class PrixiService {
    * Provides a fallback configuration if the API call fails or times out.
    */
   async getConfig(phoneNumber: string): Promise<ClinicConfig> {
+    if (phoneNumber === kollarBotConfig.clinic.inboundTwilioNumber) {
+      return {
+        clinicId: kollarBotConfig.clinic.clinicId,
+        voiceBotEnabled: true,
+        timezone: kollarBotConfig.clinic.timezone,
+        pediatricMode: false,
+      };
+    }
+
     if (phoneNumber === elisseaBotConfig.clinic.inboundTwilioNumber) {
       return {
         clinicId: elisseaBotConfig.clinic.clinicId,

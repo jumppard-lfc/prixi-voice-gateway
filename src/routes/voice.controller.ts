@@ -20,6 +20,8 @@ import { neurocentrumEdsService } from '../services/neurocentrum-eds.service';
 import { finalizeAbandonedDemoCall } from './demo-voice-bot.controller';
 import { finalizeAbandonedElisseaCall, startElisseaVoiceBot } from './elissea-voice-bot.controller';
 import { elisseaBotConfig } from '../config/elissea.config';
+import { finalizeAbandonedKollarCall, startKollarVoiceBot } from './kollar-voice-bot.controller';
+import { kollarBotConfig } from '../config/kollar.config';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
@@ -54,6 +56,8 @@ const VADKERTI_ROUTING_PHONE_NUMBER = '+421902647072';
 const NEUROCENTRUM_ROUTING_PHONE_NUMBER = neurocentrumBotConfig.clinic.routingPhoneNumber;
 const ELISSEA_TWILIO_PHONE_NUMBER = elisseaBotConfig.clinic.inboundTwilioNumber;
 const ELISSEA_CLINIC_ID = elisseaBotConfig.clinic.clinicId;
+const KOLLAR_TWILIO_PHONE_NUMBER = kollarBotConfig.clinic.inboundTwilioNumber;
+const KOLLAR_CLINIC_ID = kollarBotConfig.clinic.clinicId;
 const UNRESOLVED_CLINIC_IDS = new Set(['', 'orphan', 'fallback', 'local-dev']);
 const KLOSTERMANN_SK_GREETING = 'Dobrý deň, dovolali ste sa do Ortodoncia Klostermann. Aby ste nemuseli čakať, posielame Vám SMS správu s odkazom na objednanie. Ďakujeme.';
 const KLOSTERMANN_EN_GREETING = 'Hello, you have reached Klostermann Orthodontics. So that you don’t have to wait, we will send you an SMS with a link to order. Thank you.';
@@ -109,6 +113,7 @@ const PROTECTED_PRODUCTION_TWILIO_NUMBERS = new Set([
   VADKERTI_ROUTING_PHONE_NUMBER,
   NEUROCENTRUM_ROUTING_PHONE_NUMBER,
   ELISSEA_TWILIO_PHONE_NUMBER,
+  KOLLAR_TWILIO_PHONE_NUMBER,
   '+421800232793',
 ].filter(Boolean));
 
@@ -176,6 +181,7 @@ function assertClinicRoutingIsolation(
     [ZDRAHALOVA_ROUTING_PHONE_NUMBER, ZDRAHALOVA_CLINIC_ID],
     [POPRAD_ONCOLOGY_PHONE_NUMBER, POPRAD_ONCOLOGY_CLINIC_ID],
     [ELISSEA_TWILIO_PHONE_NUMBER, ELISSEA_CLINIC_ID],
+    [KOLLAR_TWILIO_PHONE_NUMBER, KOLLAR_CLINIC_ID],
     ...Array.from(POPRAD_ONCOLOGY_ROUTING_PHONE_NUMBERS, phoneNumber => [phoneNumber, POPRAD_ONCOLOGY_CLINIC_ID] as [string, string]),
   ]);
   const expectedClinicId = protectedRoutes.get(normalizedRoute);
@@ -278,6 +284,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const isPopradOncologyDestination = isPopradOncologyRoute(body.To);
     const isOtherDedicatedDestination = normalizedTo === CELKOVA_PHONE_NUMBER
       || normalizedTo === ELISSEA_TWILIO_PHONE_NUMBER
+      || normalizedTo === KOLLAR_TWILIO_PHONE_NUMBER
       || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
       || normalizedTo === normalizeSlovakPhoneAddress(novotnyVoiceBotPhoneNumber)
       || isZdrahalovaRoute(body.To)
@@ -287,6 +294,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
     const isExistingDedicatedDestination = isPekarcikVipTelDestination
       || normalizedTo === ELISSEA_TWILIO_PHONE_NUMBER
+      || normalizedTo === KOLLAR_TWILIO_PHONE_NUMBER
       || normalizedTo === CELKOVA_PHONE_NUMBER
       || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
       || normalizedTo === KLOSTERMANN_PHONE_NUMBER
@@ -303,6 +311,11 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     if (normalizedTo === ELISSEA_TWILIO_PHONE_NUMBER) {
       fastify.log.info({ from: fromNumber, to: body.To }, 'Routing call to Elissea Clinic production voice bot');
       return startElisseaVoiceBot(fastify, reply, body);
+    }
+
+    if (normalizedTo === KOLLAR_TWILIO_PHONE_NUMBER) {
+      fastify.log.info({ from: fromNumber, to: body.To }, 'Routing call to MUDr. Kollar production voice bot');
+      return startKollarVoiceBot(fastify, reply, body);
     }
 
     if (isNeurocentrumCall) {
@@ -851,5 +864,6 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     finalizeAbandonedNeurocentrumCall(body.CallSid);
     finalizeAbandonedDemoCall(body.CallSid, body.CallStatus);
     finalizeAbandonedElisseaCall(fastify, body.CallSid, new Date().toISOString());
+    finalizeAbandonedKollarCall(fastify, body.CallSid, new Date().toISOString());
   });
 }
