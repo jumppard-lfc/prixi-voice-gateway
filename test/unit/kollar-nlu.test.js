@@ -1,6 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { extractKollarBirthYear, parseKollarRequestType } = require('../../src/services/kollar-nlu.service');
+const {
+  extractKollarBirthYear,
+  parseKollarIdentity,
+  parseKollarRequestType,
+} = require('../../src/services/kollar-nlu.service');
 
 test('Kollar menu podporuje DTMF volby jedna az sedem', () => {
   assert.equal(parseKollarRequestType('1'), 'acute_problem');
@@ -27,4 +31,19 @@ test('Kollar bot extrahuje iba platny rok narodenia', () => {
   assert.equal(extractKollarBirthYear('1987.'), '1987');
   assert.equal(extractKollarBirthYear('neviem'), undefined);
   assert.equal(extractKollarBirthYear('2099'), undefined);
+});
+
+test('Kollar bot rozdeli meno a rok narodenia z jednej odpovede', () => {
+  assert.deepEqual(parseKollarIdentity('Jana Nováková, 1987'), {
+    patientName: 'Jana Nováková',
+    birthYear: '1987',
+  });
+  assert.deepEqual(parseKollarIdentity('Volám sa Anna Horváthová, rok narodenia 1991'), {
+    patientName: 'Anna Horváthová',
+    birthYear: '1991',
+  });
+  assert.deepEqual(parseKollarIdentity('Anna Horváthová'), {
+    patientName: 'Anna Horváthová',
+    birthYear: undefined,
+  });
 });

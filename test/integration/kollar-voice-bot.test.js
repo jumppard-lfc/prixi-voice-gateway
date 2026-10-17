@@ -54,9 +54,7 @@ async function flushPromises() {
 }
 
 async function provideIdentity(callSid, name = 'Jana Nováková', birthYear = '1987') {
-  const birthYearPrompt = await answer(callSid, name);
-  assert.match(birthYearPrompt.body, /Povedzte prosím váš rok narodenia/);
-  return answer(callSid, birthYear);
+  return answer(callSid, `${name}, ${birthYear}`);
 }
 
 test.before(async () => {
@@ -105,12 +103,12 @@ test('nepochopená odpoveď ponúkne číselný fallback jedna až sedem', async
 test('akútny problém použije schválenú otázku a vytvorí požiadavku kliniky 155', async () => {
   const callSid = 'CA-KOLLAR-ACUTE-000000000000000001';
   await incoming(callSid);
-  const prompt = await answer(callSid, '1', true);
+  const identityPrompt = await answer(callSid, '1', true);
+  assert.match(identityPrompt.body, /Rozumiem\. Povedzte prosím vaše celé meno a rok narodenia/);
+  const prompt = await provideIdentity(callSid);
   assert.match(prompt.body, /Povedzte prosím v jednej vete váš akútny problém/);
 
-  const namePrompt = await answer(callSid, 'Mám silné bolesti v podbrušku');
-  assert.match(namePrompt.body, /Povedzte prosím vaše meno a priezvisko/);
-  const completion = await provideIdentity(callSid);
+  const completion = await answer(callSid, 'Mám silné bolesti v podbrušku');
   await flushPromises();
 
   assert.match(completion.body, /Váš akútny problém pretlmočím ambulancii/);
@@ -127,13 +125,13 @@ test('akútny problém použije schválenú otázku a vytvorí požiadavku klini
 test('recept žiada názov lieku a počet balení', async () => {
   const callSid = 'CA-KOLLAR-PRESCRIPTION-000000000001';
   await incoming(callSid);
-  const prompt = await answer(callSid, 'potrebujem predpísať lieky');
+  const identityPrompt = await answer(callSid, 'potrebujem predpísať lieky');
+  assert.match(identityPrompt.body, /Rozumiem\. Povedzte prosím vaše celé meno a rok narodenia/);
+  const prompt = await provideIdentity(callSid, 'Mária Kováčová', '1978');
   assert.match(prompt.body, /Aké lieky si prajete predpísať/);
   assert.match(prompt.body, /názov lieku a počet balení/);
 
-  const namePrompt = await answer(callSid, 'Duphaston, dve balenia');
-  assert.match(namePrompt.body, /Povedzte prosím vaše meno a priezvisko/);
-  const completion = await provideIdentity(callSid, 'Mária Kováčová', '1978');
+  const completion = await answer(callSid, 'Duphaston, dve balenia');
   await flushPromises();
 
   assert.match(completion.body, /Vašu požiadavku na recept pretlmočím ambulancii/);
@@ -149,7 +147,7 @@ test('výsledok vyšetrenia vytvorí callback požiadavku', async () => {
   const callSid = 'CA-KOLLAR-RESULTS-00000000000000001';
   await incoming(callSid);
   const namePrompt = await answer(callSid, 'výsledky cytológie');
-  assert.match(namePrompt.body, /Povedzte prosím vaše meno a priezvisko/);
+  assert.match(namePrompt.body, /Rozumiem\. Povedzte prosím vaše celé meno a rok narodenia/);
   const completion = await provideIdentity(callSid);
   await flushPromises();
 
@@ -165,7 +163,7 @@ test('objednanie oznámi callback a prípravu dátumu poslednej menštruácie', 
   const callSid = 'CA-KOLLAR-APPOINTMENT-0000000000001';
   await incoming(callSid);
   const namePrompt = await answer(callSid, '4', true);
-  assert.match(namePrompt.body, /Povedzte prosím vaše meno a priezvisko/);
+  assert.match(namePrompt.body, /Rozumiem\. Povedzte prosím vaše celé meno a rok narodenia/);
   const completion = await provideIdentity(callSid);
   await flushPromises();
 
@@ -209,7 +207,7 @@ test('voľba človeka nahrá odkaz s tónom, prepíše ho a odošle do PriXi', a
   const callSid = 'CA-KOLLAR-HUMAN-000000000000000001';
   await incoming(callSid);
   const namePrompt = await answer(callSid, 'chcem sa rozprávať s človekom');
-  assert.match(namePrompt.body, /Povedzte prosím vaše meno a priezvisko/);
+  assert.match(namePrompt.body, /Rozumiem\. Povedzte prosím vaše celé meno a rok narodenia/);
   const prompt = await provideIdentity(callSid);
 
   assert.match(prompt.body, /Samozrejme rozumiem/);
@@ -260,16 +258,16 @@ test('pri chybe prepisu sa zachová pôvodná hlasová nahrávka', async () => {
   }
 });
 
-test('neplatný rok narodenia si bot vypýta ešte raz', async () => {
+test('neúplné meno alebo rok narodenia si bot vypýta ešte raz v jednej otázke', async () => {
   const callSid = 'CA-KOLLAR-BIRTH-YEAR-RETRY-000000001';
   await incoming(callSid);
   await answer(callSid, 'výsledky');
-  await answer(callSid, 'Anna Horváthová');
 
-  const retry = await answer(callSid, 'neviem');
-  assert.match(retry.body, /rok narodenia som nezachytila/);
+  const retry = await answer(callSid, 'Anna Horváthová');
+  assert.match(retry.body, /celé meno alebo rok narodenia som nezachytila/);
+  assert.match(retry.body, /celé meno a rok narodenia ešte raz/);
 
-  const completion = await answer(callSid, '1991');
+  const completion = await answer(callSid, 'Volám sa Anna Horváthová, rok narodenia 1991');
   await flushPromises();
   assert.match(completion.body, /Dovidenia/);
   assert.equal(sentEvents.length, 1);

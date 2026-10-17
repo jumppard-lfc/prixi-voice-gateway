@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import twilio from 'twilio';
 import { kollarBotConfig, KollarRequestType } from '../config/kollar.config';
-import { extractKollarBirthYear, parseKollarRequestType } from '../services/kollar-nlu.service';
+import { parseKollarIdentity, parseKollarRequestType } from '../services/kollar-nlu.service';
 import { KollarSession, kollarSessionService } from '../services/kollar-session.service';
 import { prixiService } from '../services/prixi.service';
 import { sttService } from '../services/stt.service';
@@ -16,8 +16,7 @@ const copy = {
   menuRetry: 'Prepáčte, nerozumela som. Pre akútny problém stlačte jednotku. Pre recept dvojku. Pre výsledok vyšetrenia trojku. Pre objednanie štvorku. Ak chcete byť nová pacientka, stlačte päťku. Pre ordinačné hodiny šestku. Ak sa chcete rozprávať s človekom, stlačte sedmičku.',
   acuteProblem: 'Povedzte prosím v jednej vete váš akútny problém.',
   prescription: 'Aké lieky si prajete predpísať? Uveďte prosím názov lieku a počet balení.',
-  name: 'Povedzte prosím vaše meno a priezvisko.',
-  birthYear: 'Povedzte prosím váš rok narodenia.',
+  identity: 'Rozumiem. Povedzte prosím vaše celé meno a rok narodenia.',
   results: 'Rozumiem. Požiadavku pretlmočím ambulancii a ozveme sa vám čo najskôr. Prajem ešte pekný zvyšok dňa. Dovidenia.',
   appointment: 'Rozumiem. Požiadavku na objednanie pretlmočím ambulancii. Ambulancia sa vám ozve čo najskôr pre dohodnutie termínu. Prosím pripravte si dátum poslednej menštruácie. Prajem ešte pekný zvyšok dňa. Dovidenia.',
   newPatient: 'Sme radi že chcete byť našou pacientkou. Pre registráciu prosím vyplňte formulár na www.prvazenska.sk a kliknite na tlačidlo Preniesť kartu a následne postupujte podľa pokynov. Prajem ešte pekný zvyšok dňa. Dovidenia.',
@@ -90,10 +89,9 @@ function renderDetailPrompt(reply: FastifyReply, session: KollarSession, retry =
 function renderIdentityPrompt(
   reply: FastifyReply,
   session: KollarSession,
-  step: 'name' | 'birth_year',
   retry = false
 ): FastifyReply {
-  session.step = step;
+  session.step = 'identity';
   kollarSessionService.save(session);
   const twiml = new VoiceResponse();
   const gather = twiml.gather({
@@ -103,12 +101,14 @@ function renderIdentityPrompt(
     timeout: 6,
     speechTimeout: 'auto',
     language: 'sk-SK',
-    ...(step === 'birth_year' ? { hints: '1950, 1960, 1970, 1980, 1990, 2000' } : {}),
+    hints: 'meno a priezvisko, 1950, 1960, 1970, 1980, 1990, 2000',
   } as any);
-  const retryCopy = step === 'birth_year'
-    ? 'Prepáčte, rok narodenia som nezachytila. Skúste ho prosím povedať ešte raz. '
-    : 'Prepáčte, meno som nezachytila. Skúste ho prosím povedať ešte raz. ';
-  gather.say(sayOptions, `${retry ? retryCopy : ''}${step === 'birth_year' ? copy.birthYear : copy.name}`);
+  gather.say(
+    sayOptions,
+    retry
+      ? 'Prepáčte, celé meno alebo rok narodenia som nezachytila. Povedzte prosím vaše celé meno a rok narodenia ešte raz.'
+      : copy.identity
+  );
   twiml.redirect('/voice/kollar/prompt');
   return reply.type('text/xml').send(twiml.toString());
 }
@@ -116,9 +116,7 @@ function renderIdentityPrompt(
 function renderCurrentPrompt(reply: FastifyReply, session: KollarSession, retry = false): FastifyReply {
   if (session.step === 'main_menu') return renderMenu(reply, session, retry);
   if (session.step === 'detail') return renderDetailPrompt(reply, session, retry);
-  if (session.step === 'name' || session.step === 'birth_year') {
-    return renderIdentityPrompt(reply, session, session.step, retry);
-  }
+  if (session.step === 'identity') return renderIdentityPrompt(reply, session, retry);
   return renderEnd(reply, copy.expired);
 }
 
@@ -326,11 +324,10 @@ export async function kollarVoiceBotRoutes(fastify: FastifyInstance): Promise<vo
       session.attempts = 0;
 
       if (requestType === 'acute_problem' || requestType === 'prescription') {
-        session.step = 'detail';
-        return renderDetailPrompt(reply, session);
+        return renderIdentityPrompt(reply, session);
       }
       if (requestType === 'results' || requestType === 'appointment' || requestType === 'human_message') {
-        return renderIdentityPrompt(reply, session, 'name');
+        return renderIdentityPrompt(reply, session);
       }
 
       kollarSessionService.delete(session.callSid);
@@ -339,24 +336,26 @@ export async function kollarVoiceBotRoutes(fastify: FastifyInstance): Promise<vo
 
     if (session.step === 'detail') {
       session.detail = answer;
-      session.attempts = 0;
-      return renderIdentityPrompt(reply, session, 'name');
+      return completeIdentifiedRequest(fastify, reply, session);
     }
 
-    if (session.step === 'name') {
-      session.patientName = answer;
-      session.attempts = 0;
-      return renderIdentityPrompt(reply, session, 'birth_year');
-    }
-
-    if (session.step === 'birth_year') {
-      const birthYear = extractKollarBirthYear(answer);
-      if (!birthYear && session.attempts < 1) {
+    if (session.step === 'identity') {
+      const identity = parseKollarIdentity(answer);
+      if (!identity.patientName || !identity.birthYear) {
         session.attempts += 1;
-        return renderIdentityPrompt(reply, session, 'birth_year', true);
+        if (session.attempts >= 3) {
+          kollarSessionService.delete(session.callSid);
+          return renderEnd(reply, copy.expired);
+        }
+        return renderIdentityPrompt(reply, session, true);
       }
-      session.birthYear = birthYear || answer;
+      session.patientName = identity.patientName;
+      session.birthYear = identity.birthYear;
       session.attempts = 0;
+      if (session.requestType === 'acute_problem' || session.requestType === 'prescription') {
+        session.step = 'detail';
+        return renderDetailPrompt(reply, session);
+      }
       return completeIdentifiedRequest(fastify, reply, session);
     }
 

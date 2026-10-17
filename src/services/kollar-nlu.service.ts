@@ -29,3 +29,20 @@ export function extractKollarBirthYear(value: string): string | undefined {
   if (!year || Number(year) > new Date().getFullYear()) return undefined;
   return year;
 }
+
+export function parseKollarIdentity(value: string): { patientName?: string; birthYear?: string } {
+  const birthYear = extractKollarBirthYear(value);
+  let patientName = value;
+
+  if (birthYear) patientName = patientName.replace(birthYear, ' ');
+  patientName = patientName
+    .replace(/\b(?:volám sa|volam sa|moje meno je|meno je|rok narodenia|narodila som sa|narodil som sa|narodená|narodena|narodený|narodeny|v roku)\b/giu, ' ')
+    .replace(/[\d,.;:]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return {
+    patientName: patientName || undefined,
+    birthYear,
+  };
+}

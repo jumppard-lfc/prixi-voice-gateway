@@ -1,6 +1,6 @@
 import { KollarRequestType } from '../config/kollar.config';
 
-export type KollarStep = 'main_menu' | 'detail' | 'name' | 'birth_year' | 'recording';
+export type KollarStep = 'main_menu' | 'identity' | 'detail' | 'recording';
 
 export interface KollarSession {
   callSid: string;
