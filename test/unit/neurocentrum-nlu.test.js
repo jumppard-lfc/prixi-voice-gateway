@@ -5,6 +5,7 @@ const {
   isNeurocentrumPrescriptionDetailComplete,
   isNeurocentrumUrgent,
   normalizeNeurocentrumDateOfBirth,
+  parseNeurocentrumFollowUpType,
   parseNeurocentrumRequestType,
   parseNeurocentrumYesNo,
 } = require('../../src/services/neurocentrum-nlu.service');
@@ -30,7 +31,21 @@ test('Neurocentrum rozlíši tri podporované požiadavky', () => {
   assert.equal(parseNeurocentrumRequestType('Chcem termín na kontrolu'), 'follow_up');
   assert.equal(parseNeurocentrumRequestType('Volám ohľadom výsledku MRI'), 'results');
   assert.equal(parseNeurocentrumRequestType('Volám ohľadom výsledkov vyšetrenia'), 'results');
+  assert.equal(parseNeurocentrumRequestType('Chcem sa objednať na EMG'), 'follow_up');
+  assert.equal(parseNeurocentrumRequestType('EMG'), 'follow_up');
+  assert.equal(parseNeurocentrumRequestType('Potrebujem obstrek'), 'follow_up');
+  assert.equal(parseNeurocentrumRequestType('Chcem výsledky EMG'), 'results');
   assert.equal(parseNeurocentrumRequestType('3'), 'results');
+});
+
+test('Neurocentrum rozlíši tri typy kontroly vrátane DTMF', () => {
+  assert.equal(parseNeurocentrumFollowUpType('klasická kontrola'), 'classic');
+  assert.equal(parseNeurocentrumFollowUpType('1'), 'classic');
+  assert.equal(parseNeurocentrumFollowUpType('EMG vyšetrenie'), 'emg');
+  assert.equal(parseNeurocentrumFollowUpType('2'), 'emg');
+  assert.equal(parseNeurocentrumFollowUpType('obstrek'), 'injection');
+  assert.equal(parseNeurocentrumFollowUpType('3'), 'injection');
+  assert.equal(parseNeurocentrumFollowUpType('kontrola'), undefined);
 });
 
 test('dátum narodenia sa normalizuje do Curo formátu', () => {

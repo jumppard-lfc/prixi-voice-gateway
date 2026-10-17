@@ -1,6 +1,8 @@
 import { DateTime } from 'luxon';
 import { NeurocentrumRequestType } from '../config/neurocentrum.config';
 
+export type NeurocentrumFollowUpType = 'classic' | 'emg' | 'injection';
+
 export function normalizeNeurocentrumSpeech(value: string): string {
   return value
     .toLocaleLowerCase('sk-SK')
@@ -21,8 +23,16 @@ export function parseNeurocentrumYesNo(value: string): boolean | undefined {
 export function parseNeurocentrumRequestType(value: string): NeurocentrumRequestType | undefined {
   const text = normalizeNeurocentrumSpeech(value);
   if (text === '1' || /(recept|predpis|predpisat|liek|lieky)/.test(text)) return 'prescription';
-  if (text === '3' || /(vysled|mri|magnet|ct|emg|eeg|laborator|krv)/.test(text)) return 'results';
-  if (text === '2' || /(kontrol|objedna|termin|vysetren)/.test(text)) return 'follow_up';
+  if (text === '3' || /(vysled|mri|magnet|ct|eeg|laborator|krv)/.test(text)) return 'results';
+  if (text === '2' || /(kontrol|objedna|termin|vysetren|emg|obstrek)/.test(text)) return 'follow_up';
+  return undefined;
+}
+
+export function parseNeurocentrumFollowUpType(value: string): NeurocentrumFollowUpType | undefined {
+  const text = normalizeNeurocentrumSpeech(value);
+  if (text === '2' || /\bemg\b|elektromyograf/.test(text)) return 'emg';
+  if (text === '3' || /obstrek|injekci/.test(text)) return 'injection';
+  if (text === '1' || /klasick|bezna kontrol|beznu kontrol/.test(text)) return 'classic';
   return undefined;
 }
 

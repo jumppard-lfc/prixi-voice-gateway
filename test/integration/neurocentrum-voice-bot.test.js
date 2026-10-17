@@ -64,6 +64,10 @@ function answer(callSid, speech) {
   return post('/voice/neurocentrum/answer', { CallSid: callSid, From: '+421905111222', SpeechResult: speech });
 }
 
+function answerWithDigit(callSid, digit) {
+  return post('/voice/neurocentrum/answer', { CallSid: callSid, From: '+421905111222', Digits: digit });
+}
+
 function callStatus(callSid) {
   return post('/voice/call-status', {
     CallSid: callSid,
@@ -220,21 +224,86 @@ test('požiadavka sa odošle do EDS hneď po nadiktovaní detailu', async () => 
   });
 });
 
-test('pri kontrole sa požiadavka odošle bez otázky na dôvod alebo obdobie', async () => {
-  const callSid = 'CA-NEURO-FOLLOW-UP-001';
+test('kontrola ponúkne klasickú kontrolu, EMG a obstrek a uloží zvolený detail', async t => {
+  const cases = [
+    ['klasická kontrola', 'Klasická kontrola'],
+    ['EMG', 'EMG vyšetrenie'],
+    ['obstrek', 'Obstrek'],
+  ];
+
+  for (const [index, [spokenType, expectedDetail]] of cases.entries()) {
+    await t.test(expectedDetail, async () => {
+      const callSid = `CA-NEURO-FOLLOW-UP-${index + 1}`;
+      await incoming(callSid);
+      await answer(callSid, 'áno');
+      await answer(callSid, 'Ján Novák');
+      await answer(callSid, '15. 3. 1980');
+
+      const subtypePrompt = await answer(callSid, 'kontrola');
+      assert.match(subtypePrompt.body, /klasickú kontrolu/);
+      assert.match(subtypePrompt.body, /EMG vyšetrenie/);
+      assert.match(subtypePrompt.body, /obstrek/);
+      assert.equal(sentEvents.length, 0);
+
+      const completed = await answer(callSid, spokenType);
+      assert.match(completed.body, /Vašu požiadavku sme zaznamenali/);
+      assert.equal(sentEvents.length, 1);
+      assert.equal(sentEvents[0].request.type, 'follow_up');
+      assert.equal(sentEvents[0].request.detail, expectedDetail);
+    });
+  }
+});
+
+test('DTMF dvojka v hlavnom menu otvorí podvýber kontroly a až ďalšia dvojka zvolí EMG', async () => {
+  const callSid = 'CA-NEURO-FOLLOW-UP-DTMF-001';
   await incoming(callSid);
   await answer(callSid, 'áno');
   await answer(callSid, 'Ján Novák');
   await answer(callSid, '15. 3. 1980');
 
-  const completed = await answer(callSid, 'kontrola');
+  const subtypePrompt = await answerWithDigit(callSid, '2');
+  assert.match(subtypePrompt.body, /klasickú kontrolu/);
+  assert.equal(sentEvents.length, 0);
 
+  const completed = await answerWithDigit(callSid, '2');
   assert.match(completed.body, /Vašu požiadavku sme zaznamenali/);
-  assert.doesNotMatch(completed.body, /o akú kontrolu ide/);
-  assert.doesNotMatch(completed.body, /aké obdobie vám vyhovuje/);
   assert.equal(sentEvents.length, 1);
   assert.equal(sentEvents[0].request.type, 'follow_up');
-  assert.equal(sentEvents[0].request.detail, 'Pacient žiada o objednanie na kontrolu.');
+  assert.equal(sentEvents[0].request.detail, 'EMG vyšetrenie');
+});
+
+test('priame EMG objednanie sa odlíši od žiadosti o výsledky EMG', async t => {
+  await t.test('objednanie na EMG', async () => {
+    const callSid = 'CA-NEURO-DIRECT-EMG-001';
+    await incoming(callSid);
+    await answer(callSid, 'áno');
+    await answer(callSid, 'Ján Novák');
+    await answer(callSid, '15. 3. 1980');
+
+    const completed = await answer(callSid, 'Chcem sa objednať na EMG');
+    assert.match(completed.body, /Vašu požiadavku sme zaznamenali/);
+    assert.equal(sentEvents.length, 1);
+    assert.equal(sentEvents[0].request.type, 'follow_up');
+    assert.equal(sentEvents[0].request.detail, 'EMG vyšetrenie');
+  });
+
+  await t.test('výsledky EMG', async () => {
+    const callSid = 'CA-NEURO-RESULTS-EMG-001';
+    await incoming(callSid);
+    await answer(callSid, 'áno');
+    await answer(callSid, 'Ján Novák');
+    await answer(callSid, '15. 3. 1980');
+
+    const detailPrompt = await answer(callSid, 'Chcem výsledky EMG');
+    assert.match(detailPrompt.body, /výsledok akého vyšetrenia/);
+    assert.equal(sentEvents.length, 0);
+
+    const completed = await answer(callSid, 'EMG');
+    assert.match(completed.body, /Vašu požiadavku sme zaznamenali/);
+    assert.equal(sentEvents.length, 1);
+    assert.equal(sentEvents[0].request.type, 'results');
+    assert.equal(sentEvents[0].request.detail, 'EMG');
+  });
 });
 
 test('dovolenka a čas mimo ordinačných hodín sa vyhodnocujú podľa EDS availability', async t => {

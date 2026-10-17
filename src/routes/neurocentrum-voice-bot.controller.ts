@@ -7,6 +7,7 @@ import {
   isNeurocentrumPrescriptionDetailComplete,
   isNeurocentrumUrgent,
   normalizeNeurocentrumDateOfBirth,
+  parseNeurocentrumFollowUpType,
   parseNeurocentrumRequestType,
   parseNeurocentrumYesNo,
 } from '../services/neurocentrum-nlu.service';
@@ -22,6 +23,12 @@ const requestTypeLabels: Record<NeurocentrumRequestType, string> = {
   follow_up: 'objednanie na kontrolu',
   results: 'výsledky vyšetrení',
 };
+
+const followUpTypeDetails = {
+  classic: 'Klasická kontrola',
+  emg: 'EMG vyšetrenie',
+  injection: 'Obstrek',
+} as const;
 
 function answerFrom(request: FastifyRequest): string {
   const body = request.body as Record<string, string>;
@@ -41,6 +48,7 @@ function promptFor(session: NeurocentrumSession): string {
     case 'name': return 'Povedzte, prosím, meno a priezvisko pacienta.';
     case 'date_of_birth': return 'Povedzte, prosím, celý dátum narodenia pacienta, napríklad pätnásteho marca 1980.';
     case 'request_type': return 'Čo potrebujete vybaviť? Pre predpis liekov povedzte recept alebo stlačte jednotku. Pre objednanie na kontrolu povedzte kontrola alebo stlačte dvojku. Pre výsledky vyšetrení povedzte výsledky alebo stlačte trojku.';
+    case 'follow_up_type': return 'Čo si želáte objednať? Pre klasickú kontrolu povedzte klasická kontrola alebo stlačte jednotku. Pre EMG vyšetrenie povedzte EMG alebo stlačte dvojku. Pre obstrek povedzte obstrek alebo stlačte trojku.';
     case 'detail':
       if (session.requestType === 'prescription') return 'Uveďte, prosím, názov liekov a počet balení.';
       if (session.requestType === 'follow_up') return 'Stručne povedzte, o akú kontrolu ide, prípadne aké obdobie vám vyhovuje.';
@@ -53,6 +61,7 @@ function renderPrompt(reply: FastifyReply, session: NeurocentrumSession, prefix 
   const twiml = new VoiceResponse();
   const yesNo = session.step === 'existing_patient';
   const requestType = session.step === 'request_type';
+  const followUpType = session.step === 'follow_up_type';
   const gather = twiml.gather({
     input: ['speech', 'dtmf'],
     action: '/voice/neurocentrum/answer',
@@ -60,8 +69,14 @@ function renderPrompt(reply: FastifyReply, session: NeurocentrumSession, prefix 
     timeout: 6,
     speechTimeout: 'auto',
     language: 'sk-SK',
-    ...(yesNo || requestType ? { numDigits: 1 } : {}),
-    hints: yesNo ? 'áno, nie' : requestType ? 'recept, kontrola, výsledky' : '',
+    ...(yesNo || requestType || followUpType ? { numDigits: 1 } : {}),
+    hints: yesNo
+      ? 'áno, nie'
+      : requestType
+        ? 'recept, kontrola, výsledky, EMG, obstrek'
+        : followUpType
+          ? 'klasická kontrola, EMG, obstrek'
+          : '',
   } as any);
   gather.say(sayOptions, `${prefix}${promptFor(session)}`.trim());
   twiml.redirect('/voice/neurocentrum/prompt');
@@ -238,11 +253,28 @@ export async function neurocentrumVoiceBotRoutes(fastify: FastifyInstance): Prom
       session.requestType = requestType;
       session.attempts = 0;
       if (requestType === 'follow_up') {
-        session.detail = 'Pacient žiada o objednanie na kontrolu.';
-        return completeCall(fastify, reply, session);
+        // DTMF 2 means the general "kontrola" option in the main menu. It only
+        // means EMG after the caller has entered the follow-up submenu.
+        const directFollowUpType = answer === '2' ? undefined : parseNeurocentrumFollowUpType(answer);
+        if (directFollowUpType) {
+          session.detail = followUpTypeDetails[directFollowUpType];
+          return completeCall(fastify, reply, session);
+        }
+        session.step = 'follow_up_type';
+        return renderPrompt(reply, session, 'Rozumiem, ide o objednanie na kontrolu. ');
       }
       session.step = 'detail';
       return renderPrompt(reply, session, `Rozumiem, ide o ${requestTypeLabels[requestType]}. `);
+    }
+
+    if (session.step === 'follow_up_type') {
+      const followUpType = parseNeurocentrumFollowUpType(answer);
+      if (!followUpType) {
+        return renderPrompt(reply, session, 'Vyberte, prosím, klasickú kontrolu, EMG vyšetrenie alebo obstrek. ');
+      }
+      session.detail = followUpTypeDetails[followUpType];
+      session.attempts = 0;
+      return completeCall(fastify, reply, session);
     }
 
     if (session.step === 'detail') {
