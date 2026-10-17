@@ -104,7 +104,7 @@ test('akútny problém použije schválenú otázku a vytvorí požiadavku klini
   const callSid = 'CA-KOLLAR-ACUTE-000000000000000001';
   await incoming(callSid);
   const identityPrompt = await answer(callSid, '1', true);
-  assert.match(identityPrompt.body, /Rozumiem\. Povedzte prosím vaše celé meno a rok narodenia/);
+  assert.match(identityPrompt.body, /Rozumiem\. Povedzte prosím ešte vaše celé meno a rok narodenia/);
   const prompt = await provideIdentity(callSid);
   assert.match(prompt.body, /Povedzte prosím v jednej vete váš akútny problém/);
 
@@ -147,7 +147,7 @@ test('výsledok vyšetrenia vytvorí callback požiadavku', async () => {
   const callSid = 'CA-KOLLAR-RESULTS-00000000000000001';
   await incoming(callSid);
   const namePrompt = await answer(callSid, 'výsledky cytológie');
-  assert.match(namePrompt.body, /Rozumiem\. Povedzte prosím vaše celé meno a rok narodenia/);
+  assert.match(namePrompt.body, /Rozumiem\. Povedzte prosím ešte vaše celé meno a rok narodenia/);
   const completion = await provideIdentity(callSid);
   await flushPromises();
 
@@ -163,7 +163,7 @@ test('objednanie oznámi callback a prípravu dátumu poslednej menštruácie', 
   const callSid = 'CA-KOLLAR-APPOINTMENT-0000000000001';
   await incoming(callSid);
   const namePrompt = await answer(callSid, '4', true);
-  assert.match(namePrompt.body, /Rozumiem\. Povedzte prosím vaše celé meno a rok narodenia/);
+  assert.match(namePrompt.body, /Rozumiem\. Povedzte prosím ešte vaše celé meno a rok narodenia/);
   const completion = await provideIdentity(callSid);
   await flushPromises();
 
@@ -207,7 +207,7 @@ test('voľba človeka nahrá odkaz s tónom, prepíše ho a odošle do PriXi', a
   const callSid = 'CA-KOLLAR-HUMAN-000000000000000001';
   await incoming(callSid);
   const namePrompt = await answer(callSid, 'chcem sa rozprávať s človekom');
-  assert.match(namePrompt.body, /Rozumiem\. Povedzte prosím vaše celé meno a rok narodenia/);
+  assert.match(namePrompt.body, /Rozumiem\. Povedzte prosím ešte vaše celé meno a rok narodenia/);
   const prompt = await provideIdentity(callSid);
 
   assert.match(prompt.body, /Samozrejme rozumiem/);

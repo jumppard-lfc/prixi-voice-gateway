@@ -16,7 +16,7 @@ const copy = {
   menuRetry: 'Prepáčte, nerozumela som. Pre akútny problém stlačte jednotku. Pre recept dvojku. Pre výsledok vyšetrenia trojku. Pre objednanie štvorku. Ak chcete byť nová pacientka, stlačte päťku. Pre ordinačné hodiny šestku. Ak sa chcete rozprávať s človekom, stlačte sedmičku.',
   acuteProblem: 'Povedzte prosím v jednej vete váš akútny problém.',
   prescription: 'Aké lieky si prajete predpísať? Uveďte prosím názov lieku a počet balení.',
-  identity: 'Rozumiem. Povedzte prosím vaše celé meno a rok narodenia.',
+  identity: 'Rozumiem. Povedzte prosím ešte vaše celé meno a rok narodenia.',
   results: 'Rozumiem. Požiadavku pretlmočím ambulancii a ozveme sa vám čo najskôr. Prajem ešte pekný zvyšok dňa. Dovidenia.',
   appointment: 'Rozumiem. Požiadavku na objednanie pretlmočím ambulancii. Ambulancia sa vám ozve čo najskôr pre dohodnutie termínu. Prosím pripravte si dátum poslednej menštruácie. Prajem ešte pekný zvyšok dňa. Dovidenia.',
   newPatient: 'Sme radi že chcete byť našou pacientkou. Pre registráciu prosím vyplňte formulár na www.prvazenska.sk a kliknite na tlačidlo Preniesť kartu a následne postupujte podľa pokynov. Prajem ešte pekný zvyšok dňa. Dovidenia.',
