@@ -21,7 +21,7 @@ const copy = {
   newPatient: 'Sme radi že chcete byť našou pacientkou. Pre registráciu prosím vyplňte formulár na www.prvazenska.sk a kliknite na tlačidlo Preniesť kartu a následne postupujte podľa pokynov.',
   officeHours: 'Ordinačné hodiny sú: v pondelok od 9. do 17. hodiny, na objednávku aj medzi 17. a 18. hodinou. V utorok od 7. do 16. hodiny. Utorok je prednostne tehotenská poradňa. V stredu od 7. do 13. hodiny. Vo štvrtok od 10. do 17. hodiny, na objednávku aj medzi 17. a 18. hodinou. V piatok neordinujeme.',
   humanMessage: 'Samozrejme rozumiem. Po zaznení tónu zanechajte prosím krátky odkaz a my sa vám ozveme čo najskôr.',
-  requestSaved: 'Ďakujem. Vašu požiadavku sme zaznamenali a ambulancia sa vám ozve čo najskôr.',
+  requestSaved: 'Ďakujem. Vašu požiadavku sme zaznamenali a ambulancia sa vám ozve čo najskôr. Prajem pekný zvyšok dňa. Dovidenia.',
   messageSaved: 'Ďakujem. Váš odkaz sme zaznamenali a ambulancia sa vám ozve čo najskôr.',
   expired: 'Hovor sa nepodarilo dokončiť. Zavolajte prosím znova. Dovidenia.',
   technical: 'Momentálne máme technické problémy. Skúste prosím zavolať neskôr. Dovidenia.',
