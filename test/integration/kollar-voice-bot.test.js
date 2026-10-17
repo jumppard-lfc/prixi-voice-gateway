@@ -79,7 +79,7 @@ test('produkčný DID spustí speech-first flow MUDr. Kollára so schváleným �
 
   assert.equal(response.statusCode, 200);
   assert.match(response.body, /Prepáčte za zdržanie, tu je virtuálna sestra PriXi od pána doktora Kollára/);
-  assert.match(response.body, /Stručne povedzte, čo potrebujete/);
+  assert.match(response.body, /Stručne povedzte čo potrebujete/);
   assert.doesNotMatch(response.body, /život ohrozujúci stav|155 alebo 112/);
   assert.match(response.body, /input="speech dtmf"/);
   assert.match(response.body, /action="\/voice\/kollar\/answer"/);
@@ -101,12 +101,13 @@ test('akútny problém použije schválenú otázku a vytvorí požiadavku klini
   const callSid = 'CA-KOLLAR-ACUTE-000000000000000001';
   await incoming(callSid);
   const prompt = await answer(callSid, '1', true);
-  assert.match(prompt.body, /Povedzte, prosím v jednej vete váš akútny problém/);
+  assert.match(prompt.body, /Povedzte prosím v jednej vete váš akútny problém/);
 
   const completion = await answer(callSid, 'Mám silné bolesti v podbrušku');
   await flushPromises();
 
-  assert.match(completion.body, /Vašu požiadavku sme zaznamenali/);
+  assert.match(completion.body, /Váš akútny problém pretlmočím ambulancii/);
+  assert.match(completion.body, /Prajem ešte pekný zvyšok dňa\. Dovidenia/);
   assert.equal(sentEvents.length, 1);
   assert.equal(sentEvents[0].clinicId, '155');
   assert.equal(sentEvents[0].routingPhoneNumber, '+420910922076');
@@ -121,9 +122,11 @@ test('recept žiada názov lieku a počet balení', async () => {
   assert.match(prompt.body, /Aké lieky si prajete predpísať/);
   assert.match(prompt.body, /názov lieku a počet balení/);
 
-  await answer(callSid, 'Duphaston, dve balenia');
+  const completion = await answer(callSid, 'Duphaston, dve balenia');
   await flushPromises();
 
+  assert.match(completion.body, /Vašu požiadavku na recept pretlmočím ambulancii/);
+  assert.match(completion.body, /Prajem ešte pekný zvyšok dňa\. Dovidenia/);
   assert.equal(sentEvents.length, 1);
   assert.match(sentEvents[0].problemTranscript, /Kategória: žiadosť o recept/);
   assert.match(sentEvents[0].problemTranscript, /Duphaston, dve balenia/);
@@ -135,7 +138,8 @@ test('výsledok vyšetrenia vytvorí callback požiadavku', async () => {
   const completion = await answer(callSid, 'výsledky cytológie');
   await flushPromises();
 
-  assert.match(completion.body, /Ozveme sa vám čo najskôr/);
+  assert.match(completion.body, /Požiadavku pretlmočím ambulancii a ozveme sa vám čo najskôr/);
+  assert.match(completion.body, /Prajem ešte pekný zvyšok dňa\. Dovidenia/);
   assert.equal(sentEvents.length, 1);
   assert.match(sentEvents[0].problemTranscript, /Kategória: výsledok vyšetrenia/);
 });
@@ -148,6 +152,7 @@ test('objednanie oznámi callback a prípravu dátumu poslednej menštruácie', 
 
   assert.match(completion.body, /ozve čo najskôr pre dohodnutie termínu/);
   assert.match(completion.body, /pripravte si dátum poslednej menštruácie/);
+  assert.match(completion.body, /Prajem ešte pekný zvyšok dňa\. Dovidenia/);
   assert.equal(sentEvents.length, 1);
   assert.match(sentEvents[0].problemTranscript, /Kategória: žiadosť o objednanie/);
 });
@@ -160,6 +165,7 @@ test('nová pacientka dostane webový postup bez SMS alebo PriXi požiadavky', a
 
   assert.match(completion.body, /www\.prvazenska\.sk/);
   assert.match(completion.body, /Preniesť kartu/);
+  assert.match(completion.body, /Prajem ešte pekný zvyšok dňa\. Dovidenia/);
   assert.doesNotMatch(completion.body, /SMS/i);
   assert.equal(sentEvents.length, 0);
 });
@@ -172,6 +178,7 @@ test('ordinačné hodiny obsahujú celý týždeň a utorkovú tehotenskú porad
   assert.match(completion.body, /pondelok od 9\. do 17/);
   assert.match(completion.body, /Utorok je prednostne tehotenská poradňa/);
   assert.match(completion.body, /V piatok neordinujeme/);
+  assert.match(completion.body, /Prajem ešte pekný zvyšok dňa\. Dovidenia/);
   assert.equal(sentEvents.length, 0);
 });
 
@@ -184,6 +191,7 @@ test('voľba človeka nahrá odkaz s tónom, prepíše ho a odošle do PriXi', a
   assert.match(prompt.body, /Po zaznení tónu zanechajte prosím krátky odkaz/);
   assert.match(prompt.body, /<Record[^>]+action="\/voice\/kollar\/message"/);
   assert.match(prompt.body, /playBeep="true"/);
+  assert.doesNotMatch(prompt.body, /Dovidenia/);
 
   const completion = await post('/voice/kollar/message', {
     CallSid: callSid,
@@ -193,7 +201,8 @@ test('voľba človeka nahrá odkaz s tónom, prepíše ho a odošle do PriXi', a
   });
   await flushPromises();
 
-  assert.match(completion.body, /Váš odkaz sme zaznamenali/);
+  assert.match(completion.body, /Váš odkaz pretlmočím ambulancii/);
+  assert.match(completion.body, /Prajem ešte pekný zvyšok dňa\. Dovidenia/);
   assert.equal(sentEvents.length, 1);
   assert.equal(sentEvents[0].problemUrl, 'https://api.twilio.test/recordings/kollar-message');
   assert.equal(sentEvents[0].durationSeconds, 12);
