@@ -17,7 +17,7 @@ export function parseKollarRequestType(value: string): KollarRequestType | undef
   if (text === '2' || /(recept|predpis|predpisat|liek|lieky)/.test(text)) return 'prescription';
   if (text === '3' || /(vysled|laborator|cytolog|ster|nalez)/.test(text)) return 'results';
   if (text === '4' || /(objedna|termin|kontrol|prehliadk)/.test(text)) return 'appointment';
-  if (text === '5' || /(nov.*pacient|registrov|registrac|preniest kartu|prenos karty)/.test(text)) return 'new_patient';
+  if (text === '5' || /(nov.*pacient|stat.*pacient|chcem byt.*pacient|chcela by som byt.*pacient|registrov|registrac|prestup|preniest kartu|prenos karty)/.test(text)) return 'new_patient';
   if (text === '6' || /(ordinac|otvarac|kedy ordin|pracovn.*hodin)/.test(text)) return 'office_hours';
   if (text === '7' || /(clovek|sestr|operator|odkaz|ine|iny problem|neviem zaradit)/.test(text)) return 'human_message';
 

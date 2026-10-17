@@ -22,6 +22,8 @@ test('Kollar menu rozpozna prirodzene slovenske poziadavky', () => {
   assert.equal(parseKollarRequestType('volám kvôli výsledkom cytológie'), 'results');
   assert.equal(parseKollarRequestType('chcem sa objednať na prehliadku'), 'appointment');
   assert.equal(parseKollarRequestType('chcem byť nová pacientka'), 'new_patient');
+  assert.equal(parseKollarRequestType('chcela by som sa sa stať vašou pacientkou'), 'new_patient');
+  assert.equal(parseKollarRequestType('chcem k vám prestúpiť'), 'new_patient');
   assert.equal(parseKollarRequestType('aké máte ordinačné hodiny'), 'office_hours');
   assert.equal(parseKollarRequestType('chcem sa rozprávať so sestrou'), 'human_message');
 });
