@@ -19,7 +19,7 @@ const copy = {
   identity: 'Rozumiem. Povedzte prosím ešte vaše celé meno a rok narodenia.',
   results: 'Rozumiem. Požiadavku pretlmočím ambulancii a ozveme sa vám čo najskôr. Prajem ešte pekný zvyšok dňa. Dovidenia.',
   appointment: 'Rozumiem. Požiadavku na objednanie pretlmočím ambulancii. Ambulancia sa vám ozve čo najskôr pre dohodnutie termínu. Prosím pripravte si dátum poslednej menštruácie. Prajem ešte pekný zvyšok dňa. Dovidenia.',
-  newPatient: 'Sme radi že chcete byť našou pacientkou. Pre registráciu prosím vyplňte formulár na www.prvazenska.sk a kliknite na tlačidlo Preniesť kartu a následne postupujte podľa pokynov. Prajem ešte pekný zvyšok dňa. Dovidenia.',
+  newPatient: 'Sme radi že chcete byť našou pacientkou. Pre registráciu prosím vyplňte formulár na www. prvá ženská .sk a kliknite na tlačidlo Preniesť kartu a následne postupujte podľa pokynov. Prajem ešte pekný zvyšok dňa. Dovidenia.',
   officeHours: 'Ordinačné hodiny sú: v pondelok od deviatej do sedemnástej hodiny, na objednávku aj medzi sedemnástou a osemnástou hodinou. V utorok od siedmej do šestnástej hodiny. Utorok je prednostne tehotenská poradňa. V stredu od siedmej do trinástej hodiny. Vo štvrtok od desiatej do sedemnástej hodiny, na objednávku aj medzi sedemnástou a osemnástou hodinou. V piatok neordinujeme. Verím že som vám pomohla a prajem ešte pekný zvyšok dňa. Dovidenia.',
   humanMessage: 'Samozrejme rozumiem. Po zaznení tónu zanechajte prosím krátky odkaz a my sa vám ozveme čo najskôr.',
   acuteProblemSaved: 'Rozumiem. Váš akútny problém pretlmočím ambulancii a ozveme sa vám čo najskôr. Prajem ešte pekný zvyšok dňa. Dovidenia.',
