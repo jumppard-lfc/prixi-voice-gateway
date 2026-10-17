@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseKollarRequestType } = require('../../src/services/kollar-nlu.service');
+const { extractKollarBirthYear, parseKollarRequestType } = require('../../src/services/kollar-nlu.service');
 
 test('Kollar menu podporuje DTMF volby jedna az sedem', () => {
   assert.equal(parseKollarRequestType('1'), 'acute_problem');
@@ -20,4 +20,11 @@ test('Kollar menu rozpozna prirodzene slovenske poziadavky', () => {
   assert.equal(parseKollarRequestType('chcem byť nová pacientka'), 'new_patient');
   assert.equal(parseKollarRequestType('aké máte ordinačné hodiny'), 'office_hours');
   assert.equal(parseKollarRequestType('chcem sa rozprávať so sestrou'), 'human_message');
+});
+
+test('Kollar bot extrahuje iba platny rok narodenia', () => {
+  assert.equal(extractKollarBirthYear('narodila som sa v roku 1987'), '1987');
+  assert.equal(extractKollarBirthYear('1987.'), '1987');
+  assert.equal(extractKollarBirthYear('neviem'), undefined);
+  assert.equal(extractKollarBirthYear('2099'), undefined);
 });

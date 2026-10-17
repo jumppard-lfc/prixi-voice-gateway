@@ -23,3 +23,9 @@ export function parseKollarRequestType(value: string): KollarRequestType | undef
 
   return undefined;
 }
+
+export function extractKollarBirthYear(value: string): string | undefined {
+  const year = normalizeKollarSpeech(value).match(/\b(19\d{2}|20[0-2]\d)\b/)?.[1];
+  if (!year || Number(year) > new Date().getFullYear()) return undefined;
+  return year;
+}
