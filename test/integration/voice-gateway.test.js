@@ -51,7 +51,6 @@ test.before(() => {
     timezone: 'Europe/Bratislava',
   });
 });
-
 test.after(async () => {
   prixiService.getConfig = originalGetConfig;
   prixiService.sendEvent = originalSendEvent;
@@ -1370,6 +1369,7 @@ test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
   const vadkertiClinicConfig = await originalGetConfig('+421902647072');
   const celkovaConfig = await originalGetConfig('+420910927082');
   const benovaBaloghovaConfig = await originalGetConfig('+420910927739');
+  const kutakovaConfig = await originalGetConfig('+420910924343');
   const novotnyConfig = await originalGetConfig('+420910928021');
   const hmiraTwilioConfig = await originalGetConfig('+420910924407');
   const hmiraClinicConfig = await originalGetConfig('+421948834475');
@@ -1386,6 +1386,9 @@ test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
   assert.equal(celkovaConfig.pediatricMode, true);
   assert.equal(benovaBaloghovaConfig.clinicId, '143');
   assert.equal(benovaBaloghovaConfig.pediatricMode, false);
+  assert.equal(kutakovaConfig.clinicId, '158');
+  assert.equal(kutakovaConfig.voiceBotEnabled, true);
+  assert.equal(kutakovaConfig.pediatricMode, false);
   assert.equal(novotnyConfig.clinicId, '112');
   assert.equal(novotnyConfig.pediatricMode, false);
   assert.equal(hmiraTwilioConfig.clinicId, '151');

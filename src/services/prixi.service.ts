@@ -128,6 +128,15 @@ export class PrixiService {
       };
     }
 
+    if (phoneNumber === '+420910924343') {
+      return {
+        clinicId: '158',
+        voiceBotEnabled: true,
+        timezone: 'Europe/Bratislava',
+        pediatricMode: false,
+      };
+    }
+
     if (phoneNumber === '+420910928021') {
       return {
         clinicId: '112',

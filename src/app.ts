@@ -11,6 +11,7 @@ import { vadkertiVoiceBotRoutes } from './routes/vadkerti-voice-bot.controller';
 import { neurocentrumVoiceBotRoutes } from './routes/neurocentrum-voice-bot.controller';
 import { elisseaVoiceBotRoutes } from './routes/elissea-voice-bot.controller';
 import { kollarVoiceBotRoutes } from './routes/kollar-voice-bot.controller';
+import { kutakovaVoiceBotRoutes } from './routes/kutakova-voice-bot.controller';
 
 const KLOSTERMANN_GREETING_PATH = resolve(__dirname, 'assets/audio/klostermann-greeting-v5.wav');
 const DOBROVODSKA_GREETING_PATH = resolve(__dirname, 'assets/audio/dobrovodska-1-greeting-v2.wav');
@@ -165,6 +166,7 @@ app.register(vadkertiVoiceBotRoutes, { prefix: '/voice' });
 app.register(neurocentrumVoiceBotRoutes, { prefix: '/voice' });
 app.register(elisseaVoiceBotRoutes, { prefix: '/voice' });
 app.register(kollarVoiceBotRoutes, { prefix: '/voice' });
+app.register(kutakovaVoiceBotRoutes, { prefix: '/voice' });
 app.register(voiceBotBuilderRoutes);
 
 const start = async () => {

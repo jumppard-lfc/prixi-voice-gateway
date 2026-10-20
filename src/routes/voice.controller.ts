@@ -22,6 +22,8 @@ import { finalizeAbandonedElisseaCall, startElisseaVoiceBot } from './elissea-vo
 import { elisseaBotConfig } from '../config/elissea.config';
 import { finalizeAbandonedKollarCall, startKollarVoiceBot } from './kollar-voice-bot.controller';
 import { kollarBotConfig } from '../config/kollar.config';
+import { finalizeAbandonedKutakovaCall, startKutakovaVoiceBot } from './kutakova-voice-bot.controller';
+import { kutakovaBotConfig } from '../config/kutakova.config';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
@@ -29,6 +31,8 @@ const CELKOVA_PHONE_NUMBER = '+420910927082';
 const CELKOVA_CLINIC_ID = '142';
 const BENOVA_BALOGHOVA_PHONE_NUMBER = '+420910927739';
 const BENOVA_BALOGHOVA_CLINIC_ID = '143';
+const KUTAKOVA_PHONE_NUMBER = kutakovaBotConfig.clinic.inboundTwilioNumber;
+const KUTAKOVA_CLINIC_ID = kutakovaBotConfig.clinic.clinicId;
 const KLOSTERMANN_PHONE_NUMBER = '+420910924239';
 const NOVOTNY_PHONE_NUMBER = '+420910928021';
 const NOVOTNY_CLINIC_ID = '112';
@@ -98,6 +102,7 @@ const POPRAD_ONCOLOGY_COMPLETION = 'Ďakujem. Vašu požiadavku odovzdám oddele
 const PROTECTED_PRODUCTION_TWILIO_NUMBERS = new Set([
   CELKOVA_PHONE_NUMBER,
   BENOVA_BALOGHOVA_PHONE_NUMBER,
+  KUTAKOVA_PHONE_NUMBER,
   KLOSTERMANN_PHONE_NUMBER,
   NOVOTNY_PHONE_NUMBER,
   HMIRA_PHONE_NUMBER,
@@ -174,6 +179,7 @@ function assertClinicRoutingIsolation(
     [DOBROVODSKA_ROUTING_PHONE_NUMBER, DOBROVODSKA_CLINIC_ID],
     [CELKOVA_PHONE_NUMBER, CELKOVA_CLINIC_ID],
     [BENOVA_BALOGHOVA_PHONE_NUMBER, BENOVA_BALOGHOVA_CLINIC_ID],
+    [KUTAKOVA_PHONE_NUMBER, KUTAKOVA_CLINIC_ID],
     [novotnyVoiceBotPhoneNumber, NOVOTNY_CLINIC_ID],
     [HMIRA_PHONE_NUMBER, HMIRA_CLINIC_ID],
     [HMIRA_ROUTING_PHONE_NUMBER, HMIRA_CLINIC_ID],
@@ -286,6 +292,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       || normalizedTo === ELISSEA_TWILIO_PHONE_NUMBER
       || normalizedTo === KOLLAR_TWILIO_PHONE_NUMBER
       || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
+      || normalizedTo === KUTAKOVA_PHONE_NUMBER
       || normalizedTo === normalizeSlovakPhoneAddress(novotnyVoiceBotPhoneNumber)
       || isZdrahalovaRoute(body.To)
       || isHmiraDedicatedDestination
@@ -297,6 +304,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       || normalizedTo === KOLLAR_TWILIO_PHONE_NUMBER
       || normalizedTo === CELKOVA_PHONE_NUMBER
       || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
+      || normalizedTo === KUTAKOVA_PHONE_NUMBER
       || normalizedTo === KLOSTERMANN_PHONE_NUMBER
       || normalizedTo === normalizeSlovakPhoneAddress(novotnyVoiceBotPhoneNumber)
       || isZdrahalovaRoute(body.To)
@@ -316,6 +324,11 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     if (normalizedTo === KOLLAR_TWILIO_PHONE_NUMBER) {
       fastify.log.info({ from: fromNumber, to: body.To }, 'Routing call to MUDr. Kollar production voice bot');
       return startKollarVoiceBot(fastify, reply, body);
+    }
+
+    if (normalizedTo === KUTAKOVA_PHONE_NUMBER) {
+      fastify.log.info({ from: fromNumber, to: body.To }, 'Routing call to MUDr. Kutakova pre-registration voice bot');
+      return startKutakovaVoiceBot(reply, body);
     }
 
     if (isNeurocentrumCall) {
@@ -865,5 +878,6 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     finalizeAbandonedDemoCall(body.CallSid, body.CallStatus);
     finalizeAbandonedElisseaCall(fastify, body.CallSid, new Date().toISOString());
     finalizeAbandonedKollarCall(fastify, body.CallSid, new Date().toISOString());
+    finalizeAbandonedKutakovaCall(body.CallSid);
   });
 }
