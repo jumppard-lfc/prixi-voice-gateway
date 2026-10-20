@@ -160,6 +160,13 @@ export interface VoiceBotPrixiRequestCapture {
   /** Optional clinic override for a dedicated inbound Twilio number sharing this exact flow. */
   clinicIdsByInboundTwilioNumber?: Record<string, string>;
   requestVariable: string;
+  /** Optional label used for the primary request value in the PriXi transcript. */
+  requestLabel?: string;
+  /** Additional captured answers included as labelled lines in the PriXi transcript. */
+  detailVariables?: Array<{
+    variable: string;
+    label: string;
+  }>;
   timePreferenceVariable?: string;
   /** Submit as soon as this node is reached; the end node remains a fallback. */
   dispatchAtNodeId?: string;
@@ -316,6 +323,19 @@ export function validateVoiceBotConfig(config: Partial<VoiceBotConfig>): VoiceBo
     }
     if (capture.timePreferenceVariable && !storedVariables.has(capture.timePreferenceVariable)) {
       errors.push(`Premenná preferovaného času „${capture.timePreferenceVariable}“ sa v rozhodovacom strome neukladá.`);
+    }
+    if (capture.requestLabel !== undefined && !capture.requestLabel.trim()) {
+      errors.push('Názov hlavnej PriXi požiadavky nemôže byť prázdny.');
+    }
+    for (const detail of capture.detailVariables || []) {
+      if (!detail.variable?.trim()) {
+        errors.push('Doplňujúci údaj PriXi potrebuje názov premennej.');
+      } else if (!storedVariables.has(detail.variable)) {
+        errors.push(`Premenná doplňujúceho údaja PriXi „${detail.variable}“ sa v rozhodovacom strome neukladá.`);
+      }
+      if (!detail.label?.trim()) {
+        errors.push(`Doplňujúci údaj PriXi „${detail.variable || 'bez premennej'}“ potrebuje popis.`);
+      }
     }
     if (capture.dispatchAtNodeId && !config.conversationTree?.nodes.some((node) => node.id === capture.dispatchAtNodeId)) {
       errors.push(`Uzol skorého zápisu PriXi požiadavky „${capture.dispatchAtNodeId}“ v rozhodovacom strome neexistuje.`);

@@ -253,6 +253,48 @@ test('prezentačný strom zachytí voľné hlasové údaje a vytvorí lead bez p
   assert.equal(events.some((event) => event.event === 'lead_collected'), true);
 });
 
+test('NÚRCH číslo zistí ambulanciu, zachytí problém a zapíše ho do PriXi kliniky 159', async () => {
+  const config = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/nurch-reumatologia-demo.json'), 'utf8'));
+  const validation = validateVoiceBotConfig(config);
+  assert.equal(validation.valid, true, validation.errors.join(' '));
+  await save(config);
+
+  const sentEvents = [];
+  const originalSendEvent = prixiService.sendEvent;
+  prixiService.sendEvent = async (event) => sentEvents.push(event);
+
+  try {
+    const callSid = 'CA-NURCH-PRIXI-REQUEST-159';
+    const common = { From: '+421900000159', To: '+420910925307', CallSid: callSid };
+    const routed = await signedPost('/voice/incoming', common);
+    assert.match(routed.body, /<Redirect>\/voice\/demo\/nurch-reumatologia-demo\/start<\/Redirect>/);
+
+    let response = await signedPost('/voice/demo/nurch-reumatologia-demo/start', common);
+    assert.match(response.body, /Národný ústav reumatických chorôb/);
+    assert.match(response.body, /pediatrickej reumatologickej pre deti/);
+    assert.match(response.body, /ortopedickej, osteologickej, internej alebo rehabilitačnej/);
+
+    response = await signedPost(gatherAction(response.body), { ...common, SpeechResult: 'volám pre dieťa' });
+    assert.match(response.body, /Vybrali ste možnosť: pediatrická reumatologická ambulancia pre deti/);
+    assert.match(response.body, /stručne opíšte/);
+
+    response = await signedPost(gatherAction(response.body), {
+      ...common,
+      SpeechResult: 'Dcéra má bolesti a opuchy kĺbov a potrebujeme kontrolu.',
+    });
+    await new Promise(resolve => setImmediate(resolve));
+
+    assert.match(response.body, /Vašu ukážkovú požiadavku som zaznamenala pre ambulanciu: pediatrická reumatologická ambulancia pre deti/);
+    assert.equal(sentEvents.length, 1);
+    assert.equal(sentEvents[0].clinicId, '159');
+    assert.equal(sentEvents[0].routingPhoneNumber, '+420910925307');
+    assert.match(sentEvents[0].problemTranscript, /Ambulancia: pediatrická reumatologická ambulancia pre deti/);
+    assert.match(sentEvents[0].problemTranscript, /Problém pacienta: Dcéra má bolesti a opuchy kĺbov a potrebujeme kontrolu\./);
+  } finally {
+    prixiService.sendEvent = originalSendEvent;
+  }
+});
+
 test('všetky prezentačné čísla smerujú na rovnaký univerzálny ambulantný bot', async () => {
   const presentationConfig = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/prixi-prezentacia-demo.json'), 'utf8'));
   const salonConfig = JSON.parse(readFileSync(path.join(__dirname, '../../configs/demo-voice-bots/prixi-salony-stupava-demo.json'), 'utf8'));

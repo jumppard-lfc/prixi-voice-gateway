@@ -450,6 +450,10 @@ function dispatchTreePrixiRequest(session: TreeSession): boolean {
   const timePreference = capture.timePreferenceVariable
     ? session.answers[capture.timePreferenceVariable]?.label
     : undefined;
+  const details = (capture.detailVariables || []).flatMap((detail) => {
+    const value = session.answers[detail.variable]?.label;
+    return value ? [`${detail.label}: ${value}`] : [];
+  });
   const event: VoicemailRecordedEvent = {
     event: 'voicemail_recorded',
     clinicId,
@@ -465,10 +469,11 @@ function dispatchTreePrixiRequest(session: TreeSession): boolean {
     nameTranscript: session.answers.name?.label || '',
     birthYearTranscript: '',
     problemTranscript: [
-      '[PriXi univerzálne ambulantné live demo]',
+      `[PriXi voice bot – ${session.config.clinic.displayName}]`,
       'Stav hovoru: dokončený',
       'Demo požiadavka: áno – nejde o reálnu rezerváciu ani požiadavku pacienta',
-      `Kategória: ${request}`,
+      `${capture.requestLabel?.trim() || 'Kategória'}: ${request}`,
+      ...details,
       ...(timePreference ? [`Preferovaný čas: ${timePreference}`] : []),
       `Telefón volajúceho: ${session.phone}`,
     ].join('\n'),

@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "id": "nurch-reumatologia-demo",
+  "clinic": {
+    "displayName": "Národný ústav reumatických chorôb",
+    "specialty": "reumatológia a pediatrická reumatológia",
+    "phoneNumber": "+420910925307",
+    "locale": "sk-SK",
+    "timezone": "Europe/Bratislava"
+  },
+  "provider": {
+    "kind": "custom",
+    "mode": "demo_mock"
+  },
+  "services": [],
+  "practitioners": [],
+  "routing": {
+    "inboundTwilioNumbers": [
+      "+420910925307"
+    ]
+  },
+  "prixiRequestCapture": {
+    "clinicId": "159",
+    "requestVariable": "ambulance",
+    "requestLabel": "Ambulancia",
+    "detailVariables": [
+      {
+        "variable": "patientProblem",
+        "label": "Problém pacienta"
+      }
+    ],
+    "dispatchAtNodeId": "koniec"
+  },
+  "conversation": {
+    "confirmService": false,
+    "confirmDatePreference": false,
+    "confirmSlot": false,
+    "confirmName": false,
+    "requireTerms": false,
+    "sendConfirmationSms": false,
+    "useDtmfFallback": true,
+    "playPromptTone": false
+  },
+  "copy": {
+    "questionProsody": {
+      "pitch": "+2%",
+      "rate": "95%",
+      "pauseMs": 180
+    }
+  },
+  "conversationTree": {
+    "entryNodeId": "vyber-ambulancie",
+    "nodes": [
+      {
+        "id": "vyber-ambulancie",
+        "type": "question",
+        "bridge": "Dobrý deň. Vitajte v ukážke virtuálnej asistentky PriXi pre Národný ústav reumatických chorôb v Piešťanoch.",
+        "prompt": "Povedzte, prosím, do ktorej ambulancie voláte. Reumatologickej pre dospelých, pediatrickej reumatologickej pre deti, ortopedickej, osteologickej, internej alebo rehabilitačnej?",
+        "retryPrompt": "Pre reumatologickú ambulanciu pre dospelých stlačte jednotku. Pre pediatrickú reumatologickú dvojku. Pre ortopedickú trojku. Pre osteologickú štvorku. Pre internú päťku. Pre rehabilitačnú šestku.",
+        "storeAs": "ambulance",
+        "confirmSelection": false,
+        "choices": [
+          {
+            "id": "reumatologicka-dospeli",
+            "label": "reumatologická ambulancia pre dospelých",
+            "voiceAliases": [
+              "pre dospelých",
+              "dospelí",
+              "dospelého",
+              "dospeláckej",
+              "dospelej",
+              "dospelá reumatológia"
+            ],
+            "dtmf": "1",
+            "nextNodeId": "problem"
+          },
+          {
+            "id": "pediatricka-reumatologicka",
+            "label": "pediatrická reumatologická ambulancia pre deti",
+            "voiceAliases": [
+              "pediatrická reumatologická ambulancia",
+              "pediatrická reumatológia",
+              "detská reumatológia",
+              "detskej",
+              "detská",
+              "pediatrická",
+              "pediatrickej",
+              "pre deti",
+              "dieťa",
+              "deti"
+            ],
+            "dtmf": "2",
+            "nextNodeId": "problem"
+          },
+          {
+            "id": "ortopedicka",
+            "label": "ortopedická ambulancia",
+            "voiceAliases": [
+              "ortopédia",
+              "ortopedická",
+              "ortopéd"
+            ],
+            "dtmf": "3",
+            "nextNodeId": "problem"
+          },
+          {
+            "id": "osteologicka",
+            "label": "osteologická ambulancia",
+            "voiceAliases": [
+              "osteológia",
+              "osteologická",
+              "osteológ"
+            ],
+            "dtmf": "4",
+            "nextNodeId": "problem"
+          },
+          {
+            "id": "interna",
+            "label": "interná ambulancia",
+            "voiceAliases": [
+              "interná",
+              "interné",
+              "interna"
+            ],
+            "dtmf": "5",
+            "nextNodeId": "problem"
+          },
+          {
+            "id": "rehabilitacna",
+            "label": "ambulancia fyziatrie, balneológie a liečebnej rehabilitácie",
+            "voiceAliases": [
+              "rehabilitačná ambulancia",
+              "rehabilitácia",
+              "fyziatria",
+              "FBLR"
+            ],
+            "dtmf": "6",
+            "nextNodeId": "problem"
+          }
+        ]
+      },
+      {
+        "id": "problem",
+        "type": "input",
+        "bridge": "Ďakujem. Vybrali ste možnosť: {{ambulance}}.",
+        "prompt": "Teraz, prosím, stručne opíšte, s čím vám môžeme pomôcť.",
+        "retryPrompt": "Prosím, stručne povedzte svoj problém alebo požiadavku ešte raz.",
+        "storeAs": "patientProblem",
+        "confirmInput": false,
+        "hints": [
+          "objednať sa",
+          "kontrola",
+          "výsledky",
+          "recept",
+          "bolesť kĺbov",
+          "zmena termínu"
+        ],
+        "nextNodeId": "koniec"
+      },
+      {
+        "id": "koniec",
+        "type": "end",
+        "text": "Ďakujem. Vašu ukážkovú požiadavku som zaznamenala pre ambulanciu: {{ambulance}}. Pracovníci ambulancie ju nájdu v PriXi spolu s vaším telefónnym číslom. Dovidenia.",
+        "outcome": "complete"
+      }
+    ]
+  }
+}
