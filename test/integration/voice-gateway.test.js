@@ -1442,3 +1442,67 @@ test('MUDr. Dobrovodska pouziva dvojkrokovy audio flow', async () => {
     Settings.now = originalNow;
   }
 });
+
+test('MUDr. Dobrovodska ma 23. oktobra automaticky dovolenkovy flow', async () => {
+  const originalGetConfig = prixiService.getConfig;
+  const originalSendEventForVacation = prixiService.sendEvent;
+  const originalTranscribeForVacation = sttService.transcribeAudioUrl;
+  const originalNow = Settings.now;
+  prixiService.getConfig = async () => ({
+    clinicId: '95',
+    voiceBotEnabled: true,
+    timezone: 'Europe/Prague',
+  });
+  prixiService.sendEvent = async () => {};
+  sttService.transcribeAudioUrl = async () => 'Jana Nováková, potřebuji předepsat léky.';
+  const vacationTimestamp = DateTime.fromISO('2026-10-23T18:00:00+02:00').toMillis();
+  const mondayTimestamp = DateTime.fromISO('2026-10-26T09:00:00+01:00').toMillis();
+
+  try {
+    Settings.now = () => vacationTimestamp;
+    const vacationIncoming = await signedVoicePost('/voice/incoming', {
+      From: '+420700000088',
+      To: '+421800232793',
+      CallSid: 'CA-DOBROVODSKA-VACATION-000000000001',
+    });
+
+    assert.equal(vacationIncoming.statusCode, 200);
+    assert.match(vacationIncoming.body, /language="cs-CZ" voice="Google\.cs-CZ-Wavenet-B"/);
+    assert.match(vacationIncoming.body, /Dnes má ordinace dovolenou/);
+    assert.match(vacationIncoming.body, /pondělí 26\. října/);
+    assert.match(vacationIncoming.body, /Prosím nezavěšujte/);
+    assert.match(vacationIncoming.body, /dobrovodskaVacation=true/);
+    assert.doesNotMatch(vacationIncoming.body, /dobrovodska-1-greeting-v2\.wav/);
+
+    const completionEndpoint = '/voice/record-problem?forwardedFrom=%2B421911500609&pediatricMode=false&dentalMode=false&dobrovodskaVacation=true';
+    const vacationCompletion = await signedVoicePost(completionEndpoint, {
+      From: '+420700000088',
+      CallSid: 'CA-DOBROVODSKA-VACATION-000000000001',
+      RecordingUrl: 'https://api.twilio.test/dobrovodska-vacation-request',
+      RecordingDuration: '8',
+    });
+
+    assert.equal(vacationCompletion.statusCode, 200);
+    assert.match(vacationCompletion.body, /Vaši zprávu jsme zaznamenali/);
+    assert.match(vacationCompletion.body, /pondělí 26\. října/);
+    assert.doesNotMatch(vacationCompletion.body, /dobrovodska-2-completion-v2\.wav/);
+
+    Settings.now = () => mondayTimestamp;
+    const mondayIncoming = await signedVoicePost('/voice/incoming', {
+      From: '+420700000089',
+      To: '+421800232793',
+      CallSid: 'CA-DOBROVODSKA-MONDAY-0000000000001',
+    });
+
+    assert.equal(mondayIncoming.statusCode, 200);
+    assert.match(mondayIncoming.body, /dobrovodska-1-greeting-v2\.wav/);
+    assert.match(mondayIncoming.body, /dobrovodskaVacation=false/);
+    assert.doesNotMatch(mondayIncoming.body, /Dnes má ordinace dovolenou/);
+    await new Promise(resolve => setImmediate(resolve));
+  } finally {
+    prixiService.getConfig = originalGetConfig;
+    prixiService.sendEvent = originalSendEventForVacation;
+    sttService.transcribeAudioUrl = originalTranscribeForVacation;
+    Settings.now = originalNow;
+  }
+});

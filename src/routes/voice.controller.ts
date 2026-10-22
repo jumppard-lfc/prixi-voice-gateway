@@ -24,6 +24,7 @@ import { finalizeAbandonedKollarCall, startKollarVoiceBot } from './kollar-voice
 import { kollarBotConfig } from '../config/kollar.config';
 import { finalizeAbandonedKutakovaCall, startKutakovaVoiceBot } from './kutakova-voice-bot.controller';
 import { kutakovaBotConfig } from '../config/kutakova.config';
+import { DateTime } from 'luxon';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
@@ -70,6 +71,9 @@ const KLOSTERMANN_GREETING_MEDIA_PATH = '/media/klostermann-greeting-v5.wav';
 const KLOSTERMANN_GREETING_FILE = resolve(__dirname, '../assets/audio/klostermann-greeting-v5.wav');
 const DOBROVODSKA_GREETING_FILE = resolve(__dirname, '../assets/audio/dobrovodska-1-greeting-v2.wav');
 const DOBROVODSKA_COMPLETION_FILE = resolve(__dirname, '../assets/audio/dobrovodska-2-completion-v2.wav');
+const DOBROVODSKA_VACATION_DATE = '2026-10-23';
+const DOBROVODSKA_VACATION_GREETING = 'Dobrý den, tady virtuální sestra PriXi paní doktorky Dobrovodské. Dnes má ordinace dovolenou, takže vašemu požadavku se budeme věnovat v pondělí dvacátého šestého října. Prosím nezavěšujte. Po zaznění signálu mi řekněte své jméno a s čím vám můžeme pomoci.';
+const DOBROVODSKA_VACATION_COMPLETION = 'Děkuji. Vaši zprávu jsme zaznamenali a budeme se jí věnovat v pondělí dvacátého šestého října. Na shledanou.';
 const HMIRA_GREETING_FILE = resolve(__dirname, '../assets/audio/hmira-1-greeting-v1.wav');
 const HMIRA_COMPLETION_FILE = resolve(__dirname, '../assets/audio/hmira-2-completion-v1.wav');
 
@@ -88,6 +92,12 @@ function isDobrovodskaRoute(phone?: string): boolean {
     || phone.includes('322289055')
     || phone.includes('800232793');
 }
+
+function isDobrovodskaVacationDay(): boolean {
+  const now = DateTime.now().setZone('Europe/Prague');
+  return now.isValid && now.toISODate() === DOBROVODSKA_VACATION_DATE;
+}
+
 const DEFAULT_GREETING = 'Dobrý deň, dovolali ste sa do ambulancie. Pre zanechanie odkazu popíšte po zaznení tónu najprv váš problém a po skončení stlačte hociktoré tlačidlo.';
 const PEDIATRIC_GREETING = 'Dobrý deň, dovolali ste sa do pediatrickej ambulancie doktorky Čelkovej. Ak ide o náhly život ohrozujúci stav, volajte tiesňovú linku 155 alebo 112. V opačnom prípade nám prosím po zaznení tónu stručne povedzte, s čím sa na ambulanciu obraciate. Môže ísť napríklad o zdravotné ťažkosti dieťaťa, predpis liekov, výsledky vyšetrenia alebo objednanie. Po skončení stlačte ľubovoľné tlačidlo.';
 const ORTHOPEDIC_GREETING = 'Dobrý deň, dovolali ste sa do ortopedickej ambulancie pani doktorky Miroslavy Beňovej Baloghovej. Po zaznení tónu nám, prosím, povedzte, s čím vám môžeme pomôcť. Po skončení stlačte ľubovoľné tlačidlo.';
@@ -503,15 +513,16 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       const isHmiraNumber = isHmiraRoute(forwardedFrom);
       const isZdrahalovaNumber = isZdrahalovaRoute(forwardedFrom);
       const isPopradOncologyNumber = isPopradOncologyRoute(forwardedFrom);
+      const isDobrovodskaNumber = isDobrovodskaRoute(forwardedFrom) || isDobrovodskaRoute(body.To) || isDobrovodskaRoute(carrierForwardedFrom);
+      const isDobrovodskaVacation = isDobrovodskaNumber && isDobrovodskaVacationDay();
       const isDedicatedVoiceBotNumber = isCelkovaNumber || isBenovaBaloghovaNumber || isNovotnyNumber || isHmiraNumber || isZdrahalovaNumber || isPopradOncologyNumber;
 
-      if (!isDedicatedVoiceBotNumber && !ivrService.shouldAllowCall(config, forwardedFrom)) {
+      if (!isDedicatedVoiceBotNumber && !isDobrovodskaVacation && !ivrService.shouldAllowCall(config, forwardedFrom)) {
         twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Toto číslo je momentálne nedostupné.');
         twiml.reject();
         return reply.type('text/xml').send(twiml.toString());
       }
 
-      const isDobrovodskaNumber = isDobrovodskaRoute(forwardedFrom) || isDobrovodskaRoute(body.To) || isDobrovodskaRoute(carrierForwardedFrom);
       const pediatricMode = isCelkovaNumber || isZdrahalovaNumber || (!isBenovaBaloghovaNumber && !isNovotnyNumber && !isHmiraNumber && config.pediatricMode === true);
       const dentalMode = isNovotnyNumber || isHmiraNumber;
       const greeting = isZdrahalovaNumber
@@ -529,7 +540,12 @@ export async function voiceRoutes(fastify: FastifyInstance) {
                   ? PEDIATRIC_GREETING
                   : DEFAULT_GREETING);
 
-      if (isDobrovodskaNumber && existsSync(DOBROVODSKA_GREETING_FILE)) {
+      if (isDobrovodskaVacation) {
+        twiml.say(
+          { language: 'cs-CZ', voice: 'Google.cs-CZ-Wavenet-B' as any },
+          DOBROVODSKA_VACATION_GREETING
+        );
+      } else if (isDobrovodskaNumber && existsSync(DOBROVODSKA_GREETING_FILE)) {
         twiml.play(`${getPublicBaseUrl(request)}/media/dobrovodska-1-greeting-v2.wav`);
       } else if (isHmiraNumber && existsSync(HMIRA_GREETING_FILE)) {
         twiml.play(`${getPublicBaseUrl(request)}/media/hmira-1-greeting-v1.wav`);
@@ -546,7 +562,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         dentalMode,
       });
       twiml.record({
-        action: `/voice/record-problem?forwardedFrom=${encodeURIComponent(forwardedFrom)}&pediatricMode=${pediatricMode}&dentalMode=${dentalMode}`,
+        action: `/voice/record-problem?forwardedFrom=${encodeURIComponent(forwardedFrom)}&pediatricMode=${pediatricMode}&dentalMode=${dentalMode}&dobrovodskaVacation=${isDobrovodskaVacation}`,
         playBeep: true,
         maxLength: 120,
         timeout: dentalMode || isZdrahalovaNumber || isPopradOncologyNumber ? 3 : 10
@@ -590,6 +606,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     }
 
     const isDobrovodskaNumber = isDobrovodskaRoute(forwardedFrom);
+    const isDobrovodskaVacation = isDobrovodskaNumber && query.dobrovodskaVacation === 'true';
     const isZdrahalovaNumber = isZdrahalovaRoute(forwardedFrom);
     const isPopradOncologyNumber = isPopradOncologyRoute(forwardedFrom);
     if (isDobrovodskaNumber || dentalMode || isZdrahalovaNumber || isPopradOncologyNumber) {
@@ -597,7 +614,12 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         callCompleted: true,
         callEndedAt: new Date().toISOString(),
       }) || draft;
-      if (isDobrovodskaNumber && existsSync(DOBROVODSKA_COMPLETION_FILE)) {
+      if (isDobrovodskaVacation) {
+        twiml.say(
+          { language: 'cs-CZ', voice: 'Google.cs-CZ-Wavenet-B' as any },
+          DOBROVODSKA_VACATION_COMPLETION
+        );
+      } else if (isDobrovodskaNumber && existsSync(DOBROVODSKA_COMPLETION_FILE)) {
         twiml.play(`${getPublicBaseUrl(request)}/media/dobrovodska-2-completion-v2.wav`);
       } else if (isHmiraRoute(forwardedFrom) && existsSync(HMIRA_COMPLETION_FILE)) {
         twiml.play(`${getPublicBaseUrl(request)}/media/hmira-2-completion-v1.wav`);
