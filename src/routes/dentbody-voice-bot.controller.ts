@@ -15,7 +15,7 @@ const sayOptions: any = { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-B' };
 const MAX_ANSWERED_QUESTIONS = 10;
 
 const copy = {
-  greeting: 'Dobrý deň, dovolali ste sa do RTG pracoviska Dentbody X-ray v Petržalke. Som virtuálna asistentka PriXi. S čím vám môžem pomôcť? Môžete sa opýtať napríklad na ordinačné hodiny, žiadanku, platbu alebo výsledky.',
+  greeting: 'Dobrý deň, tu virtuálna asistentka PriXi z RTG pracoviska DentBody X-Ray v Petržalke. S čím vám môžem pomôcť? Môžete sa opýtať napríklad na ordinačné hodiny, žiadanku, platbu alebo výsledky.',
   followUp: 'Môžem vám pomôcť ešte s niečím?',
   continue: 'Nech sa páči, povedzte mi vašu otázku.',
   retry: 'Prepáčte, otázke som nerozumela. Skúste ju prosím povedať ešte raz. Pre ordinačné hodiny stlačte jednotku. Pre objednanie a žiadanku dvojku. Pre snímky a výsledky trojku. Pre adresu a kontakt štvorku.',
