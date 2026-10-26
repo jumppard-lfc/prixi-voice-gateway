@@ -107,6 +107,25 @@ test('prirodzené nie ďakujem hovor slušne ukončí', async () => {
   assert.doesNotMatch(response.body, /<Gather/);
 });
 
+test('po deviatej otázke pokračuje a po desiatej odpovedi hovor ukončí', async () => {
+  const callSid = 'CA-DENTBODY-LIMIT-0000000000000001';
+  await incoming(callSid);
+
+  let response;
+  for (let question = 1; question <= 9; question += 1) {
+    response = await answer(callSid, 'Môžem platiť kartou?');
+    assert.match(response.body, /Môžem vám pomôcť ešte s niečím/);
+    assert.match(response.body, /<Gather/);
+    assert.doesNotMatch(response.body, /<Hangup/);
+  }
+
+  response = await answer(callSid, 'Potrebujem žiadanku?');
+  assert.match(response.body, /aj bez žiadanky alebo výmenného lístka/);
+  assert.match(response.body, /Ďakujem za zavolanie/);
+  assert.match(response.body, /<Hangup/);
+  assert.doesNotMatch(response.body, /Môžem vám pomôcť ešte s niečím/);
+});
+
 test('nesprávny clinic ID zastaví Dentbody flow', async () => {
   const validGetConfig = prixiService.getConfig;
   prixiService.getConfig = async () => ({

@@ -12,6 +12,7 @@ import { prixiService } from '../services/prixi.service';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 const sayOptions: any = { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-B' };
+const MAX_ANSWERED_QUESTIONS = 10;
 
 const copy = {
   greeting: 'Dobrý deň, dovolali ste sa do RTG pracoviska Dentbody X-ray v Petržalke. Som virtuálna asistentka PriXi. S čím vám môžem pomôcť? Môžete sa opýtať napríklad na ordinačné hodiny, žiadanku, platbu alebo výsledky.',
@@ -141,7 +142,7 @@ export async function dentbodyVoiceBotRoutes(fastify: FastifyInstance): Promise<
     session.failedAttempts = 0;
     session.answeredQuestions += 1;
     const response = buildDentbodyAnswer(intents, answer);
-    if (session.answeredQuestions >= 3) {
+    if (session.answeredQuestions >= MAX_ANSWERED_QUESTIONS) {
       dentbodySessionService.delete(session.callSid);
       return renderEnd(reply, `${response} ${copy.closing}`);
     }
