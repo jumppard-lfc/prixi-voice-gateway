@@ -6,6 +6,7 @@ const {
   dentbodyOfficeHoursAnswer,
   isDentbodyFinish,
   parseDentbodyIntents,
+  shouldEndDentbodyConversation,
 } = require('../../src/services/dentbody-nlu.service');
 
 test('rozpozná viac informačných zámerov v jednej prirodzenej otázke', () => {
@@ -77,6 +78,18 @@ test('bot ukončí rozhovor po prirodzenom poďakovaní', () => {
   assert.equal(isDentbodyFinish('Potrebujem výsledok'), false);
   assert.equal(isDentbodyFinish('Nie, chcem sa opýtať na žiadanku'), false);
   assert.equal(isDentbodyFinish('Nepotrebujem výmenný lístok'), false);
+});
+
+test('krátku zápornú odpoveď vyhodnotí podľa kontextu doplňujúcej otázky', () => {
+  assert.equal(shouldEndDentbodyConversation('Už nie, ďakujem pekne', true, false), true);
+  assert.equal(shouldEndDentbodyConversation('Nie', true, false), true);
+  assert.equal(shouldEndDentbodyConversation('Ďakujem pekne', true, false), true);
+  assert.equal(shouldEndDentbodyConversation('Už nie, ďakujem pekne', false, false), false);
+  assert.equal(shouldEndDentbodyConversation('Nie', false, false), false);
+  assert.equal(shouldEndDentbodyConversation('Ďakujem za informáciu', true, false), true);
+  assert.equal(shouldEndDentbodyConversation('Nie, ale kedy máte otvorené?', true, true), false);
+  assert.equal(shouldEndDentbodyConversation('Nie, mám ešte jednu otázku', true, false), false);
+  assert.equal(shouldEndDentbodyConversation('Nepotrebujem výmenný lístok', true, true), false);
 });
 
 test('žiadosť o medicínske odporúčanie nevyberá typ snímky', () => {

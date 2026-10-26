@@ -4,6 +4,7 @@ export interface DentbodySession {
   clinicId: string;
   answeredQuestions: number;
   failedAttempts: number;
+  awaitingFollowUp: boolean;
   startedAt: string;
   expiresAt: number;
 }
@@ -20,6 +21,7 @@ export class DentbodySessionService {
       clinicId,
       answeredQuestions: 0,
       failedAttempts: 0,
+      awaitingFollowUp: false,
       startedAt: new Date().toISOString(),
       expiresAt: Date.now() + SESSION_TTL_MS,
     };

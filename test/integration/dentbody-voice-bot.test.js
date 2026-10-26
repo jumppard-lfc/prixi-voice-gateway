@@ -132,6 +132,31 @@ test('nie to bude všetko ďakujem ukončí hovor bez chybového fallbacku', asy
   assert.doesNotMatch(response.body, /<Gather/);
 });
 
+test('už nie ďakujem pekne po doplňujúcej otázke ukončí hovor', async () => {
+  const callSid = 'CA-DENTBODY-CONTEXT-END-00000000001';
+  await incoming(callSid);
+  const firstResponse = await answer(callSid, 'Môžem platiť kartou?');
+  assert.match(firstResponse.body, /Môžem vám pomôcť ešte s niečím/);
+
+  const response = await answer(callSid, 'Už nie, ďakujem pekne');
+  assert.match(response.body, /príjemný zvyšok dňa/);
+  assert.match(response.body, /<Hangup/);
+  assert.doesNotMatch(response.body, /otázke som nerozumela/);
+  assert.doesNotMatch(response.body, /<Gather/);
+});
+
+test('záporný úvod s novou otázkou hovor neukončí', async () => {
+  const callSid = 'CA-DENTBODY-CONTEXT-QUESTION-00001';
+  await incoming(callSid);
+  await answer(callSid, 'Môžem platiť kartou?');
+
+  const response = await answer(callSid, 'Nie, ale kedy máte otvorené?');
+  assert.match(response.body, /Ordinačné hodiny sú/);
+  assert.match(response.body, /Môžem vám pomôcť ešte s niečím/);
+  assert.match(response.body, /<Gather/);
+  assert.doesNotMatch(response.body, /<Hangup/);
+});
+
 test('po deviatej otázke pokračuje a po desiatej odpovedi hovor ukončí', async () => {
   const callSid = 'CA-DENTBODY-LIMIT-0000000000000001';
   await incoming(callSid);

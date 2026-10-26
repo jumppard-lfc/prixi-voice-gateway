@@ -4,8 +4,8 @@ import { dentbodyBotConfig } from '../config/dentbody.config';
 import {
   buildDentbodyAnswer,
   isDentbodyContinue,
-  isDentbodyFinish,
   parseDentbodyIntents,
+  shouldEndDentbodyConversation,
 } from '../services/dentbody-nlu.service';
 import { DentbodySession, dentbodySessionService } from '../services/dentbody-session.service';
 import { prixiService } from '../services/prixi.service';
@@ -121,17 +121,18 @@ export async function dentbodyVoiceBotRoutes(fastify: FastifyInstance): Promise<
       return renderPrompt(reply, session, copy.retry);
     }
 
-    if (isDentbodyFinish(answer)) {
+    const intents = parseDentbodyIntents(answer);
+    if (shouldEndDentbodyConversation(answer, session.awaitingFollowUp, intents.length > 0)) {
       dentbodySessionService.delete(session.callSid);
       return renderEnd(reply, copy.closing);
     }
 
-    if (isDentbodyContinue(answer)) {
+    if (session.awaitingFollowUp && isDentbodyContinue(answer)) {
       session.failedAttempts = 0;
+      session.awaitingFollowUp = false;
       return renderPrompt(reply, session, copy.continue);
     }
 
-    const intents = parseDentbodyIntents(answer);
     if (intents.length === 0) {
       session.failedAttempts += 1;
       if (session.failedAttempts >= 2) {
@@ -148,6 +149,7 @@ export async function dentbodyVoiceBotRoutes(fastify: FastifyInstance): Promise<
       dentbodySessionService.delete(session.callSid);
       return renderEnd(reply, `${response} ${copy.closing}`);
     }
+    session.awaitingFollowUp = true;
     return renderPrompt(reply, session, `${response} ${copy.followUp}`);
   });
 }

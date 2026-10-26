@@ -13,12 +13,48 @@ export function normalizeDentbodySpeech(value: string): string {
 
 export function isDentbodyFinish(value: string): boolean {
   const text = normalizeDentbodySpeech(value);
-  if (/^(nie|nie dakujem|dakujem|dakujem dovidenia|(nie )?(dakujem )?(to je vsetko|to bude vsetko|uz nic|nic viac|nic dalsie|dovidenia|staci)( dakujem)?)$/.test(text)) {
+  if (/^(nie dakujem|nic|dakujem|dakujem dovidenia|(nie )?(dakujem )?(to je vsetko|to bude vsetko|uz nic|nic viac|nic dalsie|dovidenia|staci)( dakujem)?)$/.test(text)) {
     return true;
   }
   return /^(nie )?(uz )?nepotrebujem (uz )?nic( viac| dalsie)?( dakujem)?$/.test(text)
     || /^(nie )?(uz )?nic( viac| dalsie)? nepotrebujem( dakujem)?$/.test(text)
     || /^(nie )?(uz )?netreba mi (uz )?nic( viac| dalsie)?( dakujem)?$/.test(text);
+}
+
+/**
+ * A short negative is an unambiguous answer only after the bot has asked
+ * whether it can help with anything else. A recognized FAQ question always
+ * wins, so e.g. "Nie, ale kedy máte otvorené?" continues the conversation.
+ */
+export function shouldEndDentbodyConversation(
+  value: string,
+  awaitingFollowUp: boolean,
+  hasRecognizedIntent: boolean
+): boolean {
+  if (isDentbodyFinish(value)) return true;
+  if (!awaitingFollowUp || hasRecognizedIntent) return false;
+
+  const text = normalizeDentbodySpeech(value);
+  if (!text) return false;
+
+  const closingWords = new Set([
+    'nie', 'uz', 'dakujem', 'pekne', 'velmi', 'vdaka', 'diky', 'dovidenia',
+    'to', 'je', 'bude', 'bolo', 'vsetko', 'nic', 'viac', 'dalsie', 'netreba',
+    'staci', 'prosim',
+  ]);
+  const words = text.split(' ');
+  const signalsContinuation = /\b(ale|este|mam|chcem|potrebujem|mozem|otazk\p{L}*)\b/u.test(text);
+  if (signalsContinuation) return false;
+
+  if (words.some(word => ['dakujem', 'vdaka', 'diky', 'dovidenia'].includes(word))) {
+    return true;
+  }
+
+  const containsClosingSignal = words.some(word =>
+    ['nie', 'dakujem', 'vdaka', 'diky', 'dovidenia', 'vsetko', 'nic', 'netreba', 'staci'].includes(word)
+  );
+
+  return containsClosingSignal && words.every(word => closingWords.has(word));
 }
 
 export function isDentbodyContinue(value: string): boolean {
