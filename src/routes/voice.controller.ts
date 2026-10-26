@@ -24,6 +24,8 @@ import { finalizeAbandonedKollarCall, startKollarVoiceBot } from './kollar-voice
 import { kollarBotConfig } from '../config/kollar.config';
 import { finalizeAbandonedKutakovaCall, startKutakovaVoiceBot } from './kutakova-voice-bot.controller';
 import { kutakovaBotConfig } from '../config/kutakova.config';
+import { finalizeDentbodyCall, startDentbodyVoiceBot } from './dentbody-voice-bot.controller';
+import { dentbodyBotConfig } from '../config/dentbody.config';
 import { DateTime } from 'luxon';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -63,6 +65,8 @@ const ELISSEA_TWILIO_PHONE_NUMBER = elisseaBotConfig.clinic.inboundTwilioNumber;
 const ELISSEA_CLINIC_ID = elisseaBotConfig.clinic.clinicId;
 const KOLLAR_TWILIO_PHONE_NUMBER = kollarBotConfig.clinic.inboundTwilioNumber;
 const KOLLAR_CLINIC_ID = kollarBotConfig.clinic.clinicId;
+const DENTBODY_TWILIO_PHONE_NUMBER = dentbodyBotConfig.clinic.inboundTwilioNumber;
+const DENTBODY_CLINIC_ID = dentbodyBotConfig.clinic.clinicId;
 const UNRESOLVED_CLINIC_IDS = new Set(['', 'orphan', 'fallback', 'local-dev']);
 const KLOSTERMANN_SK_GREETING = 'Dobrý deň, dovolali ste sa do Ortodoncia Klostermann. Aby ste nemuseli čakať, posielame Vám SMS správu s odkazom na objednanie. Ďakujeme.';
 const KLOSTERMANN_EN_GREETING = 'Hello, you have reached Klostermann Orthodontics. So that you don’t have to wait, we will send you an SMS with a link to order. Thank you.';
@@ -129,6 +133,7 @@ const PROTECTED_PRODUCTION_TWILIO_NUMBERS = new Set([
   NEUROCENTRUM_ROUTING_PHONE_NUMBER,
   ELISSEA_TWILIO_PHONE_NUMBER,
   KOLLAR_TWILIO_PHONE_NUMBER,
+  DENTBODY_TWILIO_PHONE_NUMBER,
   '+421800232793',
 ].filter(Boolean));
 
@@ -198,6 +203,7 @@ function assertClinicRoutingIsolation(
     [POPRAD_ONCOLOGY_PHONE_NUMBER, POPRAD_ONCOLOGY_CLINIC_ID],
     [ELISSEA_TWILIO_PHONE_NUMBER, ELISSEA_CLINIC_ID],
     [KOLLAR_TWILIO_PHONE_NUMBER, KOLLAR_CLINIC_ID],
+    [DENTBODY_TWILIO_PHONE_NUMBER, DENTBODY_CLINIC_ID],
     ...Array.from(POPRAD_ONCOLOGY_ROUTING_PHONE_NUMBERS, phoneNumber => [phoneNumber, POPRAD_ONCOLOGY_CLINIC_ID] as [string, string]),
   ]);
   const expectedClinicId = protectedRoutes.get(normalizedRoute);
@@ -301,6 +307,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const isOtherDedicatedDestination = normalizedTo === CELKOVA_PHONE_NUMBER
       || normalizedTo === ELISSEA_TWILIO_PHONE_NUMBER
       || normalizedTo === KOLLAR_TWILIO_PHONE_NUMBER
+      || normalizedTo === DENTBODY_TWILIO_PHONE_NUMBER
       || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
       || normalizedTo === KUTAKOVA_PHONE_NUMBER
       || normalizedTo === normalizeSlovakPhoneAddress(novotnyVoiceBotPhoneNumber)
@@ -312,6 +319,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const isExistingDedicatedDestination = isPekarcikVipTelDestination
       || normalizedTo === ELISSEA_TWILIO_PHONE_NUMBER
       || normalizedTo === KOLLAR_TWILIO_PHONE_NUMBER
+      || normalizedTo === DENTBODY_TWILIO_PHONE_NUMBER
       || normalizedTo === CELKOVA_PHONE_NUMBER
       || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
       || normalizedTo === KUTAKOVA_PHONE_NUMBER
@@ -334,6 +342,11 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     if (normalizedTo === KOLLAR_TWILIO_PHONE_NUMBER) {
       fastify.log.info({ from: fromNumber, to: body.To }, 'Routing call to MUDr. Kollar production voice bot');
       return startKollarVoiceBot(fastify, reply, body);
+    }
+
+    if (normalizedTo === DENTBODY_TWILIO_PHONE_NUMBER) {
+      fastify.log.info({ from: fromNumber, to: body.To }, 'Routing call to Dentbody X-ray production voice bot');
+      return startDentbodyVoiceBot(fastify, reply, body);
     }
 
     if (normalizedTo === KUTAKOVA_PHONE_NUMBER) {
@@ -901,5 +914,6 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     finalizeAbandonedElisseaCall(fastify, body.CallSid, new Date().toISOString());
     finalizeAbandonedKollarCall(fastify, body.CallSid, new Date().toISOString());
     finalizeAbandonedKutakovaCall(body.CallSid);
+    finalizeDentbodyCall(body.CallSid);
   });
 }

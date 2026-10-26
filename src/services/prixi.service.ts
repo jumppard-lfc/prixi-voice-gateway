@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { vadkertiBotConfig } from '../config/vadkerti.config';
 import { elisseaBotConfig } from '../config/elissea.config';
 import { kollarBotConfig } from '../config/kollar.config';
+import { dentbodyBotConfig } from '../config/dentbody.config';
 
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -80,6 +81,15 @@ export class PrixiService {
    * Provides a fallback configuration if the API call fails or times out.
    */
   async getConfig(phoneNumber: string): Promise<ClinicConfig> {
+    if (phoneNumber === dentbodyBotConfig.clinic.inboundTwilioNumber) {
+      return {
+        clinicId: dentbodyBotConfig.clinic.clinicId,
+        voiceBotEnabled: true,
+        timezone: dentbodyBotConfig.clinic.timezone,
+        pediatricMode: false,
+      };
+    }
+
     if (phoneNumber === kollarBotConfig.clinic.inboundTwilioNumber) {
       return {
         clinicId: kollarBotConfig.clinic.clinicId,
