@@ -20,7 +20,7 @@ const copy = {
   continue: 'Nech sa páči, povedzte mi vašu otázku.',
   retry: 'Prepáčte, otázke som nerozumela. Skúste ju prosím povedať ešte raz. Pre ordinačné hodiny stlačte jednotku. Pre objednanie a žiadanku dvojku. Pre snímky a výsledky trojku. Pre adresu a kontakt štvorku.',
   fallback: 'Túto informáciu nemám spoľahlivo potvrdenú. Napíšte prosím na ambulancia bodka er té gé zavináč dentbodyxray bodka es ká. Ďakujem a dovidenia.',
-  closing: 'Ďakujem za zavolanie. Prajem pekný deň. Dovidenia.',
+  closing: 'Ďakujem za zavolanie. Prajem vám príjemný zvyšok dňa. Dovidenia.',
   expired: 'Hovor sa nepodarilo dokončiť. Zavolajte prosím znova. Dovidenia.',
   technical: 'Momentálne máme technické problémy. Skúste prosím zavolať neskôr. Dovidenia.',
 };
@@ -49,7 +49,9 @@ function renderPrompt(
     action: '/voice/dentbody/answer',
     method: 'POST',
     timeout: 6,
-    speechTimeout: 'auto',
+    // A fixed pause window preserves a second clause after a natural breath,
+    // for example "musím sa objednať ... a potrebujem výmenný lístok?".
+    speechTimeout: 2,
     language: 'sk-SK',
     numDigits: 1,
     hints: 'ordinačné hodiny, otvorené, objednať sa, žiadanka, výmenný lístok, platba kartou, adresa, snímka, výsledok, popis, cenník, deti, imobilný pacient',

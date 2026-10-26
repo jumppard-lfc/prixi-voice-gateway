@@ -13,7 +13,12 @@ export function normalizeDentbodySpeech(value: string): string {
 
 export function isDentbodyFinish(value: string): boolean {
   const text = normalizeDentbodySpeech(value);
-  return /^(nie|nie dakujem|dakujem|dakujem dovidenia|(nie )?(dakujem )?(to je vsetko|uz nic|dovidenia|staci))$/.test(text);
+  if (/^(nie|nie dakujem|dakujem|dakujem dovidenia|(nie )?(dakujem )?(to je vsetko|to bude vsetko|uz nic|nic viac|nic dalsie|dovidenia|staci))$/.test(text)) {
+    return true;
+  }
+  return /^(nie )?(uz )?nepotrebujem (uz )?nic( viac| dalsie)?( dakujem)?$/.test(text)
+    || /^(nie )?(uz )?nic( viac| dalsie)? nepotrebujem( dakujem)?$/.test(text)
+    || /^(nie )?(uz )?netreba mi (uz )?nic( viac| dalsie)?( dakujem)?$/.test(text);
 }
 
 export function isDentbodyContinue(value: string): boolean {
@@ -39,7 +44,7 @@ export function parseDentbodyIntents(value: string): DentbodyIntent[] {
   add('retrospective_image', /(spatne|stara|starsia|znova|dodatocne|neskor).*\b(snim|rtg|r[eo]ntgen)|\b(snim|rtg|r[eo]ntgen).*\b(spatne|stara|starsia|znova|dodatocne|neskor)/);
   add('office_hours', /(ordinac|otvarac|otvorene|otvoreni|kedy.*(ordin|otvor)|dokedy|pracovn.*hodin|obedn.*prest|vikend|zajtra)/);
   add('appointment', /(objedna|rezerv|termin|na pockanie|bez objednania|treba sa hlasit)/);
-  add('referral', /(ziadank|vymenn.*list|odporuc|bez listka|bez papier)/);
+  add('referral', /(ziadank|vymenn|listok od lekar|papier od lekar|odporuc|bez listka|bez papier)/);
   add('address', /(adresa|kde (ste|sidli|vas najdem)|ako sa k vam|fedinov|petrzalk|zdravotn.*stredisk)/);
   add('patients', /(diet|deti|dosp|imobil|vozick|pacientov prijimate|pre koho)/);
   add('payment', /(plat|kart|hotovost|cash|terminal)/);

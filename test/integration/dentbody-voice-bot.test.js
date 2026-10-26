@@ -57,10 +57,11 @@ test('produkčný DID spustí prirodzený Dentbody informačný flow', async () 
   const response = await incoming('CA-DENTBODY-ROUTE-0000000000000001');
 
   assert.equal(response.statusCode, 200);
-  assert.match(response.body, /Dentbody X-ray v Petržalke/);
+  assert.match(response.body, /DentBody X-Ray v Petržalke/i);
   assert.match(response.body, /S čím vám môžem pomôcť/);
   assert.match(response.body, /action="\/voice\/dentbody\/answer"/);
   assert.match(response.body, /input="speech dtmf"/);
+  assert.match(response.body, /speechTimeout="2"/);
   assert.doesNotMatch(response.body, /Kollára|Elissea|Vadkerti/);
 });
 
@@ -104,6 +105,18 @@ test('prirodzené nie ďakujem hovor slušne ukončí', async () => {
 
   assert.match(response.body, /Ďakujem za zavolanie/);
   assert.match(response.body, /<Hangup/);
+  assert.doesNotMatch(response.body, /<Gather/);
+});
+
+test('už nepotrebujem nič viac ukončí hovor príjemnou rozlúčkou', async () => {
+  const callSid = 'CA-DENTBODY-NOTHING-ELSE-000000001';
+  await incoming(callSid);
+  const response = await answer(callSid, 'Už nepotrebujem nič viac');
+
+  assert.match(response.body, /príjemný zvyšok dňa/);
+  assert.match(response.body, /Dovidenia/);
+  assert.match(response.body, /<Hangup/);
+  assert.doesNotMatch(response.body, /otázke som nerozumela/);
   assert.doesNotMatch(response.body, /<Gather/);
 });
 
