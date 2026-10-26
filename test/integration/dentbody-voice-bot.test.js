@@ -120,6 +120,18 @@ test('už nepotrebujem nič viac ukončí hovor príjemnou rozlúčkou', async (
   assert.doesNotMatch(response.body, /<Gather/);
 });
 
+test('nie to bude všetko ďakujem ukončí hovor bez chybového fallbacku', async () => {
+  const callSid = 'CA-DENTBODY-THATS-ALL-0000000000001';
+  await incoming(callSid);
+  const response = await answer(callSid, 'Nie, to bude všetko, ďakujem');
+
+  assert.match(response.body, /príjemný zvyšok dňa/);
+  assert.match(response.body, /Dovidenia/);
+  assert.match(response.body, /<Hangup/);
+  assert.doesNotMatch(response.body, /otázke som nerozumela/);
+  assert.doesNotMatch(response.body, /<Gather/);
+});
+
 test('po deviatej otázke pokračuje a po desiatej odpovedi hovor ukončí', async () => {
   const callSid = 'CA-DENTBODY-LIMIT-0000000000000001';
   await incoming(callSid);

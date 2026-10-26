@@ -70,6 +70,7 @@ test('hodiny rozumejú aj zajtrajšku a víkendu', () => {
 
 test('bot ukončí rozhovor po prirodzenom poďakovaní', () => {
   assert.equal(isDentbodyFinish('Nie, ďakujem, to je všetko.'), true);
+  assert.equal(isDentbodyFinish('Nie, to bude všetko, ďakujem.'), true);
   assert.equal(isDentbodyFinish('Už nepotrebujem nič viac.'), true);
   assert.equal(isDentbodyFinish('Nie, už nič ďalšie nepotrebujem, ďakujem.'), true);
   assert.equal(isDentbodyFinish('To bude všetko.'), true);

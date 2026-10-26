@@ -13,7 +13,7 @@ export function normalizeDentbodySpeech(value: string): string {
 
 export function isDentbodyFinish(value: string): boolean {
   const text = normalizeDentbodySpeech(value);
-  if (/^(nie|nie dakujem|dakujem|dakujem dovidenia|(nie )?(dakujem )?(to je vsetko|to bude vsetko|uz nic|nic viac|nic dalsie|dovidenia|staci))$/.test(text)) {
+  if (/^(nie|nie dakujem|dakujem|dakujem dovidenia|(nie )?(dakujem )?(to je vsetko|to bude vsetko|uz nic|nic viac|nic dalsie|dovidenia|staci)( dakujem)?)$/.test(text)) {
     return true;
   }
   return /^(nie )?(uz )?nepotrebujem (uz )?nic( viac| dalsie)?( dakujem)?$/.test(text)
