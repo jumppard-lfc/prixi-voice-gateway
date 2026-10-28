@@ -18,7 +18,7 @@ const VoiceResponse = twilio.twiml.VoiceResponse;
 const sayOptions: any = { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-B' };
 
 const copy = {
-  greeting: 'Dobrý deň, dovolali ste sa do ambulancie MUDr. Malákovej. Potrebujete sa objednať na vyšetrenie, požiadať o recept alebo sa spojiť s ambulanciou? Pre objednanie stlačte jednotku, pre recept dvojku a pre kontakt s ambulanciou trojku.',
+  greeting: 'Dobrý deň, dovolali ste sa do ambulancie pani doktorky Malákovej. Potrebujete sa objednať na vyšetrenie, požiadať o recept alebo sa spojiť s ambulanciou? Pre objednanie stlačte jednotku, pre recept dvojku a pre kontakt s ambulanciou trojku.',
   appointmentType: 'O aký typ návštevy ide? Pre zdravotné ťažkosti stlačte jednotku. Pre potvrdenie dvojku. Pre predoperačné vyšetrenie trojku. Pre preventívnu prehliadku štvorku. Pre iný dôvod päťku.',
   name: 'Prosím, povedzte svoje meno a priezvisko.',
   prescriptionDetail: 'Aký liek potrebujete predpísať na recept?',
