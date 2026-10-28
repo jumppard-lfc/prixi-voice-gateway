@@ -57,12 +57,36 @@ test('produkčný DID spustí prirodzený Dentbody informačný flow', async () 
   const response = await incoming('CA-DENTBODY-ROUTE-0000000000000001');
 
   assert.equal(response.statusCode, 200);
-  assert.match(response.body, /DentBody X-Ray v Petržalke/i);
-  assert.match(response.body, /S čím vám môžem pomôcť/);
+  assert.match(response.body, /röntgenové pracovisko na Fedinovej/i);
+  assert.match(response.body, /Ako pomôžem/);
+  assert.doesNotMatch(response.body, /Môžete sa opýtať napríklad/);
   assert.match(response.body, /action="\/voice\/dentbody\/answer"/);
   assert.match(response.body, /input="speech dtmf"/);
-  assert.match(response.body, /speechTimeout="2"/);
+  assert.match(response.body, /timeout="4"/);
+  assert.match(response.body, /speechTimeout="1"/);
+  assert.ok(response.body.indexOf('<Say') < response.body.indexOf('<Gather'));
   assert.doesNotMatch(response.body, /Kollára|Elissea|Vadkerti/);
+});
+
+test('otázka kde sa nachádza ambulancia dostane konkrétnu adresu', async () => {
+  const callSid = 'CA-DENTBODY-ADDRESS-00000000000001';
+  await incoming(callSid);
+  const response = await answer(callSid, 'Kde sa nachádza ambulancia?');
+
+  assert.match(response.body, /Zdravotného strediska FEDINOVA/);
+  assert.match(response.body, /na prvom poschodí/);
+  assert.match(response.body, /Fedinovej 9/);
+  assert.doesNotMatch(response.body, /informáciu nemám|otázke som nerozumela/i);
+});
+
+test('otázka na poschodie povie prvé poschodie aj potvrdenú adresu', async () => {
+  const callSid = 'CA-DENTBODY-FLOOR-000000000000001';
+  await incoming(callSid);
+  const response = await answer(callSid, 'Na ktorom poschodí vás nájdem?');
+
+  assert.match(response.body, /na prvom poschodí/);
+  assert.match(response.body, /Fedinovej 9/);
+  assert.doesNotMatch(response.body, /otázke som nerozumela/);
 });
 
 test('objednanie a žiadanka dostanú obe schválené odpovede bez rezervácie', async () => {

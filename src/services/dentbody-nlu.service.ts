@@ -81,7 +81,8 @@ export function parseDentbodyIntents(value: string): DentbodyIntent[] {
   add('office_hours', /(ordinac|otvarac|otvorene|otvoreni|kedy.*(ordin|otvor)|dokedy|pracovn.*hodin|obedn.*prest|vikend|zajtra)/);
   add('appointment', /(objedna|rezerv|termin|na pockanie|bez objednania|treba sa hlasit)/);
   add('referral', /(ziadank|vymenn|listok od lekar|papier od lekar|odporuc|bez listka|bez papier)/);
-  add('address', /(adresa|kde (ste|sidli|vas najdem)|ako sa k vam|fedinov|petrzalk|zdravotn.*stredisk)/);
+  add('floor', /(poschod|podlazi)/);
+  add('address', /(adresa|kde\s+(sa\s+)?(nachadza|nachadzate|ste|sidli|je)\b|kde\s+(vas\s+)?(najdem|hladat)\b|kam\s+(mam\s+)?(ist|prist)\b|ako\s+sa\s+(tam|k\s+vam)\s+(mam\s+)?(dostat|dostanem)\b|ako\s+sa\s+(mam\s+)?(dostat|dostanem)\s+k\s+vam\b|fedinov|petrzalk|zdravotn.*stredisk)/);
   add('patients', /(diet|deti|dosp|imobil|vozick|pacientov prijimate|pre koho)/);
   add('payment', /(plat|kart|hotovost|cash|terminal)/);
   add('certificate', /(potvrden|priepust|zamestnavatel|uhrada.*vysetren|doklad)/);
@@ -91,6 +92,10 @@ export function parseDentbodyIntents(value: string): DentbodyIntent[] {
   add('pricing', /(cena|cennik|kolko (to|stoji|zaplatim)|poplatok|euro)/);
   add('contact', /(kontakt|web|strank|dentbodyxray|aky.*(email|e mail|mail)|kde.*(email|e mail|mail)|emailov.*adres)/);
   add('medical_advice', /(aky|aku|ake|ktory|ktoru|ktore).*\b(rtg|r[eo]ntgen|snim|vysetren)|diagnoz|je to vhodne|mozem ist na (rtg|r[eo]ntgen)|potrebujem (rtg|r[eo]ntgen)/);
+
+  if (intents.includes('floor')) {
+    return intents.filter(intent => intent !== 'address');
+  }
 
   if (intents.includes('retrospective_image')) {
     return intents.filter(intent => !['dental_images', 'general_images', 'contact', 'medical_advice'].includes(intent));
@@ -218,7 +223,8 @@ export function dentbodyOfficeHoursAnswer(
 
 const answers: Record<Exclude<DentbodyIntent, 'office_hours'>, string> = {
   appointment: 'Na zubné ani všeobecné RTG vyšetrenie sa neobjednáva. Pacientov vyšetrujeme na počkanie počas ordinačných hodín.',
-  address: 'Obe RTG ambulancie sa nachádzajú v Zdravotnom stredisku FEDINOVA na Fedinovej 9 v Bratislave, v Petržalke.',
+  address: 'Obe RTG ambulancie sa nachádzajú na prvom poschodí Zdravotného strediska FEDINOVA na Fedinovej 9 v Bratislave, v Petržalke.',
+  floor: 'RTG ambulancie nájdete na prvom poschodí Zdravotného strediska FEDINOVA na Fedinovej 9 v Bratislave, v Petržalke.',
   referral: 'Prijímame pacientov aj bez žiadanky alebo výmenného lístka.',
   patients: 'Vyšetrujeme deti, dospelých aj imobilných pacientov.',
   payment: 'Za RTG vyšetrenie môžete zaplatiť kartou alebo v hotovosti.',

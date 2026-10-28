@@ -15,7 +15,7 @@ const sayOptions: any = { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-B' };
 const MAX_ANSWERED_QUESTIONS = 10;
 
 const copy = {
-  greeting: 'Dobrý deň, tu virtuálna asistentka PriXi z RTG pracoviska DentBody X-Ray v Petržalke. S čím vám môžem pomôcť? Môžete sa opýtať napríklad na ordinačné hodiny, žiadanku, platbu alebo výsledky.',
+  greeting: 'Dobrý deň, tu je röntgenové pracovisko na Fedinovej. Ako pomôžem?',
   followUp: 'Môžem vám pomôcť ešte s niečím?',
   continue: 'Nech sa páči, povedzte mi vašu otázku.',
   retry: 'Prepáčte, otázke som nerozumela. Skúste ju prosím povedať ešte raz. Pre ordinačné hodiny stlačte jednotku. Pre objednanie a žiadanku dvojku. Pre snímky a výsledky trojku. Pre adresu a kontakt štvorku.',
@@ -44,19 +44,21 @@ function renderPrompt(
 ): FastifyReply {
   dentbodySessionService.save(session);
   const twiml = new VoiceResponse();
-  const gather = twiml.gather({
+  // Finish the prompt before listening. This prevents ambient speech or radio
+  // from interrupting the bot and being mistaken for the caller's answer.
+  twiml.say(sayOptions, message);
+  twiml.gather({
     input: ['speech', 'dtmf'],
     action: '/voice/dentbody/answer',
     method: 'POST',
-    timeout: 6,
-    // A fixed pause window preserves a second clause after a natural breath,
-    // for example "musím sa objednať ... a potrebujem výmenný lístok?".
-    speechTimeout: 2,
+    timeout: 4,
+    // One second still permits a natural short pause between two clauses while
+    // halving the former post-speech delay.
+    speechTimeout: 1,
     language: 'sk-SK',
     numDigits: 1,
-    hints: 'ordinačné hodiny, otvorené, objednať sa, žiadanka, výmenný lístok, platba kartou, adresa, snímka, výsledok, popis, cenník, deti, imobilný pacient',
+    hints: 'ordinačné hodiny, otvorené, objednať sa, žiadanka, výmenný lístok, platba kartou, adresa, kde sa nachádza ambulancia, kde vás nájdem, na ktorom poschodí, kam mám ísť, Fedinova, Petržalka, snímka, výsledok, popis, cenník, deti, imobilný pacient',
   } as any);
-  gather.say(sayOptions, message);
   twiml.redirect('/voice/dentbody/prompt');
   return reply.type('text/xml').send(twiml.toString());
 }

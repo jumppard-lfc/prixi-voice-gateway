@@ -2,6 +2,7 @@ export type DentbodyIntent =
   | 'appointment'
   | 'office_hours'
   | 'address'
+  | 'floor'
   | 'referral'
   | 'patients'
   | 'payment'

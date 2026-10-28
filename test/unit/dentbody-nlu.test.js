@@ -41,6 +41,32 @@ test('pokrýva všetky schválené Dentbody informačné témy', () => {
   }
 });
 
+test('rozpozná prirodzené otázky na polohu pracoviska', () => {
+  const addressQuestions = [
+    'Kde sa nachádza ambulancia?',
+    'Kde vás nájdem?',
+    'Kde nájdem ambulanciu?',
+    'Kde ste?',
+    'Kam mám ísť?',
+    'Ako sa k vám mám dostať?',
+    'Ako sa dostanem k vám?',
+  ];
+
+  for (const question of addressQuestions) {
+    assert.ok(parseDentbodyIntents(question).includes('address'), question);
+  }
+
+  assert.deepEqual(parseDentbodyIntents('Na ktorom poschodí vás nájdem?'), ['floor']);
+  assert.match(
+    buildDentbodyAnswer(['floor'], 'Na ktorom poschodí vás nájdem?'),
+    /na prvom poschodí.*Fedinovej 9/
+  );
+  assert.match(
+    buildDentbodyAnswer(['address'], 'Kde sa nachádza ambulancia?'),
+    /na prvom poschodí.*Fedinovej 9/
+  );
+});
+
 test('spätné zaslanie snímky má samostatný bezpečný postup', () => {
   const intents = parseDentbodyIntents('Potrebujem spätne poslať staršiu RTG snímku e-mailom');
   assert.deepEqual(intents, ['retrospective_image']);
