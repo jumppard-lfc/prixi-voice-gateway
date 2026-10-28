@@ -26,6 +26,8 @@ import { finalizeAbandonedKutakovaCall, startKutakovaVoiceBot } from './kutakova
 import { kutakovaBotConfig } from '../config/kutakova.config';
 import { finalizeDentbodyCall, startDentbodyVoiceBot } from './dentbody-voice-bot.controller';
 import { dentbodyBotConfig } from '../config/dentbody.config';
+import { finalizeAbandonedMalakovaCall, startMalakovaVoiceBot } from './malakova-voice-bot.controller';
+import { malakovaBotConfig } from '../config/malakova.config';
 import { DateTime } from 'luxon';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -67,6 +69,9 @@ const KOLLAR_TWILIO_PHONE_NUMBER = kollarBotConfig.clinic.inboundTwilioNumber;
 const KOLLAR_CLINIC_ID = kollarBotConfig.clinic.clinicId;
 const DENTBODY_TWILIO_PHONE_NUMBER = dentbodyBotConfig.clinic.inboundTwilioNumber;
 const DENTBODY_CLINIC_ID = dentbodyBotConfig.clinic.clinicId;
+const MALAKOVA_TWILIO_PHONE_NUMBER = malakovaBotConfig.clinic.inboundTwilioNumber;
+const MALAKOVA_ROUTING_PHONE_NUMBER = malakovaBotConfig.clinic.routingPhoneNumber;
+const MALAKOVA_CLINIC_ID = malakovaBotConfig.clinic.clinicId;
 const UNRESOLVED_CLINIC_IDS = new Set(['', 'orphan', 'fallback', 'local-dev']);
 const KLOSTERMANN_SK_GREETING = 'Dobrý deň, dovolali ste sa do Ortodoncia Klostermann. Aby ste nemuseli čakať, posielame Vám SMS správu s odkazom na objednanie. Ďakujeme.';
 const KLOSTERMANN_EN_GREETING = 'Hello, you have reached Klostermann Orthodontics. So that you don’t have to wait, we will send you an SMS with a link to order. Thank you.';
@@ -134,6 +139,8 @@ const PROTECTED_PRODUCTION_TWILIO_NUMBERS = new Set([
   ELISSEA_TWILIO_PHONE_NUMBER,
   KOLLAR_TWILIO_PHONE_NUMBER,
   DENTBODY_TWILIO_PHONE_NUMBER,
+  MALAKOVA_TWILIO_PHONE_NUMBER,
+  MALAKOVA_ROUTING_PHONE_NUMBER,
   '+421800232793',
 ].filter(Boolean));
 
@@ -204,6 +211,8 @@ function assertClinicRoutingIsolation(
     [ELISSEA_TWILIO_PHONE_NUMBER, ELISSEA_CLINIC_ID],
     [KOLLAR_TWILIO_PHONE_NUMBER, KOLLAR_CLINIC_ID],
     [DENTBODY_TWILIO_PHONE_NUMBER, DENTBODY_CLINIC_ID],
+    [MALAKOVA_TWILIO_PHONE_NUMBER, MALAKOVA_CLINIC_ID],
+    [MALAKOVA_ROUTING_PHONE_NUMBER, MALAKOVA_CLINIC_ID],
     ...Array.from(POPRAD_ONCOLOGY_ROUTING_PHONE_NUMBERS, phoneNumber => [phoneNumber, POPRAD_ONCOLOGY_CLINIC_ID] as [string, string]),
   ]);
   const expectedClinicId = protectedRoutes.get(normalizedRoute);
@@ -304,10 +313,12 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const isPekarcikVipTelDestination = normalizedTo === PEKARCIK_VIPTEL_PHONE_NUMBER;
     const isHmiraDedicatedDestination = normalizedTo === HMIRA_PHONE_NUMBER;
     const isPopradOncologyDestination = isPopradOncologyRoute(body.To);
+    const isMalakovaDedicatedDestination = normalizedTo === MALAKOVA_TWILIO_PHONE_NUMBER;
     const isOtherDedicatedDestination = normalizedTo === CELKOVA_PHONE_NUMBER
       || normalizedTo === ELISSEA_TWILIO_PHONE_NUMBER
       || normalizedTo === KOLLAR_TWILIO_PHONE_NUMBER
       || normalizedTo === DENTBODY_TWILIO_PHONE_NUMBER
+      || isMalakovaDedicatedDestination
       || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
       || normalizedTo === KUTAKOVA_PHONE_NUMBER
       || normalizedTo === normalizeSlovakPhoneAddress(novotnyVoiceBotPhoneNumber)
@@ -320,6 +331,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       || normalizedTo === ELISSEA_TWILIO_PHONE_NUMBER
       || normalizedTo === KOLLAR_TWILIO_PHONE_NUMBER
       || normalizedTo === DENTBODY_TWILIO_PHONE_NUMBER
+      || isMalakovaDedicatedDestination
       || normalizedTo === CELKOVA_PHONE_NUMBER
       || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
       || normalizedTo === KUTAKOVA_PHONE_NUMBER
@@ -331,6 +343,14 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       || isPopradOncologyDestination
       || normalizedTo === NEUROCENTRUM_ROUTING_PHONE_NUMBER
       || isDobrovodskaRoute(body.To);
+    const isMalakovaCall = isMalakovaDedicatedDestination
+      || normalizedTo === MALAKOVA_ROUTING_PHONE_NUMBER
+      || (!isExistingDedicatedDestination && normalizedCarrierForwardedFrom === MALAKOVA_ROUTING_PHONE_NUMBER);
+
+    if (isMalakovaCall) {
+      fastify.log.info({ from: fromNumber, to: body.To, forwardedFrom: carrierForwardedFrom }, 'Routing call to MUDr. Malakova production voice bot');
+      return startMalakovaVoiceBot(fastify, reply, body);
+    }
     const isNeurocentrumCall = (!isExistingDedicatedDestination && normalizedCarrierForwardedFrom === NEUROCENTRUM_ROUTING_PHONE_NUMBER)
       || normalizedTo === NEUROCENTRUM_ROUTING_PHONE_NUMBER;
 
@@ -915,5 +935,6 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     finalizeAbandonedKollarCall(fastify, body.CallSid, new Date().toISOString());
     finalizeAbandonedKutakovaCall(body.CallSid);
     finalizeDentbodyCall(body.CallSid);
+    finalizeAbandonedMalakovaCall(fastify, body.CallSid, new Date().toISOString());
   });
 }

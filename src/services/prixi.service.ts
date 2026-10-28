@@ -5,6 +5,7 @@ import { vadkertiBotConfig } from '../config/vadkerti.config';
 import { elisseaBotConfig } from '../config/elissea.config';
 import { kollarBotConfig } from '../config/kollar.config';
 import { dentbodyBotConfig } from '../config/dentbody.config';
+import { malakovaBotConfig } from '../config/malakova.config';
 
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -81,6 +82,18 @@ export class PrixiService {
    * Provides a fallback configuration if the API call fails or times out.
    */
   async getConfig(phoneNumber: string): Promise<ClinicConfig> {
+    if (
+      phoneNumber === malakovaBotConfig.clinic.inboundTwilioNumber
+      || phoneNumber === malakovaBotConfig.clinic.routingPhoneNumber
+    ) {
+      return {
+        clinicId: malakovaBotConfig.clinic.clinicId,
+        voiceBotEnabled: true,
+        timezone: malakovaBotConfig.clinic.timezone,
+        pediatricMode: false,
+      };
+    }
+
     if (phoneNumber === dentbodyBotConfig.clinic.inboundTwilioNumber) {
       return {
         clinicId: dentbodyBotConfig.clinic.clinicId,
