@@ -12,8 +12,8 @@ export function normalizeMalakovaSpeech(value: string): string {
 
 export function parseMalakovaMainMenu(value: string): MalakovaRequestType | undefined {
   const text = normalizeMalakovaSpeech(value);
-  if (text === '1' || /(objedna|termin|vysetren)/.test(text)) return 'appointment';
   if (text === '2' || /(recept|predpis|liek)/.test(text)) return 'prescription';
+  if (text === '1' || /(objedna|termin|vysetren)/.test(text)) return 'appointment';
   if (text === '3' || /(spojit|ambulanci|telefon|kontakt|sestra|lekarka)/.test(text)) return 'contact';
   return undefined;
 }

@@ -9,6 +9,8 @@ const {
 test('Malakova hlavne menu podporuje hlas aj DTMF', () => {
   assert.equal(parseMalakovaMainMenu('chcem sa objednať'), 'appointment');
   assert.equal(parseMalakovaMainMenu('2'), 'prescription');
+  assert.equal(parseMalakovaMainMenu('chcel by som si objednať recept'), 'prescription');
+  assert.equal(parseMalakovaMainMenu('potrebujem objednať lieky'), 'prescription');
   assert.equal(parseMalakovaMainMenu('chcem sa spojiť s ambulanciou'), 'contact');
   assert.equal(parseMalakovaMainMenu('neviem'), undefined);
 });

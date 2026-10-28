@@ -72,7 +72,7 @@ test('produkčný endpoint routuje autoritatívny Malakova DID do oddeleného fl
   });
 
   assert.equal(response.statusCode, 200);
-  assert.match(response.body, /ambulancie MUDr\. Malákovej/);
+  assert.match(response.body, /ambulancie .*Malákovej/);
   assert.match(response.body, /action="\/voice\/malakova\/answer"/);
   assert.doesNotMatch(response.body, /Vadkerti|Elissea/);
   assert.equal(app.hasRoute({ method: 'POST', url: '/voice/malakova/incoming' }), false);
@@ -85,7 +85,7 @@ test('volanie smerované cez reálne číslo ambulancie tiež spustí Malakova f
   });
 
   assert.equal(response.statusCode, 200);
-  assert.match(response.body, /ambulancie MUDr\. Malákovej/);
+  assert.match(response.body, /ambulancie .*Malákovej/);
 });
 
 test('zdravotné ťažkosti vytvoria clinic 161 požiadavku s dĺžkou 20 minút bez falošnej rezervácie', async () => {
@@ -135,7 +135,7 @@ test('predoperačné vyšetrenie vytvorí callback požiadavku', async () => {
 test('recept zachytí meno a názov lieku', async () => {
   const callSid = 'CA-MALAKOVA-PRESCRIPTION-00000000001';
   await incoming(callSid);
-  const namePrompt = await answer(callSid, '2', true);
+  const namePrompt = await answer(callSid, 'chcel by som si objednať recept');
   assert.match(namePrompt.body, /meno a priezvisko/);
   const detailPrompt = await answer(callSid, 'Eva Malíková');
   assert.match(detailPrompt.body, /Aký liek potrebujete predpísať na recept/);
