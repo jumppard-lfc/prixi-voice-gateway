@@ -82,7 +82,24 @@ export function parseDentbodyIntents(value: string): DentbodyIntent[] {
   add('appointment', /(objedna|rezerv|termin|na pockanie|bez objednania|treba sa hlasit)/);
   add('referral', /(ziadank|vymenn|listok od lekar|papier od lekar|odporuc|bez listka|bez papier)/);
   add('floor', /(poschod|podlazi)/);
-  add('address', /(adresa|kde\s+(sa\s+)?(nachadza|nachadzate|ste|sidli|je)\b|kde\s+(vas\s+)?(najdem|hladat)\b|kam\s+(mam\s+)?(ist|prist)\b|ako\s+sa\s+(tam|k\s+vam)\s+(mam\s+)?(dostat|dostanem)\b|ako\s+sa\s+(mam\s+)?(dostat|dostanem)\s+k\s+vam\b|fedinov|petrzalk|zdravotn.*stredisk)/);
+  const asksWhere = /\bkde\b/.test(text);
+  const hasLocationSubject = /\b(ambulanc\p{L}*|pracovisk\p{L}*|rtg|rontgen\p{L}*|ste)\b/u.test(text);
+  const hasLocationVerb = /\b(nachadz\p{L}*|sidl\p{L}*)\b/u.test(text);
+  const hasSearchVerb = /\b(najd\p{L}*|hladat)\b/u.test(text);
+  const refersToClinic = hasLocationSubject || /\b(vas|vy)\b/.test(text);
+  const asksForDirections = (
+    /\bkam\b/.test(text) && /\b(ist|prist)\b/.test(text)
+  ) || (
+    /\bako\b/.test(text)
+    && /\b(dostat|dostanem)\b/.test(text)
+    && /\b(tam|vam|vas)\b/.test(text)
+  );
+  const asksForAddress = /\badres\p{L}*\b/u.test(text)
+    || (asksWhere && (hasLocationSubject || hasLocationVerb || (hasSearchVerb && refersToClinic)))
+    || (hasLocationSubject && hasLocationVerb)
+    || asksForDirections
+    || /(fedinov|petrzalk|zdravotn.*stredisk)/.test(text);
+  if (asksForAddress) intents.push('address');
   add('patients', /(diet|deti|dosp|imobil|vozick|pacientov prijimate|pre koho)/);
   add('payment', /(plat|kart|hotovost|cash|terminal)/);
   add('certificate', /(potvrden|priepust|zamestnavatel|uhrada.*vysetren|doklad)/);

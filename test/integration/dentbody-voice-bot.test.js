@@ -79,6 +79,16 @@ test('otázka kde sa nachádza ambulancia dostane konkrétnu adresu', async () =
   assert.doesNotMatch(response.body, /informáciu nemám|otázke som nerozumela/i);
 });
 
+test('zdvorilostné slovo uprostred otázky nezabráni odpovedi s adresou', async () => {
+  const callSid = 'CA-DENTBODY-POLITE-ADDRESS-00000001';
+  await incoming(callSid);
+  const response = await answer(callSid, 'Kde sa prosím nachádza ambulancia?');
+
+  assert.match(response.body, /na prvom poschodí/);
+  assert.match(response.body, /Fedinovej 9/);
+  assert.doesNotMatch(response.body, /otázke som nerozumela/);
+});
+
 test('otázka na poschodie povie prvé poschodie aj potvrdenú adresu', async () => {
   const callSid = 'CA-DENTBODY-FLOOR-000000000000001';
   await incoming(callSid);

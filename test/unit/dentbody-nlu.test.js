@@ -44,6 +44,9 @@ test('pokrýva všetky schválené Dentbody informačné témy', () => {
 test('rozpozná prirodzené otázky na polohu pracoviska', () => {
   const addressQuestions = [
     'Kde sa nachádza ambulancia?',
+    'Kde sa prosím nachádza ambulancia?',
+    'Prosím vás, kde sa vlastne nachádza vaše pracovisko?',
+    'Viete mi povedať, kde vás nájdem?',
     'Kde vás nájdem?',
     'Kde nájdem ambulanciu?',
     'Kde ste?',
@@ -55,6 +58,9 @@ test('rozpozná prirodzené otázky na polohu pracoviska', () => {
   for (const question of addressQuestions) {
     assert.ok(parseDentbodyIntents(question).includes('address'), question);
   }
+
+  assert.deepEqual(parseDentbodyIntents('Kde môžem zaplatiť kartou?'), ['payment']);
+  assert.deepEqual(parseDentbodyIntents('Kde vám môžem poslať e-mail?'), ['contact']);
 
   assert.deepEqual(parseDentbodyIntents('Na ktorom poschodí vás nájdem?'), ['floor']);
   assert.match(

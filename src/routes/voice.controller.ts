@@ -28,6 +28,7 @@ import { finalizeDentbodyCall, startDentbodyVoiceBot } from './dentbody-voice-bo
 import { dentbodyBotConfig } from '../config/dentbody.config';
 import { finalizeAbandonedMalakovaCall, startMalakovaVoiceBot } from './malakova-voice-bot.controller';
 import { malakovaBotConfig } from '../config/malakova.config';
+import { skripkovaBotConfig } from '../config/skripkova.config';
 import { DateTime } from 'luxon';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -72,6 +73,9 @@ const DENTBODY_CLINIC_ID = dentbodyBotConfig.clinic.clinicId;
 const MALAKOVA_TWILIO_PHONE_NUMBER = malakovaBotConfig.clinic.inboundTwilioNumber;
 const MALAKOVA_ROUTING_PHONE_NUMBER = malakovaBotConfig.clinic.routingPhoneNumber;
 const MALAKOVA_CLINIC_ID = malakovaBotConfig.clinic.clinicId;
+const SKRIPKOVA_TWILIO_PHONE_NUMBER = skripkovaBotConfig.clinic.inboundTwilioNumber;
+const SKRIPKOVA_ROUTING_PHONE_NUMBER = skripkovaBotConfig.clinic.routingPhoneNumber;
+const SKRIPKOVA_CLINIC_ID = skripkovaBotConfig.clinic.clinicId;
 const UNRESOLVED_CLINIC_IDS = new Set(['', 'orphan', 'fallback', 'local-dev']);
 const KLOSTERMANN_SK_GREETING = 'Dobrý deň, dovolali ste sa do Ortodoncia Klostermann. Aby ste nemuseli čakať, posielame Vám SMS správu s odkazom na objednanie. Ďakujeme.';
 const KLOSTERMANN_EN_GREETING = 'Hello, you have reached Klostermann Orthodontics. So that you don’t have to wait, we will send you an SMS with a link to order. Thank you.';
@@ -85,6 +89,8 @@ const DOBROVODSKA_VACATION_GREETING = 'Dobrý den, tady virtuální sestra PriXi
 const DOBROVODSKA_VACATION_COMPLETION = 'Děkuji. Vaši zprávu jsme zaznamenali a budeme se jí věnovat v pondělí dvacátého šestého října. Na shledanou.';
 const HMIRA_GREETING_FILE = resolve(__dirname, '../assets/audio/hmira-1-greeting-v1.wav');
 const HMIRA_COMPLETION_FILE = resolve(__dirname, '../assets/audio/hmira-2-completion-v1.wav');
+const SKRIPKOVA_GREETING_FILE = resolve(__dirname, '../assets/audio/skripkova-1-greeting-v1.wav');
+const SKRIPKOVA_COMPLETION_FILE = resolve(__dirname, '../assets/audio/skripkova-2-completion-v1.wav');
 
 function getPublicBaseUrl(request: FastifyRequest): string {
   const forwardedProto = String(request.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
@@ -141,6 +147,8 @@ const PROTECTED_PRODUCTION_TWILIO_NUMBERS = new Set([
   DENTBODY_TWILIO_PHONE_NUMBER,
   MALAKOVA_TWILIO_PHONE_NUMBER,
   MALAKOVA_ROUTING_PHONE_NUMBER,
+  SKRIPKOVA_TWILIO_PHONE_NUMBER,
+  SKRIPKOVA_ROUTING_PHONE_NUMBER,
   '+421800232793',
 ].filter(Boolean));
 
@@ -170,6 +178,12 @@ function isZdrahalovaRoute(value?: string): boolean {
   const normalizedValue = normalizeSlovakPhoneAddress(value);
   return normalizedValue === ZDRAHALOVA_PHONE_NUMBER
     || normalizedValue === ZDRAHALOVA_ROUTING_PHONE_NUMBER;
+}
+
+function isSkripkovaRoute(value?: string): boolean {
+  const normalizedValue = normalizeSlovakPhoneAddress(value);
+  return normalizedValue === SKRIPKOVA_TWILIO_PHONE_NUMBER
+    || normalizedValue === SKRIPKOVA_ROUTING_PHONE_NUMBER;
 }
 
 function isPopradOncologyRoute(value?: string): boolean {
@@ -213,6 +227,8 @@ function assertClinicRoutingIsolation(
     [DENTBODY_TWILIO_PHONE_NUMBER, DENTBODY_CLINIC_ID],
     [MALAKOVA_TWILIO_PHONE_NUMBER, MALAKOVA_CLINIC_ID],
     [MALAKOVA_ROUTING_PHONE_NUMBER, MALAKOVA_CLINIC_ID],
+    [SKRIPKOVA_TWILIO_PHONE_NUMBER, SKRIPKOVA_CLINIC_ID],
+    [SKRIPKOVA_ROUTING_PHONE_NUMBER, SKRIPKOVA_CLINIC_ID],
     ...Array.from(POPRAD_ONCOLOGY_ROUTING_PHONE_NUMBERS, phoneNumber => [phoneNumber, POPRAD_ONCOLOGY_CLINIC_ID] as [string, string]),
   ]);
   const expectedClinicId = protectedRoutes.get(normalizedRoute);
@@ -314,11 +330,13 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const isHmiraDedicatedDestination = normalizedTo === HMIRA_PHONE_NUMBER;
     const isPopradOncologyDestination = isPopradOncologyRoute(body.To);
     const isMalakovaDedicatedDestination = normalizedTo === MALAKOVA_TWILIO_PHONE_NUMBER;
+    const isSkripkovaDedicatedDestination = normalizedTo === SKRIPKOVA_TWILIO_PHONE_NUMBER;
     const isOtherDedicatedDestination = normalizedTo === CELKOVA_PHONE_NUMBER
       || normalizedTo === ELISSEA_TWILIO_PHONE_NUMBER
       || normalizedTo === KOLLAR_TWILIO_PHONE_NUMBER
       || normalizedTo === DENTBODY_TWILIO_PHONE_NUMBER
       || isMalakovaDedicatedDestination
+      || isSkripkovaDedicatedDestination
       || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
       || normalizedTo === KUTAKOVA_PHONE_NUMBER
       || normalizedTo === normalizeSlovakPhoneAddress(novotnyVoiceBotPhoneNumber)
@@ -332,6 +350,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       || normalizedTo === KOLLAR_TWILIO_PHONE_NUMBER
       || normalizedTo === DENTBODY_TWILIO_PHONE_NUMBER
       || isMalakovaDedicatedDestination
+      || isSkripkovaDedicatedDestination
       || normalizedTo === CELKOVA_PHONE_NUMBER
       || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
       || normalizedTo === KUTAKOVA_PHONE_NUMBER
@@ -484,6 +503,13 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       forwardedFrom = novotnyVoiceBotPhoneNumber;
       fastify.log.info({ from: fromNumber, to: body.To, carrierForwardedFrom }, 'Applied dedicated Twilio number routing for MUDr. Novotny');
     } else if (
+      isSkripkovaDedicatedDestination
+      || isSkripkovaRoute(body.To)
+      || (!isOtherDedicatedDestination && isSkripkovaRoute(carrierForwardedFrom))
+    ) {
+      forwardedFrom = SKRIPKOVA_ROUTING_PHONE_NUMBER;
+      fastify.log.info({ from: fromNumber, to: body.To, carrierForwardedFrom }, 'Applied routing for MUDr. Skripkova');
+    } else if (
       isZdrahalovaRoute(body.To)
       || (!isOtherDedicatedDestination && isZdrahalovaRoute(carrierForwardedFrom))
     ) {
@@ -545,10 +571,11 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       const isNovotnyNumber = Boolean(novotnyVoiceBotPhoneNumber) && forwardedFrom === novotnyVoiceBotPhoneNumber;
       const isHmiraNumber = isHmiraRoute(forwardedFrom);
       const isZdrahalovaNumber = isZdrahalovaRoute(forwardedFrom);
+      const isSkripkovaNumber = isSkripkovaRoute(forwardedFrom);
       const isPopradOncologyNumber = isPopradOncologyRoute(forwardedFrom);
       const isDobrovodskaNumber = isDobrovodskaRoute(forwardedFrom) || isDobrovodskaRoute(body.To) || isDobrovodskaRoute(carrierForwardedFrom);
       const isDobrovodskaVacation = isDobrovodskaNumber && isDobrovodskaVacationDay();
-      const isDedicatedVoiceBotNumber = isCelkovaNumber || isBenovaBaloghovaNumber || isNovotnyNumber || isHmiraNumber || isZdrahalovaNumber || isPopradOncologyNumber;
+      const isDedicatedVoiceBotNumber = isCelkovaNumber || isBenovaBaloghovaNumber || isNovotnyNumber || isHmiraNumber || isZdrahalovaNumber || isSkripkovaNumber || isPopradOncologyNumber;
 
       if (!isDedicatedVoiceBotNumber && !isDobrovodskaVacation && !ivrService.shouldAllowCall(config, forwardedFrom)) {
         twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Toto číslo je momentálne nedostupné.');
@@ -556,22 +583,24 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         return reply.type('text/xml').send(twiml.toString());
       }
 
-      const pediatricMode = isCelkovaNumber || isZdrahalovaNumber || (!isBenovaBaloghovaNumber && !isNovotnyNumber && !isHmiraNumber && config.pediatricMode === true);
+      const pediatricMode = isCelkovaNumber || isZdrahalovaNumber || isSkripkovaNumber || (!isBenovaBaloghovaNumber && !isNovotnyNumber && !isHmiraNumber && config.pediatricMode === true);
       const dentalMode = isNovotnyNumber || isHmiraNumber;
-      const greeting = isZdrahalovaNumber
-        ? ZDRAHALOVA_PEDIATRIC_GREETING
-        : isPopradOncologyNumber
-          ? POPRAD_ONCOLOGY_GREETING
-          : config.greetingMessage
-          || (isBenovaBaloghovaNumber
-            ? ORTHOPEDIC_GREETING
-            : isHmiraNumber
-              ? HMIRA_DENTAL_GREETING
-              : dentalMode
-                ? NOVOTNY_DENTAL_GREETING
-                : pediatricMode
-                  ? PEDIATRIC_GREETING
-                  : DEFAULT_GREETING);
+      const greeting = isSkripkovaNumber
+        ? skripkovaBotConfig.copy.greeting
+        : isZdrahalovaNumber
+          ? ZDRAHALOVA_PEDIATRIC_GREETING
+          : isPopradOncologyNumber
+            ? POPRAD_ONCOLOGY_GREETING
+            : config.greetingMessage
+            || (isBenovaBaloghovaNumber
+              ? ORTHOPEDIC_GREETING
+              : isHmiraNumber
+                ? HMIRA_DENTAL_GREETING
+                : dentalMode
+                  ? NOVOTNY_DENTAL_GREETING
+                  : pediatricMode
+                    ? PEDIATRIC_GREETING
+                    : DEFAULT_GREETING);
 
       if (isDobrovodskaVacation) {
         twiml.say(
@@ -582,6 +611,8 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         twiml.play(`${getPublicBaseUrl(request)}/media/dobrovodska-1-greeting-v2.wav`);
       } else if (isHmiraNumber && existsSync(HMIRA_GREETING_FILE)) {
         twiml.play(`${getPublicBaseUrl(request)}/media/hmira-1-greeting-v1.wav`);
+      } else if (isSkripkovaNumber && existsSync(SKRIPKOVA_GREETING_FILE)) {
+        twiml.play(`${getPublicBaseUrl(request)}${skripkovaBotConfig.copy.greetingAudioPath}`);
       } else {
         twiml.say(
           { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
@@ -598,7 +629,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         action: `/voice/record-problem?forwardedFrom=${encodeURIComponent(forwardedFrom)}&pediatricMode=${pediatricMode}&dentalMode=${dentalMode}&dobrovodskaVacation=${isDobrovodskaVacation}`,
         playBeep: true,
         maxLength: 120,
-        timeout: dentalMode || isZdrahalovaNumber || isPopradOncologyNumber ? 3 : 10
+        timeout: dentalMode || isZdrahalovaNumber || isSkripkovaNumber || isPopradOncologyNumber ? 3 : 10
       });
 
       return reply.type('text/xml').send(twiml.toString());
@@ -641,8 +672,9 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const isDobrovodskaNumber = isDobrovodskaRoute(forwardedFrom);
     const isDobrovodskaVacation = isDobrovodskaNumber && query.dobrovodskaVacation === 'true';
     const isZdrahalovaNumber = isZdrahalovaRoute(forwardedFrom);
+    const isSkripkovaNumber = isSkripkovaRoute(forwardedFrom);
     const isPopradOncologyNumber = isPopradOncologyRoute(forwardedFrom);
-    if (isDobrovodskaNumber || dentalMode || isZdrahalovaNumber || isPopradOncologyNumber) {
+    if (isDobrovodskaNumber || dentalMode || isZdrahalovaNumber || isSkripkovaNumber || isPopradOncologyNumber) {
       const completedDraft = updateVoicemailDraft(body.CallSid, {
         callCompleted: true,
         callEndedAt: new Date().toISOString(),
@@ -656,16 +688,20 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         twiml.play(`${getPublicBaseUrl(request)}/media/dobrovodska-2-completion-v2.wav`);
       } else if (isHmiraRoute(forwardedFrom) && existsSync(HMIRA_COMPLETION_FILE)) {
         twiml.play(`${getPublicBaseUrl(request)}/media/hmira-2-completion-v1.wav`);
+      } else if (isSkripkovaNumber && existsSync(SKRIPKOVA_COMPLETION_FILE)) {
+        twiml.play(`${getPublicBaseUrl(request)}${skripkovaBotConfig.copy.completionAudioPath}`);
       } else {
         twiml.say(
           { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
           isDobrovodskaNumber
             ? 'Ďakujeme, vašu požiadavku sme zaznamenali. Ambulancia sa vám ozve najneskôr do 24 hodín. Dovidenia.'
-            : isZdrahalovaNumber
-              ? ZDRAHALOVA_PEDIATRIC_COMPLETION
-              : isPopradOncologyNumber
-                ? POPRAD_ONCOLOGY_COMPLETION
-                : getDentalCompletion(forwardedFrom)
+            : isSkripkovaNumber
+              ? skripkovaBotConfig.copy.completion
+              : isZdrahalovaNumber
+                ? ZDRAHALOVA_PEDIATRIC_COMPLETION
+                : isPopradOncologyNumber
+                  ? POPRAD_ONCOLOGY_COMPLETION
+                  : getDentalCompletion(forwardedFrom)
         );
       }
       twiml.hangup();
@@ -791,13 +827,15 @@ export async function voiceRoutes(fastify: FastifyInstance) {
             ? 'Telefonická požiadavka pacienta pre ambulanciu všeobecnej lekárky v češtine. Pacient môže uviesť svoje meno a následne zdravotnú alebo administratívnu požiadavku; zachovaj všetky údaje v prepise.'
             : isPopradOncologyRoute(forwardedFrom)
               ? 'Telefonická požiadavka pacienta pre oddelenie klinickej onkológie v slovenčine. Pacient môže na začiatku uviesť svoje meno; zachovaj všetky údaje v prepise.'
-              : isZdrahalovaRoute(forwardedFrom)
-                ? 'Telefonická požiadavka rodiča pre pediatrickú ambulanciu v slovenčine. Rodič môže uviesť meno dieťaťa a následne zdravotnú alebo administratívnu požiadavku; zachovaj všetky údaje v prepise.'
-                : pediatricMode
-                  ? 'Telefonická požiadavka rodiča pre pediatrickú ambulanciu v slovenčine.'
-                  : dentalMode
-                    ? 'Telefonická požiadavka pacienta pre zubnú ambulanciu v slovenčine. Pacient môže na začiatku uviesť svoje meno; zachovaj ho v prepise.'
-                    : 'Telefonická požiadavka pacienta pre lekársku ambulanciu v slovenčine.')
+              : isSkripkovaRoute(forwardedFrom)
+                ? 'Telefonická požiadavka volajúceho pre pediatrickú ambulanciu MUDr. Škripkovej v slovenčine. Volajúci uvádza svoje meno a dôvod volania v jednej odpovedi; zachovaj všetky údaje v prepise.'
+                : isZdrahalovaRoute(forwardedFrom)
+                  ? 'Telefonická požiadavka rodiča pre pediatrickú ambulanciu v slovenčine. Rodič môže uviesť meno dieťaťa a následne zdravotnú alebo administratívnu požiadavku; zachovaj všetky údaje v prepise.'
+                  : pediatricMode
+                    ? 'Telefonická požiadavka rodiča pre pediatrickú ambulanciu v slovenčine.'
+                    : dentalMode
+                      ? 'Telefonická požiadavka pacienta pre zubnú ambulanciu v slovenčine. Pacient môže na začiatku uviesť svoje meno; zachovaj ho v prepise.'
+                      : 'Telefonická požiadavka pacienta pre lekársku ambulanciu v slovenčine.')
         ]);
         const birthYearTranscript = normalizeBirthYearTranscript(rawBirthYearTranscript);
 

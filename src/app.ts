@@ -20,6 +20,8 @@ const DOBROVODSKA_GREETING_PATH = resolve(__dirname, 'assets/audio/dobrovodska-1
 const DOBROVODSKA_COMPLETION_PATH = resolve(__dirname, 'assets/audio/dobrovodska-2-completion-v2.wav');
 const HMIRA_GREETING_PATH = resolve(__dirname, 'assets/audio/hmira-1-greeting-v1.wav');
 const HMIRA_COMPLETION_PATH = resolve(__dirname, 'assets/audio/hmira-2-completion-v1.wav');
+const SKRIPKOVA_GREETING_PATH = resolve(__dirname, 'assets/audio/skripkova-1-greeting-v1.wav');
+const SKRIPKOVA_COMPLETION_PATH = resolve(__dirname, 'assets/audio/skripkova-2-completion-v1.wav');
 
 function createPromptToneWav(): Buffer {
   const sampleRate = 8_000;
@@ -126,6 +128,32 @@ app.get('/media/hmira-2-completion-v1.wav', async (_request, reply) => {
     .header('Content-Length', audioStats.size)
     .header('Cache-Control', 'public, max-age=31536000, immutable')
     .send(createReadStream(HMIRA_COMPLETION_PATH));
+});
+
+app.get('/media/skripkova-1-greeting-v1.wav', async (_request, reply) => {
+  try {
+    const audioStats = statSync(SKRIPKOVA_GREETING_PATH);
+    return reply
+      .type('audio/wav')
+      .header('Content-Length', audioStats.size)
+      .header('Cache-Control', 'public, max-age=31536000, immutable')
+      .send(createReadStream(SKRIPKOVA_GREETING_PATH));
+  } catch {
+    return reply.code(404).send();
+  }
+});
+
+app.get('/media/skripkova-2-completion-v1.wav', async (_request, reply) => {
+  try {
+    const audioStats = statSync(SKRIPKOVA_COMPLETION_PATH);
+    return reply
+      .type('audio/wav')
+      .header('Content-Length', audioStats.size)
+      .header('Cache-Control', 'public, max-age=31536000, immutable')
+      .send(createReadStream(SKRIPKOVA_COMPLETION_PATH));
+  } catch {
+    return reply.code(404).send();
+  }
 });
 
 app.get('/media/booking-prompt-tone.wav', async (_request, reply) => reply
