@@ -9,9 +9,21 @@ const { prixiService } = require('../../src/services/prixi.service');
 const { sttService } = require('../../src/services/stt.service');
 
 const originalGetConfig = prixiService.getConfig.bind(prixiService);
+const originalGetVoiceAssistantConfig = prixiService.getVoiceAssistantConfig.bind(prixiService);
 const originalSendEvent = prixiService.sendEvent.bind(prixiService);
 const originalTranscribeAudioUrl = sttService.transcribeAudioUrl.bind(sttService);
 let sentEvents = [];
+let voiceAssistantConfig;
+
+const configuredWorkingHours = {
+  monday: { enabled: true, from: '09:00', to: '17:00' },
+  tuesday: { enabled: true, from: '07:00', to: '16:00' },
+  wednesday: { enabled: true, from: '07:00', to: '13:00' },
+  thursday: { enabled: true, from: '10:00', to: '17:00' },
+  friday: { enabled: false, from: null, to: null },
+  saturday: { enabled: false, from: null, to: null },
+  sunday: { enabled: false, from: null, to: null },
+};
 
 function signature(url, params) {
   return twilio.getExpectedTwilioSignature(process.env.TWILIO_AUTH_TOKEN, url, params);
@@ -62,6 +74,10 @@ test.before(async () => {
     assert.equal(phone, '+420910922076');
     return { clinicId: '155', voiceBotEnabled: true, timezone: 'Europe/Bratislava' };
   };
+  prixiService.getVoiceAssistantConfig = async phone => {
+    assert.equal(phone, '+420910922076');
+    return voiceAssistantConfig;
+  };
   prixiService.sendEvent = async event => sentEvents.push(event);
   sttService.transcribeAudioUrl = async () => 'Prosím, zavolajte mi ohľadom môjho vyšetrenia.';
   await app.ready();
@@ -69,10 +85,24 @@ test.before(async () => {
 
 test.beforeEach(() => {
   sentEvents = [];
+  voiceAssistantConfig = {
+    clinicId: '155',
+    assistantType: 'kollar',
+    enabled: true,
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+    availability: { status: 'open', message: null },
+    messages: {
+      vacation: 'Momentálne máme dovolenku. Prosíme, zavolajte nám opäť po návrate.',
+    },
+    workingHours: configuredWorkingHours,
+    officeHoursNote: 'V pondelok a vo štvrtok objednávame aj medzi sedemnástou a osemnástou. Utorok je prednostne tehotenská poradňa.',
+  };
 });
 
 test.after(async () => {
   prixiService.getConfig = originalGetConfig;
+  prixiService.getVoiceAssistantConfig = originalGetVoiceAssistantConfig;
   prixiService.sendEvent = originalSendEvent;
   sttService.transcribeAudioUrl = originalTranscribeAudioUrl;
   await app.close();
@@ -88,6 +118,35 @@ test('produkčný DID spustí speech-first flow MUDr. Kollára so schváleným �
   assert.match(response.body, /input="speech dtmf"/);
   assert.match(response.body, /action="\/voice\/kollar\/answer"/);
   assert.doesNotMatch(response.body, /Elissea|Vadkerti/);
+});
+
+test('počas dovolenky prehrá nakonfigurovanú hlášku a hovor prirodzene ukončí', async () => {
+  voiceAssistantConfig.availability = {
+    status: 'vacation',
+    message: 'Momentálne máme dovolenku. Opäť ordinujeme od 9. novembra.',
+  };
+
+  const response = await incoming('CA-KOLLAR-VACATION-0000000000000001');
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /Momentálne máme dovolenku/);
+  assert.match(response.body, /Opäť ordinujeme od 9. novembra/);
+  assert.match(response.body, /Ďakujeme za pochopenie/);
+  assert.match(response.body, /Prajem ešte pekný zvyšok dňa\. Dovidenia/);
+  assert.match(response.body, /<Hangup/);
+  assert.doesNotMatch(response.body, /<Gather/);
+});
+
+test('stav mimo ordinačných hodín neblokuje Kollárov existujúci callback flow', async () => {
+  voiceAssistantConfig.availability = {
+    status: 'outside_hours',
+    message: 'Ambulancia je teraz zatvorená.',
+  };
+
+  const response = await incoming('CA-KOLLAR-AFTER-HOURS-0000000000001');
+
+  assert.match(response.body, /Ako vám pomôžem/);
+  assert.match(response.body, /<Gather/);
 });
 
 test('nepochopená odpoveď ponúkne číselný fallback jedna až sedem', async () => {
@@ -126,7 +185,7 @@ test('recept žiada názov lieku a počet balení', async () => {
   const callSid = 'CA-KOLLAR-PRESCRIPTION-000000000001';
   await incoming(callSid);
   const identityPrompt = await answer(callSid, 'potrebujem predpísať lieky');
-  assert.match(identityPrompt.body, /Rozumiem\. Povedzte prosím vaše celé meno a rok narodenia/);
+  assert.match(identityPrompt.body, /Rozumiem\. Povedzte prosím ešte vaše celé meno a rok narodenia/);
   const prompt = await provideIdentity(callSid, 'Mária Kováčová', '1978');
   assert.match(prompt.body, /Aké lieky si prajete predpísať/);
   assert.match(prompt.body, /názov lieku a počet balení/);
@@ -182,7 +241,7 @@ test('nová pacientka dostane webový postup bez SMS alebo PriXi požiadavky', a
   const completion = await answer(callSid, 'chcem byť nová pacientka');
   await flushPromises();
 
-  assert.match(completion.body, /www\.prvazenska\.sk/);
+  assert.match(completion.body, /www\.prváženská\.sk/);
   assert.match(completion.body, /Preniesť kartu/);
   assert.doesNotMatch(completion.body, /meno a priezvisko|rok narodenia/);
   assert.match(completion.body, /Prajem ešte pekný zvyšok dňa\. Dovidenia/);
@@ -195,12 +254,29 @@ test('ordinačné hodiny obsahujú celý týždeň a utorkovú tehotenskú porad
   await incoming(callSid);
   const completion = await answer(callSid, '6', true);
 
-  assert.match(completion.body, /pondelok od 9\. do 17/);
+  assert.match(completion.body, /V pondelok ordinujeme od deviatej do sedemnástej/);
   assert.match(completion.body, /Utorok je prednostne tehotenská poradňa/);
   assert.match(completion.body, /V piatok neordinujeme/);
+  assert.match(completion.body, /V sobotu neordinujeme/);
   assert.doesNotMatch(completion.body, /meno a priezvisko|rok narodenia/);
-  assert.match(completion.body, /Prajem ešte pekný zvyšok dňa\. Dovidenia/);
+  assert.match(completion.body, /prajem ešte pekný zvyšok dňa\. Dovidenia/);
   assert.equal(sentEvents.length, 0);
+});
+
+test('pri nedostupnej konfigurácii ordinačných hodín použije bezpečný fallback', async () => {
+  const validGetVoiceAssistantConfig = prixiService.getVoiceAssistantConfig;
+  prixiService.getVoiceAssistantConfig = async () => { throw new Error('test API failure'); };
+  try {
+    const callSid = 'CA-KOLLAR-HOURS-FALLBACK-00000000001';
+    await incoming(callSid);
+    const completion = await answer(callSid, 'ordinačné hodiny');
+
+    assert.match(completion.body, /v pondelok od deviatej do sedemnástej/);
+    assert.match(completion.body, /Utorok je prednostne tehotenská poradňa/);
+    assert.match(completion.body, /V piatok neordinujeme/);
+  } finally {
+    prixiService.getVoiceAssistantConfig = validGetVoiceAssistantConfig;
+  }
 });
 
 test('voľba človeka nahrá odkaz s tónom, prepíše ho a odošle do PriXi', async () => {
