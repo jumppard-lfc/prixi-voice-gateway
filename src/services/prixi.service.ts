@@ -247,6 +247,24 @@ export class PrixiService {
   }
 
   /**
+   * Loads the persisted EDS voice-assistant configuration without applying the
+   * dedicated production-route overrides used by getConfig(). Dedicated bots
+   * can use this for optional, clinic-managed runtime data while preserving
+   * their existing safe routing fallback.
+   */
+  async getVoiceAssistantConfig(phoneNumber: string): Promise<ClinicConfig> {
+    if (this.mockMode) {
+      throw new Error('Remote voice-assistant configuration is unavailable in mock mode');
+    }
+
+    const response = await this.client.get<ClinicConfig>('/api/voice/config', {
+      params: { phoneNumber },
+      timeout: 2000,
+    });
+    return response.data;
+  }
+
+  /**
    * Sends an event (call_forwarded or voicemail_recorded) to the Prixi API.
    * Implements basic retry logic for 5xx errors.
    */

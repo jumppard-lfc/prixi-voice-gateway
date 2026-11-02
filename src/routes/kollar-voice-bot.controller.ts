@@ -3,6 +3,7 @@ import twilio from 'twilio';
 import { kollarBotConfig, KollarRequestType } from '../config/kollar.config';
 import { parseKollarIdentity, parseKollarRequestType } from '../services/kollar-nlu.service';
 import { KollarSession, kollarSessionService } from '../services/kollar-session.service';
+import { buildKollarOfficeHoursMessage } from '../services/kollar-office-hours.service';
 import { prixiService } from '../services/prixi.service';
 import { sttService } from '../services/stt.service';
 import { VoicemailRecordedEvent } from '../types';
@@ -145,6 +146,48 @@ async function resolveClinicId(): Promise<string> {
   return clinicId;
 }
 
+async function resolveOfficeHours(fastify: FastifyInstance): Promise<string> {
+  try {
+    const config = await prixiService.getVoiceAssistantConfig(kollarBotConfig.clinic.inboundTwilioNumber);
+    const message = buildKollarOfficeHoursMessage(config);
+    if (message) return message;
+    fastify.log.warn(
+      { clinicId: config.clinicId, assistantType: config.assistantType },
+      'MUDr. Kollar office-hours configuration is incomplete; using fallback copy'
+    );
+  } catch (error) {
+    fastify.log.warn({ err: error }, 'Failed to load MUDr. Kollar office hours; using fallback copy');
+  }
+  return copy.officeHours;
+}
+
+function naturalVacationEnding(message: string): string {
+  const trimmed = message.trim();
+  if (/dovidenia[.!]?$/i.test(trimmed)) return trimmed;
+  return `${trimmed.replace(/[.!?]+$/, '')}. Ďakujeme za pochopenie. Prajem ešte pekný zvyšok dňa. Dovidenia.`;
+}
+
+async function resolveVacationMessage(fastify: FastifyInstance): Promise<string | undefined> {
+  try {
+    const config = await prixiService.getVoiceAssistantConfig(kollarBotConfig.clinic.inboundTwilioNumber);
+    if (
+      String(config.clinicId) !== kollarBotConfig.clinic.clinicId
+      || config.assistantType !== 'kollar'
+      || config.availability?.status !== 'vacation'
+    ) {
+      return undefined;
+    }
+
+    const message = config.availability.message?.trim()
+      || config.messages?.vacation?.trim()
+      || 'Momentálne máme dovolenku. Prosíme, zavolajte nám opäť po návrate.';
+    return naturalVacationEnding(message);
+  } catch (error) {
+    fastify.log.warn({ err: error }, 'Failed to load MUDr. Kollar vacation status; continuing with the normal flow');
+    return undefined;
+  }
+}
+
 function hasMeaningfulRequest(session: KollarSession): boolean {
   if (session.requestType === 'results' || session.requestType === 'appointment') return true;
   return Boolean(session.detail || session.recordingUrl);
@@ -258,6 +301,8 @@ export async function startKollarVoiceBot(
 ): Promise<FastifyReply> {
   try {
     const clinicId = await resolveClinicId();
+    const vacationMessage = await resolveVacationMessage(fastify);
+    if (vacationMessage) return renderEnd(reply, vacationMessage);
     return renderMenu(reply, kollarSessionService.create(body.CallSid, body.From || '', clinicId));
   } catch (error) {
     fastify.log.error(error, 'MUDr. Kollar clinic routing validation failed');
@@ -331,7 +376,10 @@ export async function kollarVoiceBotRoutes(fastify: FastifyInstance): Promise<vo
       }
 
       kollarSessionService.delete(session.callSid);
-      return renderEnd(reply, requestType === 'new_patient' ? copy.newPatient : copy.officeHours);
+      return renderEnd(
+        reply,
+        requestType === 'new_patient' ? copy.newPatient : await resolveOfficeHours(fastify)
+      );
     }
 
     if (session.step === 'detail') {

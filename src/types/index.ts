@@ -3,9 +3,33 @@ export interface OfficeHours {
   to: string;   // e.g. "15:00"
 }
 
+export interface VoiceAssistantWorkingHoursDay {
+  enabled: boolean;
+  from: string | null;
+  to: string | null;
+}
+
+export type VoiceAssistantWorkingHours = Partial<Record<
+  'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday',
+  VoiceAssistantWorkingHoursDay
+>>;
+
 export interface ClinicConfig {
   clinicId: string;
   voiceBotEnabled: boolean;
+  enabled?: boolean;
+  assistantType?: string | null;
+  twilioPhoneNumber?: string | null;
+  availability?: {
+    status: 'open' | 'vacation' | 'outside_hours' | 'disabled';
+    message?: string | null;
+  };
+  messages?: {
+    vacation?: string | null;
+    [key: string]: string | null | undefined;
+  };
+  workingHours?: VoiceAssistantWorkingHours;
+  officeHoursNote?: string | null;
   officeHours?: {
     monday?: OfficeHours;
     tuesday?: OfficeHours;
