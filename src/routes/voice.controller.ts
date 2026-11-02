@@ -3,7 +3,7 @@ import twilio from 'twilio';
 import { prixiService } from '../services/prixi.service';
 import { sttService } from '../services/stt.service';
 import { ivrService } from '../services/ivr.service';
-import { bulkGateSmsService } from '../services/bulkgate-sms.service';
+import { prixiVoiceSmsService } from '../services/prixi-voice-sms.service';
 import { getCelkovaTimeMessage } from '../services/pediatric-call-context.service';
 import { CallForwardedEvent, ClinicConfig, VoicemailRecordedEvent } from '../types';
 import { claimVoiceEvent, completeVoiceEvent, failVoiceEvent, createVoiceEventKey } from '../utils/voice-event-ledger';
@@ -40,6 +40,7 @@ const BENOVA_BALOGHOVA_CLINIC_ID = '143';
 const KUTAKOVA_PHONE_NUMBER = kutakovaBotConfig.clinic.inboundTwilioNumber;
 const KUTAKOVA_CLINIC_ID = kutakovaBotConfig.clinic.clinicId;
 const KLOSTERMANN_PHONE_NUMBER = '+420910924239';
+const KLOSTERMANN_HEALTHCARE_PROVIDER_ID = 153;
 const NOVOTNY_PHONE_NUMBER = '+420910928021';
 const NOVOTNY_CLINIC_ID = '112';
 const HMIRA_PHONE_NUMBER = '+420910924407';
@@ -440,12 +441,28 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       }
 
       if (process.env.NODE_ENV !== 'test') {
-        bulkGateSmsService.sendTransactionalSms(fromNumber, KLOSTERMANN_SMS).then(result => {
-          fastify.log.info({ messageId: result.messageId, status: result.status, to: fromNumber }, 'Klostermann booking SMS accepted by BulkGate');
-        }).catch(err => {
-          const error = err instanceof Error ? { name: err.name, message: err.message } : { message: String(err) };
-          fastify.log.error({ err: error, to: fromNumber }, 'Failed to send Klostermann booking SMS through BulkGate');
-        });
+        const callSid = body.CallSid?.trim();
+        if (!callSid) {
+          fastify.log.error({ to: fromNumber }, 'Cannot send Klostermann booking SMS without Twilio CallSid');
+        } else {
+          const idempotencyKey = `call-${callSid}-sms-klostermann-booking-link`;
+          prixiVoiceSmsService.send({
+            healthcareProviderId: KLOSTERMANN_HEALTHCARE_PROVIDER_ID,
+            phoneNumber: fromNumber,
+            message: KLOSTERMANN_SMS,
+            idempotencyKey,
+          }).then(result => {
+            const logContext = { smsLogId: result.smsLogId, status: result.status, to: fromNumber };
+            if (result.status === 'sent') {
+              fastify.log.info(logContext, 'Klostermann booking SMS accepted by PriXi');
+            } else {
+              fastify.log.warn(logContext, 'Klostermann booking SMS has a non-final PriXi status');
+            }
+          }).catch(err => {
+            const error = err instanceof Error ? { name: err.name, message: err.message } : { message: String(err) };
+            fastify.log.error({ err: error, to: fromNumber }, 'Failed to send Klostermann booking SMS through PriXi');
+          });
+        }
       }
 
       twiml.hangup();
