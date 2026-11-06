@@ -519,7 +519,7 @@ test('Gyncentrum Dolny Kubin pouzije chranene smerovanie a Pekarcikov trojkrokov
     assert.equal(incoming.statusCode, 200);
     assert.equal(requestedPhoneNumber, '+421948050099');
     assert.match(incoming.body, /gynekologickej ambulancie Gyncentrum Dolný Kubín/);
-    assert.match(incoming.body, /www\.gyncentrumdk\.sk/);
+    assert.match(incoming.body, /www\.gyncentrumdéká\.sk/);
     assert.match(incoming.body, /record-problem\?forwardedFrom=%2B421948050099/);
 
     const problemUrl = 'https://api.twilio.test/problem-165';
@@ -1581,7 +1581,7 @@ test('MUDr. Dobrovodska ma 23. oktobra automaticky dovolenkovy flow', async () =
     voiceBotEnabled: true,
     timezone: 'Europe/Prague',
   });
-  prixiService.sendEvent = async () => {};
+  prixiService.sendEvent = async () => { };
   sttService.transcribeAudioUrl = async () => 'Jana Nováková, potřebuji předepsat léky.';
   const vacationTimestamp = DateTime.fromISO('2026-10-23T18:00:00+02:00').toMillis();
   const mondayTimestamp = DateTime.fromISO('2026-10-26T09:00:00+01:00').toMillis();

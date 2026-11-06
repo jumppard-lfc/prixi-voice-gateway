@@ -13,6 +13,6 @@ export const gyncentrumBotConfig = {
     timezone: 'Europe/Bratislava',
   },
   copy: {
-    greeting: 'Dobrý deň, dovolali ste sa do gynekologickej ambulancie Gyncentrum Dolný Kubín. Som Prixi, vaša virtuálna sestra. Ak máte akútny zdravotný problém, príďte na vyšetrenie bez objednania počas ordinačných hodín. Nájdete ich na stránke www.gyncentrumdk.sk. Prostredníctvom tejto stránky sa môžete objednať na preventívnu prehliadku, požiadať o predpis receptu alebo vybaviť ďalšie požiadavky. Prosíme, uprednostnite komunikáciu cez www.gyncentrumdk.sk. Ak nám chcete zanechať telefonický odkaz, po zaznení tónu najskôr stručne opíšte svoj problém. Potom stlačte ľubovoľné tlačidlo a pokračujte podľa pokynov. Ďakujeme.',
+    greeting: 'Dobrý deň, dovolali ste sa do ambulancie Gyncentrum Dolný Kubín. Som Prixi, vaša virtuálna sestra. Ak máte akútny zdravotný problém, príďte na vyšetrenie bez objednania počas ordinačných hodín. Nájdete ich na stránke www.gyncentrumdéká.sk. Prostredníctvom tejto stránky sa môžete objednať na preventívnu prehliadku, požiadať o predpis receptu alebo vybaviť ďalšie požiadavky. Prosíme, uprednostnite komunikáciu cez www.gyncentrumdéká.sk. Ak nám chcete zanechať telefonický odkaz, po zaznení tónu najskôr stručne opíšte svoj problém. Potom stlačte ľubovoľné tlačidlo a pokračujte podľa pokynov. Ďakujeme.',
   },
 } as const;
