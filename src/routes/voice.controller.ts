@@ -29,6 +29,7 @@ import { dentbodyBotConfig } from '../config/dentbody.config';
 import { finalizeAbandonedMalakovaCall, startMalakovaVoiceBot } from './malakova-voice-bot.controller';
 import { malakovaBotConfig } from '../config/malakova.config';
 import { skripkovaBotConfig } from '../config/skripkova.config';
+import { gyncentrumBotConfig } from '../config/gyncentrum.config';
 import { DateTime } from 'luxon';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -62,6 +63,9 @@ const DOBROVODSKA_CLINIC_ID = '95';
 const PEKARCIK_VIPTEL_PHONE_NUMBER = '+421332289010';
 const PEKARCIK_ROUTING_PHONE_NUMBER = '+421940610160';
 const PEKARCIK_CLINIC_ID = '64';
+const GYNCENTRUM_TWILIO_PHONE_NUMBER = gyncentrumBotConfig.clinic.inboundTwilioNumber;
+const GYNCENTRUM_ROUTING_PHONE_NUMBER = gyncentrumBotConfig.clinic.routingPhoneNumber;
+const GYNCENTRUM_CLINIC_ID = gyncentrumBotConfig.clinic.clinicId;
 const VADKERTI_TWILIO_PHONE_NUMBER = vadkertiBotConfig.clinic.inboundTwilioNumber;
 const VADKERTI_ROUTING_PHONE_NUMBER = '+421902647072';
 const NEUROCENTRUM_ROUTING_PHONE_NUMBER = neurocentrumBotConfig.clinic.routingPhoneNumber;
@@ -139,6 +143,8 @@ const PROTECTED_PRODUCTION_TWILIO_NUMBERS = new Set([
   ...POPRAD_ONCOLOGY_ROUTING_PHONE_NUMBERS,
   PEKARCIK_VIPTEL_PHONE_NUMBER,
   PEKARCIK_ROUTING_PHONE_NUMBER,
+  GYNCENTRUM_TWILIO_PHONE_NUMBER,
+  GYNCENTRUM_ROUTING_PHONE_NUMBER,
   DOBROVODSKA_ROUTING_PHONE_NUMBER,
   VADKERTI_TWILIO_PHONE_NUMBER,
   VADKERTI_ROUTING_PHONE_NUMBER,
@@ -193,6 +199,12 @@ function isPopradOncologyRoute(value?: string): boolean {
     || POPRAD_ONCOLOGY_ROUTING_PHONE_NUMBERS.has(normalizedValue);
 }
 
+function isGyncentrumRoute(value?: string): boolean {
+  const normalizedValue = normalizeSlovakPhoneAddress(value);
+  return normalizedValue === GYNCENTRUM_TWILIO_PHONE_NUMBER
+    || normalizedValue === GYNCENTRUM_ROUTING_PHONE_NUMBER;
+}
+
 function getDentalCompletion(routingPhoneNumber: string): string {
   return isHmiraRoute(routingPhoneNumber) ? HMIRA_DENTAL_COMPLETION : NOVOTNY_DENTAL_COMPLETION;
 }
@@ -213,6 +225,8 @@ function assertClinicRoutingIsolation(
   const normalizedRoute = normalizeSlovakPhoneAddress(routingPhoneNumber);
   const protectedRoutes = new Map<string, string>([
     [PEKARCIK_ROUTING_PHONE_NUMBER, PEKARCIK_CLINIC_ID],
+    [GYNCENTRUM_TWILIO_PHONE_NUMBER, GYNCENTRUM_CLINIC_ID],
+    [GYNCENTRUM_ROUTING_PHONE_NUMBER, GYNCENTRUM_CLINIC_ID],
     [DOBROVODSKA_ROUTING_PHONE_NUMBER, DOBROVODSKA_CLINIC_ID],
     [CELKOVA_PHONE_NUMBER, CELKOVA_CLINIC_ID],
     [BENOVA_BALOGHOVA_PHONE_NUMBER, BENOVA_BALOGHOVA_CLINIC_ID],
@@ -328,6 +342,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const normalizedTo = normalizeSlovakPhoneAddress(body.To);
     const normalizedCarrierForwardedFrom = normalizeSlovakPhoneAddress(carrierForwardedFrom);
     const isPekarcikVipTelDestination = normalizedTo === PEKARCIK_VIPTEL_PHONE_NUMBER;
+    const isGyncentrumDedicatedDestination = normalizedTo === GYNCENTRUM_TWILIO_PHONE_NUMBER;
     const isHmiraDedicatedDestination = normalizedTo === HMIRA_PHONE_NUMBER;
     const isPopradOncologyDestination = isPopradOncologyRoute(body.To);
     const isMalakovaDedicatedDestination = normalizedTo === MALAKOVA_TWILIO_PHONE_NUMBER;
@@ -344,9 +359,11 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       || isZdrahalovaRoute(body.To)
       || isHmiraDedicatedDestination
       || isHmiraRoute(body.To)
-      || isPopradOncologyDestination;
+      || isPopradOncologyDestination
+      || isGyncentrumDedicatedDestination;
 
     const isExistingDedicatedDestination = isPekarcikVipTelDestination
+      || isGyncentrumDedicatedDestination
       || normalizedTo === ELISSEA_TWILIO_PHONE_NUMBER
       || normalizedTo === KOLLAR_TWILIO_PHONE_NUMBER
       || normalizedTo === DENTBODY_TWILIO_PHONE_NUMBER
@@ -546,6 +563,13 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       forwardedFrom = POPRAD_ONCOLOGY_PHONE_NUMBER;
       fastify.log.info({ from: fromNumber, to: body.To, carrierForwardedFrom }, 'Applied routing for Poprad clinical oncology department');
     } else if (
+      isGyncentrumDedicatedDestination
+      || normalizedTo === GYNCENTRUM_ROUTING_PHONE_NUMBER
+      || (!isOtherDedicatedDestination && normalizedCarrierForwardedFrom === GYNCENTRUM_ROUTING_PHONE_NUMBER)
+    ) {
+      forwardedFrom = GYNCENTRUM_ROUTING_PHONE_NUMBER;
+      fastify.log.info({ from: fromNumber, to: body.To, carrierForwardedFrom }, 'Applied protected routing for Gyncentrum Dolny Kubin');
+    } else if (
       isPekarcikVipTelDestination
       || normalizedCarrierForwardedFrom === PEKARCIK_VIPTEL_PHONE_NUMBER
       || normalizedCarrierForwardedFrom === PEKARCIK_ROUTING_PHONE_NUMBER
@@ -590,6 +614,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       const isZdrahalovaNumber = isZdrahalovaRoute(forwardedFrom);
       const isSkripkovaNumber = isSkripkovaRoute(forwardedFrom);
       const isPopradOncologyNumber = isPopradOncologyRoute(forwardedFrom);
+      const isGyncentrumNumber = isGyncentrumRoute(forwardedFrom);
       const isDobrovodskaNumber = isDobrovodskaRoute(forwardedFrom) || isDobrovodskaRoute(body.To) || isDobrovodskaRoute(carrierForwardedFrom);
       const isDobrovodskaVacation = isDobrovodskaNumber && isDobrovodskaVacationDay();
       const isDedicatedVoiceBotNumber = isCelkovaNumber || isBenovaBaloghovaNumber || isNovotnyNumber || isHmiraNumber || isZdrahalovaNumber || isSkripkovaNumber || isPopradOncologyNumber;
@@ -608,16 +633,18 @@ export async function voiceRoutes(fastify: FastifyInstance) {
           ? ZDRAHALOVA_PEDIATRIC_GREETING
           : isPopradOncologyNumber
             ? POPRAD_ONCOLOGY_GREETING
-            : config.greetingMessage
-            || (isBenovaBaloghovaNumber
-              ? ORTHOPEDIC_GREETING
-              : isHmiraNumber
-                ? HMIRA_DENTAL_GREETING
-                : dentalMode
-                  ? NOVOTNY_DENTAL_GREETING
-                  : pediatricMode
-                    ? PEDIATRIC_GREETING
-                    : DEFAULT_GREETING);
+            : isGyncentrumNumber
+              ? gyncentrumBotConfig.copy.greeting
+              : (config.greetingMessage
+                || (isBenovaBaloghovaNumber
+                  ? ORTHOPEDIC_GREETING
+                  : isHmiraNumber
+                    ? HMIRA_DENTAL_GREETING
+                    : dentalMode
+                      ? NOVOTNY_DENTAL_GREETING
+                      : pediatricMode
+                        ? PEDIATRIC_GREETING
+                        : DEFAULT_GREETING));
 
       if (isDobrovodskaVacation) {
         twiml.say(

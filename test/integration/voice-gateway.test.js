@@ -485,6 +485,128 @@ test('Platny Pekarcikov hovor vytvori udalost iba s clinicId 64', async () => {
   }
 });
 
+test('Gyncentrum Dolny Kubin pouzije chranene smerovanie a Pekarcikov trojkrokovy flow', async () => {
+  const sentEvents = [];
+  let requestedPhoneNumber = null;
+  prixiService.getConfig = async (phoneNumber) => {
+    requestedPhoneNumber = phoneNumber;
+    return {
+      clinicId: '165',
+      voiceBotEnabled: true,
+      timezone: 'Europe/Bratislava',
+    };
+  };
+  prixiService.sendEvent = async (event) => {
+    sentEvents.push(event);
+  };
+  sttService.transcribeAudioUrl = async (url) => {
+    if (url.includes('problem')) return 'Potrebujem gynekologicke vysetrenie.';
+    if (url.includes('name')) return 'Jana Novakova.';
+    return '1985';
+  };
+
+  const callSid = 'CA16500000000000000000000000000001';
+  const from = '+421900000165';
+
+  try {
+    const incoming = await signedVoicePost('/voice/incoming', {
+      From: from,
+      To: '+420910927874',
+      ForwardedFrom: '+421940610160',
+      CallSid: callSid,
+    });
+
+    assert.equal(incoming.statusCode, 200);
+    assert.equal(requestedPhoneNumber, '+421948050099');
+    assert.match(incoming.body, /gynekologickej ambulancie Gyncentrum Dolný Kubín/);
+    assert.match(incoming.body, /www\.gyncentrumdk\.sk/);
+    assert.match(incoming.body, /record-problem\?forwardedFrom=%2B421948050099/);
+
+    const problemUrl = 'https://api.twilio.test/problem-165';
+    const problem = await signedVoicePost(
+      '/voice/record-problem?forwardedFrom=%2B421948050099&pediatricMode=false&dentalMode=false',
+      {
+        From: from,
+        CallSid: callSid,
+        RecordingUrl: problemUrl,
+        RecordingDuration: '8',
+        Digits: '1',
+      }
+    );
+
+    assert.equal(problem.statusCode, 200);
+    assert.match(problem.body, /uveďte vaše meno a priezvisko/);
+
+    const nameUrl = 'https://api.twilio.test/name-165';
+    const name = await signedVoicePost(
+      `/voice/record-name?problemUrl=${encodeURIComponent(problemUrl)}&problemDuration=8&forwardedFrom=%2B421948050099&pediatricMode=false&dentalMode=false`,
+      {
+        From: from,
+        CallSid: callSid,
+        RecordingUrl: nameUrl,
+        RecordingDuration: '3',
+        Digits: '1',
+      }
+    );
+
+    assert.equal(name.statusCode, 200);
+    assert.match(name.body, /uveďte váš rok narodenia/);
+
+    const complete = await signedVoicePost(
+      `/voice/recording-complete?problemUrl=${encodeURIComponent(problemUrl)}&problemDuration=8&nameUrl=${encodeURIComponent(nameUrl)}&nameDuration=3&forwardedFrom=%2B421948050099&pediatricMode=false&dentalMode=false`,
+      {
+        From: from,
+        CallSid: callSid,
+        RecordingUrl: 'https://api.twilio.test/birth-year-165',
+        RecordingDuration: '2',
+        Digits: '1',
+      }
+    );
+
+    assert.equal(complete.statusCode, 200);
+    assert.match(complete.body, /vaša požiadavka je zaznamenaná/);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(sentEvents.length, 1);
+    assert.equal(String(sentEvents[0].clinicId), '165');
+    assert.equal(sentEvents[0].routingPhoneNumber, '+421948050099');
+    assert.equal(sentEvents[0].phone, from);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+    prixiService.sendEvent = originalSendEvent;
+    sttService.transcribeAudioUrl = originalTranscribeAudioUrl;
+  }
+});
+
+test('Gyncentrum routing zablokuje konfiguraciu cudzej ambulancie', async () => {
+  prixiService.getConfig = async () => ({
+    clinicId: '64',
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+  });
+
+  try {
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000166',
+      To: '+420910927874',
+      CallSid: 'CA16500000000000000000000000000002',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body, /Momentálne máme technické problémy\./);
+    assert.doesNotMatch(response.body, /<Record/);
+  } finally {
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+  }
+});
+
 test('Zlozenie pocas nahravania problemu odosle ciastocnu poziadavku do PriXi', async () => {
   const sentEvents = [];
   prixiService.getConfig = async () => ({
@@ -1378,10 +1500,16 @@ test('Twilio cisla ambulancii su priradene spravnym providerom', async () => {
   const popradOncologyTwilioConfig = await originalGetConfig('+420910925584');
   const popradOncologySharedLineConfig = await originalGetConfig('+421524314169');
   const kollarTwilioConfig = await originalGetConfig('+420910922076');
+  const gyncentrumTwilioConfig = await originalGetConfig('+420910927874');
+  const gyncentrumClinicConfig = await originalGetConfig('+421948050099');
 
   assert.equal(vadkertiTwilioConfig.clinicId, '146');
   assert.equal(vadkertiTwilioConfig.voiceBotEnabled, true);
   assert.equal(vadkertiClinicConfig.clinicId, '146');
+  assert.equal(gyncentrumTwilioConfig.clinicId, '165');
+  assert.equal(gyncentrumTwilioConfig.voiceBotEnabled, true);
+  assert.equal(gyncentrumTwilioConfig.greetingMessage.includes('Gyncentrum Dolný Kubín'), true);
+  assert.equal(gyncentrumClinicConfig.clinicId, '165');
   assert.equal(celkovaConfig.clinicId, '142');
   assert.equal(celkovaConfig.pediatricMode, true);
   assert.equal(benovaBaloghovaConfig.clinicId, '143');

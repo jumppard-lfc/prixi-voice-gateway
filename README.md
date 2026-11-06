@@ -186,6 +186,24 @@ after 24 hours. Because the stores are intentionally in memory, an application
 restart or a request routed to a different instance can lose an unfinished
 draft.
 
+## Gyncentrum Dolný Kubín production bot
+
+The Gyncentrum bot uses the same three-step voicemail intake as the MUDr.
+Pekarčík flow: it records the caller's problem, then asks for the patient's
+name and birth year. The protected Twilio DID `+420910927874` is mapped to
+clinic routing number `+421948050099` and PriXi clinic `165`.
+
+Configure both Twilio callbacks as HTTP POST requests:
+
+```text
+https://<voice-gateway-host>/voice/incoming
+https://<voice-gateway-host>/voice/call-status
+```
+
+The Twilio DID is authoritative even if a conflicting `ForwardedFrom` header
+is present. The gateway rejects the call or event if either protected number
+resolves to any clinic other than `165`.
+
 ## NEUROCENTRUM Levice production bot
 
 The Neurocentrum bot is a separate production intake flow. EDS owns its runtime
