@@ -657,6 +657,13 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         twiml.play(`${getPublicBaseUrl(request)}/media/hmira-1-greeting-v1.wav`);
       } else if (isSkripkovaNumber && existsSync(SKRIPKOVA_GREETING_FILE)) {
         twiml.play(`${getPublicBaseUrl(request)}${skripkovaBotConfig.copy.greetingAudioPath}`);
+      } else if (isGyncentrumNumber) {
+        for (const segment of gyncentrumBotConfig.copy.greetingSegments) {
+          twiml.say(
+            { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
+            segment
+          );
+        }
       } else {
         twiml.say(
           { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },

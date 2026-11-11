@@ -518,8 +518,11 @@ test('Gyncentrum Dolny Kubin pouzije chranene smerovanie a Pekarcikov trojkrokov
 
     assert.equal(incoming.statusCode, 200);
     assert.equal(requestedPhoneNumber, '+421948050099');
-    assert.match(incoming.body, /gynekologickej ambulancie Gyncentrum Dolný Kubín/);
+    assert.equal((incoming.body.match(/<Say /g) || []).length, 4);
+    assert.match(incoming.body, /voice="Google\.sk-SK-Wavenet-A"/);
+    assert.match(incoming.body, /ambulancie Gyncentrum Dolný Kubín/);
     assert.match(incoming.body, /www\.gyncentrumdéká\.sk/);
+    assert.doesNotMatch(incoming.body, /<Play>/);
     assert.match(incoming.body, /record-problem\?forwardedFrom=%2B421948050099/);
 
     const problemUrl = 'https://api.twilio.test/problem-165';

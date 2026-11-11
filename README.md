@@ -204,6 +204,11 @@ The Twilio DID is authoritative even if a conflicting `ForwardedFrom` header
 is present. The gateway rejects the call or event if either protected number
 resolves to any clinic other than `165`.
 
+The introduction keeps the same Twilio Google Slovak voice as the original
+production flow. It is split into short `<Say>` segments so Twilio can begin
+speaking after synthesizing the short introduction instead of waiting for the
+entire long message to be synthesized first.
+
 ## NEUROCENTRUM Levice production bot
 
 The Neurocentrum bot is a separate production intake flow. EDS owns its runtime
