@@ -1,5 +1,11 @@
 import { DateTime } from 'luxon';
 import { DentbodyIntent } from '../config/dentbody.config';
+import { DentbodyAudioKey } from '../config/dentbody-audio.config';
+
+export type DentbodySpokenResponse = {
+  text: string;
+  audioKeys: DentbodyAudioKey[];
+};
 
 export function normalizeDentbodySpeech(value: string): string {
   return value
@@ -193,49 +199,110 @@ function requestedWeekday(text: string): number | undefined {
   return patterns.find(([, pattern]) => pattern.test(text))?.[0];
 }
 
-function scheduleForDay(weekday: number): string {
-  if (weekday === 1) return 'V pondelok vyšetrujeme od siedmej tridsať do dvanástej tridsať a od trinástej do šestnástej tridsať.';
-  if (weekday >= 2 && weekday <= 4) return `V ${weekdayLabels[weekday]} vyšetrujeme od siedmej tridsať do dvanástej tridsať a od trinástej do pätnástej.`;
-  if (weekday === 5) return 'V piatok vyšetrujeme od siedmej tridsať do trinástej bez obednej prestávky.';
-  return `V ${weekdayLabels[weekday]} máme zatvorené.`;
+function scheduleForDay(weekday: number): DentbodySpokenResponse {
+  const audioKeys: DentbodyAudioKey[] = [
+    'hoursFullWeek',
+    'hoursMonday',
+    'hoursTuesday',
+    'hoursWednesday',
+    'hoursThursday',
+    'hoursFriday',
+    'hoursSaturday',
+    'hoursSunday',
+  ];
+
+  if (weekday === 1) {
+    return {
+      text: 'V pondelok vyšetrujeme od siedmej tridsať do dvanástej tridsať a od trinástej do šestnástej tridsať.',
+      audioKeys: [audioKeys[weekday]],
+    };
+  }
+  if (weekday >= 2 && weekday <= 4) {
+    return {
+      text: `V ${weekdayLabels[weekday]} vyšetrujeme od siedmej tridsať do dvanástej tridsať a od trinástej do pätnástej.`,
+      audioKeys: [audioKeys[weekday]],
+    };
+  }
+  if (weekday === 5) {
+    return {
+      text: 'V piatok vyšetrujeme od siedmej tridsať do trinástej bez obednej prestávky.',
+      audioKeys: [audioKeys[weekday]],
+    };
+  }
+  return {
+    text: `V ${weekdayLabels[weekday]} máme zatvorené.`,
+    audioKeys: [audioKeys[weekday]],
+  };
 }
 
-export function dentbodyOfficeHoursAnswer(
+export function dentbodyOfficeHoursResponse(
   originalQuestion: string,
   now: DateTime = DateTime.now().setZone('Europe/Bratislava')
-): string {
+): DentbodySpokenResponse {
   const text = normalizeDentbodySpeech(originalQuestion);
   const weekday = requestedWeekday(text);
   if (weekday !== undefined) return scheduleForDay(weekday);
-  if (/vikend/.test(text)) return 'V sobotu a v nedeľu máme zatvorené.';
+  if (/vikend/.test(text)) {
+    return { text: 'V sobotu a v nedeľu máme zatvorené.', audioKeys: ['hoursWeekend'] };
+  }
   if (/zajtra/.test(text)) return scheduleForDay(now.plus({ days: 1 }).weekday);
 
   const asksAboutToday = /(dnes|teraz|aktualne|momentalne|dokedy)/.test(text);
   if (!asksAboutToday) {
-    return 'Ordinačné hodiny sú v pondelok od siedmej tridsať do dvanástej tridsať a od trinástej do šestnástej tridsať. V utorok, stredu a štvrtok od siedmej tridsať do dvanástej tridsať a od trinástej do pätnástej. V piatok od siedmej tridsať do trinástej.';
+    return {
+      text: 'Ordinačné hodiny sú v pondelok od siedmej tridsať do dvanástej tridsať a od trinástej do šestnástej tridsať. V utorok, stredu a štvrtok od siedmej tridsať do dvanástej tridsať a od trinástej do pätnástej. V piatok od siedmej tridsať do trinástej.',
+      audioKeys: ['hoursFullWeek'],
+    };
   }
 
   const intervals = intervalsForWeekday(now.weekday);
-  if (intervals.length === 0) return `Dnes, v ${weekdayLabels[now.weekday]}, máme zatvorené.`;
+  if (intervals.length === 0) {
+    return {
+      text: `Dnes, v ${weekdayLabels[now.weekday]}, máme zatvorené.`,
+      audioKeys: [now.weekday === 6 ? 'todaySaturdayClosed' : 'todaySundayClosed'],
+    };
+  }
 
   const minute = now.hour * 60 + now.minute;
   const active = intervals.find(interval => minute >= interval.start && minute < interval.end);
   if (active) {
     const next = intervals.find(interval => interval.start > active.end);
     if (next) {
-      return `Momentálne vyšetrujeme do ${spokenTime(active.endLabel)}. Po obednej prestávke pokračujeme od ${spokenTime(next.startLabel)} do ${spokenTime(next.endLabel)}.`;
+      return {
+        text: `Momentálne vyšetrujeme do ${spokenTime(active.endLabel)}. Po obednej prestávke pokračujeme od ${spokenTime(next.startLabel)} do ${spokenTime(next.endLabel)}.`,
+        audioKeys: [now.weekday === 1 ? 'openMondayMorning' : 'openTuesdayThursdayMorning'],
+      };
     }
-    return `Momentálne vyšetrujeme do ${spokenTime(active.endLabel)}.`;
+    return {
+      text: `Momentálne vyšetrujeme do ${spokenTime(active.endLabel)}.`,
+      audioKeys: [
+        now.weekday === 1
+          ? 'openMondayAfternoon'
+          : now.weekday === 5
+            ? 'openFriday'
+            : 'openTuesdayThursdayAfternoon',
+      ],
+    };
   }
 
   const next = intervals.find(interval => minute < interval.start);
   if (next) {
     if (minute >= intervals[0].end) {
-      return `Momentálne je obedná prestávka. Znovu vyšetrujeme od ${spokenTime(next.startLabel)} do ${spokenTime(next.endLabel)}.`;
+      return {
+        text: `Momentálne je obedná prestávka. Znovu vyšetrujeme od ${spokenTime(next.startLabel)} do ${spokenTime(next.endLabel)}.`,
+        audioKeys: [now.weekday === 1 ? 'lunchMonday' : 'lunchTuesdayThursday'],
+      };
     }
-    return `Dnes otvárame o ${spokenTime(next.startLabel)}.`;
+    return { text: `Dnes otvárame o ${spokenTime(next.startLabel)}.`, audioKeys: ['opensToday'] };
   }
-  return 'Dnes už máme zatvorené.';
+  return { text: 'Dnes už máme zatvorené.', audioKeys: ['closedToday'] };
+}
+
+export function dentbodyOfficeHoursAnswer(
+  originalQuestion: string,
+  now?: DateTime
+): string {
+  return dentbodyOfficeHoursResponse(originalQuestion, now).text;
 }
 
 const answers: Record<Exclude<DentbodyIntent, 'office_hours'>, string> = {
@@ -255,15 +322,43 @@ const answers: Record<Exclude<DentbodyIntent, 'office_hours'>, string> = {
   medical_advice: 'Neviem určiť, ktorý typ RTG vyšetrenia potrebujete. Overte si to prosím u svojho ošetrujúceho lekára.',
 };
 
+const answerAudioKeys: Record<Exclude<DentbodyIntent, 'office_hours'>, DentbodyAudioKey> = {
+  appointment: 'appointment',
+  address: 'address',
+  floor: 'floor',
+  referral: 'referral',
+  patients: 'patients',
+  payment: 'payment',
+  dental_images: 'dentalImages',
+  general_images: 'generalImages',
+  radiology_report: 'radiologyReport',
+  certificate: 'certificate',
+  retrospective_image: 'retrospectiveImage',
+  contact: 'contact',
+  pricing: 'pricing',
+  medical_advice: 'medicalAdvice',
+};
+
+export function buildDentbodyResponse(
+  intents: DentbodyIntent[],
+  originalQuestion: string,
+  now?: DateTime
+): DentbodySpokenResponse {
+  const unique = [...new Set(intents)].slice(0, 3);
+  const responses = unique.map(intent => intent === 'office_hours'
+    ? dentbodyOfficeHoursResponse(originalQuestion, now)
+    : { text: answers[intent], audioKeys: [answerAudioKeys[intent]] });
+
+  return {
+    text: responses.map(response => response.text).join(' '),
+    audioKeys: responses.flatMap(response => response.audioKeys),
+  };
+}
+
 export function buildDentbodyAnswer(
   intents: DentbodyIntent[],
   originalQuestion: string,
   now?: DateTime
 ): string {
-  const unique = [...new Set(intents)].slice(0, 3);
-  return unique
-    .map(intent => intent === 'office_hours'
-      ? dentbodyOfficeHoursAnswer(originalQuestion, now)
-      : answers[intent])
-    .join(' ');
+  return buildDentbodyResponse(intents, originalQuestion, now).text;
 }

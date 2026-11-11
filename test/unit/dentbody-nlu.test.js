@@ -3,11 +3,75 @@ const assert = require('node:assert/strict');
 const { DateTime } = require('luxon');
 const {
   buildDentbodyAnswer,
+  buildDentbodyResponse,
   dentbodyOfficeHoursAnswer,
+  dentbodyOfficeHoursResponse,
   isDentbodyFinish,
   parseDentbodyIntents,
   shouldEndDentbodyConversation,
 } = require('../../src/services/dentbody-nlu.service');
+
+test('každý informačný zámer je priradený k správnej ElevenLabs nahrávke', () => {
+  const cases = [
+    ['appointment', 'appointment'],
+    ['referral', 'referral'],
+    ['address', 'address'],
+    ['floor', 'floor'],
+    ['patients', 'patients'],
+    ['payment', 'payment'],
+    ['dental_images', 'dentalImages'],
+    ['general_images', 'generalImages'],
+    ['radiology_report', 'radiologyReport'],
+    ['certificate', 'certificate'],
+    ['retrospective_image', 'retrospectiveImage'],
+    ['contact', 'contact'],
+    ['pricing', 'pricing'],
+    ['medical_advice', 'medicalAdvice'],
+  ];
+
+  for (const [intent, expectedAudioKey] of cases) {
+    assert.deepEqual(buildDentbodyResponse([intent], 'test').audioKeys, [expectedAudioKey]);
+  }
+
+  assert.deepEqual(
+    buildDentbodyResponse(['appointment', 'referral'], 'Musím sa objednať a potrebujem žiadanku?').audioKeys,
+    ['appointment', 'referral']
+  );
+});
+
+test('všetky dynamické varianty ordinačných hodín majú vlastnú nahrávku', () => {
+  const at = iso => DateTime.fromISO(iso, { zone: 'Europe/Bratislava' });
+  const cases = [
+    ['Aké máte ordinačné hodiny?', '2026-10-26T10:00:00', 'hoursFullWeek'],
+    ['Ako ste otvorení v pondelok?', '2026-10-26T10:00:00', 'hoursMonday'],
+    ['Ako ste otvorení v utorok?', '2026-10-26T10:00:00', 'hoursTuesday'],
+    ['Ako ste otvorení v stredu?', '2026-10-26T10:00:00', 'hoursWednesday'],
+    ['Ako ste otvorení vo štvrtok?', '2026-10-26T10:00:00', 'hoursThursday'],
+    ['Ako ste otvorení v piatok?', '2026-10-26T10:00:00', 'hoursFriday'],
+    ['Ako ste otvorení v sobotu?', '2026-10-26T10:00:00', 'hoursSaturday'],
+    ['Ako ste otvorení v nedeľu?', '2026-10-26T10:00:00', 'hoursSunday'],
+    ['Ste otvorení cez víkend?', '2026-10-26T10:00:00', 'hoursWeekend'],
+    ['Ste dnes otvorení?', '2026-10-31T10:00:00', 'todaySaturdayClosed'],
+    ['Ste dnes otvorení?', '2026-11-01T10:00:00', 'todaySundayClosed'],
+    ['Ste teraz otvorení?', '2026-10-26T10:00:00', 'openMondayMorning'],
+    ['Ste teraz otvorení?', '2026-10-27T10:00:00', 'openTuesdayThursdayMorning'],
+    ['Ste teraz otvorení?', '2026-10-26T14:00:00', 'openMondayAfternoon'],
+    ['Ste teraz otvorení?', '2026-10-28T14:00:00', 'openTuesdayThursdayAfternoon'],
+    ['Ste teraz otvorení?', '2026-10-30T10:00:00', 'openFriday'],
+    ['Ste teraz otvorení?', '2026-10-26T12:45:00', 'lunchMonday'],
+    ['Ste teraz otvorení?', '2026-10-27T12:45:00', 'lunchTuesdayThursday'],
+    ['Ste teraz otvorení?', '2026-10-26T06:00:00', 'opensToday'],
+    ['Ste teraz otvorení?', '2026-10-26T17:00:00', 'closedToday'],
+  ];
+
+  for (const [question, iso, expectedAudioKey] of cases) {
+    assert.deepEqual(
+      dentbodyOfficeHoursResponse(question, at(iso)).audioKeys,
+      [expectedAudioKey],
+      `${question} at ${iso}`
+    );
+  }
+});
 
 test('rozpozná viac informačných zámerov v jednej prirodzenej otázke', () => {
   assert.deepEqual(

@@ -1,8 +1,16 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import twilio from 'twilio';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { dentbodyBotConfig } from '../config/dentbody.config';
 import {
-  buildDentbodyAnswer,
+  DentbodyAudioKey,
+  dentbodyAudioFiles,
+  dentbodyAudioMediaPath,
+} from '../config/dentbody-audio.config';
+import {
+  buildDentbodyResponse,
+  DentbodySpokenResponse,
   isDentbodyContinue,
   parseDentbodyIntents,
   shouldEndDentbodyConversation,
@@ -15,24 +23,65 @@ const sayOptions: any = { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-B' };
 const MAX_ANSWERED_QUESTIONS = 10;
 
 const copy = {
-  greeting: 'Dobrý deň, tu je röntgenové pracovisko na Fedinovej. Ako pomôžem?',
-  followUp: 'Môžem vám pomôcť ešte s niečím?',
-  continue: 'Nech sa páči, povedzte mi vašu otázku.',
-  retry: 'Prepáčte, otázke som nerozumela. Skúste ju prosím povedať ešte raz. Pre ordinačné hodiny stlačte jednotku. Pre objednanie a žiadanku dvojku. Pre snímky a výsledky trojku. Pre adresu a kontakt štvorku.',
-  fallback: 'Túto informáciu nemám spoľahlivo potvrdenú. Napíšte prosím na ambulancia bodka er té gé zavináč dentbodyxray bodka es ká. Ďakujem a dovidenia.',
-  closing: 'Ďakujem za zavolanie. Prajem vám príjemný zvyšok dňa. Dovidenia.',
-  expired: 'Hovor sa nepodarilo dokončiť. Zavolajte prosím znova. Dovidenia.',
-  technical: 'Momentálne máme technické problémy. Skúste prosím zavolať neskôr. Dovidenia.',
+  greeting: spoken('Dobrý deň, tu je röntgenové pracovisko na Fedinovej. Ako pomôžem?', 'greeting'),
+  followUp: spoken('Môžem vám pomôcť ešte s niečím?', 'followUp'),
+  continue: spoken('Nech sa páči, povedzte mi vašu otázku.', 'continue'),
+  retry: spoken('Prepáčte, otázke som nerozumela. Skúste ju prosím povedať ešte raz. Pre ordinačné hodiny stlačte jednotku. Pre objednanie a žiadanku dvojku. Pre snímky a výsledky trojku. Pre adresu a kontakt štvorku.', 'retry'),
+  fallback: spoken('Túto informáciu nemám spoľahlivo potvrdenú. Napíšte prosím na ambulancia bodka er té gé zavináč dentbodyxray bodka es ká. Ďakujem a dovidenia.', 'fallback'),
+  closing: spoken('Ďakujem za zavolanie. Prajem vám príjemný zvyšok dňa. Dovidenia.', 'closing'),
+  expired: spoken('Hovor sa nepodarilo dokončiť. Zavolajte prosím znova. Dovidenia.', 'expired'),
+  technical: spoken('Momentálne máme technické problémy. Skúste prosím zavolať neskôr. Dovidenia.', 'technical'),
 };
+
+function spoken(text: string, ...audioKeys: DentbodyAudioKey[]): DentbodySpokenResponse {
+  return { text, audioKeys };
+}
+
+function combineSpoken(...parts: DentbodySpokenResponse[]): DentbodySpokenResponse {
+  return {
+    text: parts.map(part => part.text).join(' '),
+    audioKeys: parts.flatMap(part => part.audioKeys),
+  };
+}
+
+function firstHeader(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value?.split(',')[0]?.trim();
+}
+
+function publicBaseUrl(request: FastifyRequest): string {
+  const protocol = firstHeader(request.headers['x-forwarded-proto']) || 'https';
+  const host = firstHeader(request.headers['x-forwarded-host']) || firstHeader(request.headers.host) || 'localhost';
+  return (process.env.PUBLIC_BASE_URL || `${protocol}://${host}`).replace(/\/$/, '');
+}
+
+function hasAudioFiles(audioKeys: DentbodyAudioKey[]): boolean {
+  return audioKeys.every(key => existsSync(resolve(__dirname, '../assets/audio', dentbodyAudioFiles[key])));
+}
+
+function appendSpoken(
+  twiml: InstanceType<typeof VoiceResponse>,
+  request: FastifyRequest,
+  content: DentbodySpokenResponse
+): void {
+  if (!hasAudioFiles(content.audioKeys)) {
+    twiml.say(sayOptions, content.text);
+    return;
+  }
+
+  const baseUrl = publicBaseUrl(request);
+  for (const audioKey of content.audioKeys) {
+    twiml.play(`${baseUrl}${dentbodyAudioMediaPath(audioKey)}`);
+  }
+}
 
 function answerFrom(request: FastifyRequest): string {
   const body = request.body as Record<string, string>;
   return (body.SpeechResult || body.Digits || '').trim();
 }
 
-function renderEnd(reply: FastifyReply, message: string): FastifyReply {
+function renderEnd(reply: FastifyReply, content: DentbodySpokenResponse): FastifyReply {
   const twiml = new VoiceResponse();
-  twiml.say(sayOptions, message);
+  appendSpoken(twiml, reply.request, content);
   twiml.hangup();
   return reply.type('text/xml').send(twiml.toString());
 }
@@ -40,13 +89,13 @@ function renderEnd(reply: FastifyReply, message: string): FastifyReply {
 function renderPrompt(
   reply: FastifyReply,
   session: DentbodySession,
-  message: string
+  content: DentbodySpokenResponse
 ): FastifyReply {
   dentbodySessionService.save(session);
   const twiml = new VoiceResponse();
   // Finish the prompt before listening. This prevents ambient speech or radio
   // from interrupting the bot and being mistaken for the caller's answer.
-  twiml.say(sayOptions, message);
+  appendSpoken(twiml, reply.request, content);
   twiml.gather({
     input: ['speech', 'dtmf'],
     action: '/voice/dentbody/answer',
@@ -146,12 +195,12 @@ export async function dentbodyVoiceBotRoutes(fastify: FastifyInstance): Promise<
 
     session.failedAttempts = 0;
     session.answeredQuestions += 1;
-    const response = buildDentbodyAnswer(intents, answer);
+    const response = buildDentbodyResponse(intents, answer);
     if (session.answeredQuestions >= MAX_ANSWERED_QUESTIONS) {
       dentbodySessionService.delete(session.callSid);
-      return renderEnd(reply, `${response} ${copy.closing}`);
+      return renderEnd(reply, combineSpoken(response, copy.closing));
     }
     session.awaitingFollowUp = true;
-    return renderPrompt(reply, session, `${response} ${copy.followUp}`);
+    return renderPrompt(reply, session, combineSpoken(response, copy.followUp));
   });
 }

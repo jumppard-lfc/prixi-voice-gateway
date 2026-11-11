@@ -14,6 +14,7 @@ import { kollarVoiceBotRoutes } from './routes/kollar-voice-bot.controller';
 import { kutakovaVoiceBotRoutes } from './routes/kutakova-voice-bot.controller';
 import { dentbodyVoiceBotRoutes } from './routes/dentbody-voice-bot.controller';
 import { malakovaVoiceBotRoutes } from './routes/malakova-voice-bot.controller';
+import { dentbodyAudioFileNames } from './config/dentbody-audio.config';
 
 const KLOSTERMANN_GREETING_PATH = resolve(__dirname, 'assets/audio/klostermann-greeting-v5.wav');
 const DOBROVODSKA_GREETING_PATH = resolve(__dirname, 'assets/audio/dobrovodska-1-greeting-v2.wav');
@@ -161,6 +162,22 @@ app.get('/media/booking-prompt-tone.wav', async (_request, reply) => reply
   .header('Content-Length', BOOKING_PROMPT_TONE_WAV.length)
   .header('Cache-Control', 'public, max-age=31536000, immutable')
   .send(BOOKING_PROMPT_TONE_WAV));
+
+for (const audioFileName of dentbodyAudioFileNames) {
+  const audioFilePath = resolve(__dirname, 'assets/audio', audioFileName);
+  app.get(`/media/${audioFileName}`, async (_request, reply) => {
+    try {
+      const audioStats = statSync(audioFilePath);
+      return reply
+        .type('audio/wav')
+        .header('Content-Length', audioStats.size)
+        .header('Cache-Control', 'public, max-age=31536000, immutable')
+        .send(createReadStream(audioFilePath));
+    } catch {
+      return reply.code(404).send();
+    }
+  });
+}
 
 // Fastify preHandler to globally secure /voice routes with X-Twilio-Signature
 app.addHook('preHandler', async (request, reply) => {
