@@ -124,7 +124,9 @@ Odporúčaný export: MP3 alebo WAV, rovnaký hlas a nastavenia pri všetkých s
 
 ## Dynamické hlášky
 
-Tieto hlášky nie je možné vopred nahrať ako konečné celé vety, pretože obsahujú údaje z Calendar API alebo údaje pacienta. Počas hovoru ich číta `Google.sk-SK-Wavenet-B` cez Twilio `<Say>`.
+Tieto hlášky nie je možné vopred nahrať ako konečné celé vety, pretože obsahujú údaje z Calendar API. Počas hovoru ich generuje ElevenLabs API rovnakým hlasom ako statické nahrávky. Ak API nie je nakonfigurované alebo zlyhá, gateway ich prečíta cez `Google.sk-SK-Wavenet-B`.
+
+Voice ID `zGjIP4SZlMnY9m93k97r`, model `eleven_flash_v2_5` a nastavenia hlasu sú uložené v Nimala konfigurácii. V prostredí sa uchováva iba tajný `ELEVENLABS_API_KEY`.
 
 1. `slot-offer`
 
@@ -132,7 +134,7 @@ Tieto hlášky nie je možné vopred nahrať ako konečné celé vety, pretože 
 
 2. `booking-confirmation`
 
-   Ďakujem. Prosím, potvrďte rezerváciu: `{typ vyšetrenia}` v trvaní `{počet minút}` minút, `{dátum a čas}`, u lekára `{meno lekára}`, pre pacienta `{meno pacienta}`. Ak sú údaje správne, povedzte áno alebo stlačte jednotku. Ak chcete vybrať iný termín, povedzte nie alebo stlačte dvojku.
+   Ďakujem. Prosím, potvrďte rezerváciu: `{typ vyšetrenia}` v trvaní `{počet minút}` minút, `{dátum a čas}`, u lekára `{meno lekára}`. Ak sú údaje správne, povedzte áno alebo stlačte jednotku. Ak chcete vybrať iný termín, povedzte nie alebo stlačte dvojku.
 
 3. `booking-success`
 
@@ -140,4 +142,4 @@ Tieto hlášky nie je možné vopred nahrať ako konečné celé vety, pretože 
 
 ## Poznámka k integrácii
 
-Statické hlášky sú v kóde zapojené cez Twilio `<Play>`. WAV súbory treba vložiť do `src/assets/audio` presne pod názvami uvedenými vyššie. Ak niektorý súbor chýba, gateway bezpečne použije `Google.sk-SK-Wavenet-B` cez Twilio `<Say>`. Ponuka termínov, rekapitulácia a úspešné potvrdenie rezervácie používajú Google hlas vždy, aj keď sú prítomné všetky statické nahrávky.
+Statické hlášky sú v kóde zapojené cez Twilio `<Play>`. WAV súbory treba vložiť do `src/assets/audio` presne pod názvami uvedenými vyššie. Ak niektorý súbor chýba, gateway bezpečne použije `Google.sk-SK-Wavenet-B` cez Twilio `<Say>`. Dynamické hlášky sa generujú ako μ-law 8 kHz cez ElevenLabs a krátkodobo sa sprístupnia Twiliu pod náhodným URL bez verejného cachovania. Meno pacienta sa do ElevenLabs neposiela.

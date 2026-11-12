@@ -53,6 +53,7 @@ test('krátke hlasové odpovede áno a dva sa rozpoznajú v správnom kontexte',
   assert.equal(parseNimalaSlotChoice('možnosť dva', slots), 1);
   assert.equal(parseNimalaSlotChoice('druhý termín', slots), 1);
   assert.equal(parseNimalaYesNo('áno'), true);
+  assert.equal(parseNimalaYesNo('annon'), true);
   assert.equal(parseNimalaYesNo('áno, platí'), true);
 });
 

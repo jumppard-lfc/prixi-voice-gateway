@@ -47,7 +47,7 @@ export function parseNimalaAppointmentType(value: string): NimalaAppointmentType
 
 export function parseNimalaYesNo(value: string): boolean | undefined {
   const text = normalizeNimalaSpeech(value);
-  if (/^(1|ano|hej|suhlasim|potvrdzujem|dobre|spravne|plati|moze byt)(\s|$)/.test(text)) return true;
+  if (/^(1|ano|anon|annon|hej|suhlasim|potvrdzujem|dobre|spravne|plati|moze byt)(\s|$)/.test(text)) return true;
   if (/^(2|nie|nesuhlasim|iny|ine|zmenit|chcem iny)(\s|$)/.test(text)) return false;
   return undefined;
 }

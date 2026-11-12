@@ -33,6 +33,8 @@ import {
   prixiCalendarService,
 } from '../services/prixi-calendar.service';
 import { prixiService } from '../services/prixi.service';
+import { elevenLabsTtsService } from '../services/elevenlabs-tts.service';
+import { nimalaDynamicAudioService } from '../services/nimala-dynamic-audio.service';
 import { VoicemailRecordedEvent } from '../types';
 import { claimVoiceEvent, completeVoiceEvent, createVoiceEventKey, failVoiceEvent } from '../utils/voice-event-ledger';
 
@@ -42,10 +44,15 @@ const sayOptions: any = { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-B' };
 interface NimalaSpokenResponse {
   text: string;
   audioKeys: NimalaAudioKey[];
+  dynamic?: boolean;
 }
 
 function spoken(text: string, ...audioKeys: NimalaAudioKey[]): NimalaSpokenResponse {
   return { text, audioKeys };
+}
+
+function dynamicSpoken(text: string): NimalaSpokenResponse {
+  return { text, audioKeys: [], dynamic: true };
 }
 
 const copy = {
@@ -118,7 +125,7 @@ function formatSlot(slot: PrixiCalendarSlot): string {
 function slotOffer(session: NimalaSession): NimalaSpokenResponse {
   const slots = session.offeredSlots || [];
   if (!slots.length) return copy.noSlotInSession;
-  return spoken(`Ďakujem. Mám pre vás tieto voľné termíny. ${slots.map((slot, index) => `Možnosť ${index + 1}: ${formatSlot(slot)}.`).join(' ')} Povedzte číslo možnosti alebo ho stlačte na klávesnici.`);
+  return dynamicSpoken(`Ďakujem. Mám pre vás tieto voľné termíny. ${slots.map((slot, index) => `Možnosť ${index + 1}: ${formatSlot(slot)}.`).join(' ')} Povedzte číslo možnosti alebo ho stlačte na klávesnici.`);
 }
 
 function bookingConfirmation(session: NimalaSession): NimalaSpokenResponse {
@@ -127,7 +134,7 @@ function bookingConfirmation(session: NimalaSession): NimalaSpokenResponse {
   const doctor = session.selectedSlot?.calendarName || 'MUDr. Dávid Anovčin';
   const duration = session.selectedSlot?.durationMinutes
     || (session.appointmentType ? serviceDefinition(session.appointmentType).durationMinutes : undefined);
-  return spoken(`Ďakujem. Prosím, potvrďte rezerváciu: ${service}${duration ? ` v trvaní ${duration} minút` : ''}, ${slot}, u lekára ${doctor}, pre pacienta ${session.patientName}. Ak sú údaje správne, povedzte áno alebo stlačte jednotku. Ak chcete vybrať iný termín, povedzte nie alebo stlačte dvojku.`);
+  return dynamicSpoken(`Ďakujem. Prosím, potvrďte rezerváciu: ${service}${duration ? ` v trvaní ${duration} minút` : ''}, ${slot}, u lekára ${doctor}. Ak sú údaje správne, povedzte áno alebo stlačte jednotku. Ak chcete vybrať iný termín, povedzte nie alebo stlačte dvojku.`);
 }
 
 function promptFor(session: NimalaSession): NimalaSpokenResponse {
@@ -157,11 +164,25 @@ function hasAudioFiles(audioKeys: NimalaAudioKey[]): boolean {
   return audioKeys.every(key => existsSync(resolve(__dirname, '../assets/audio', nimalaAudioFiles[key])));
 }
 
-function appendSpoken(
+async function appendSpoken(
   twiml: InstanceType<typeof VoiceResponse>,
   request: FastifyRequest,
   content: NimalaSpokenResponse
-): void {
+): Promise<void> {
+  if (content.dynamic && elevenLabsTtsService.isConfigured()) {
+    try {
+      const audio = await elevenLabsTtsService.synthesizeForPhone(content.text, nimalaBotConfig.tts);
+      const token = nimalaDynamicAudioService.put(audio);
+      twiml.play(`${publicBaseUrl(request)}/media/nimala-dynamic/${token}.ulaw`);
+      return;
+    } catch (error) {
+      request.log.warn(
+        { message: error instanceof Error ? error.message : String(error) },
+        'ElevenLabs dynamic TTS failed; using Google fallback'
+      );
+    }
+  }
+
   if (!content.audioKeys.length || !hasAudioFiles(content.audioKeys)) {
     twiml.say(sayOptions, content.text);
     return;
@@ -189,18 +210,18 @@ function hintsFor(session: NimalaSession): string {
   return '';
 }
 
-function renderPrompt(
+async function renderPrompt(
   reply: FastifyReply,
   session: NimalaSession,
   prefix?: NimalaSpokenResponse
-): FastifyReply {
+): Promise<FastifyReply> {
   nimalaSessionService.save(session);
   const twiml = new VoiceResponse();
   const menuStep = ['intent', 'main_menu', 'appointment_type', 'slot', 'booking_confirmation'].includes(session.step);
   // As in the Dentbody flow, finish speaking before listening. This avoids
   // capturing the bot's own prompt or ambient speech as the caller's answer.
-  if (prefix) appendSpoken(twiml, reply.request, prefix);
-  appendSpoken(twiml, reply.request, promptFor(session));
+  if (prefix) await appendSpoken(twiml, reply.request, prefix);
+  await appendSpoken(twiml, reply.request, promptFor(session));
   twiml.gather({
     input: ['speech', 'dtmf'],
     action: '/voice/nimala/answer',
@@ -215,9 +236,9 @@ function renderPrompt(
   return reply.type('text/xml').send(twiml.toString());
 }
 
-function renderEnd(reply: FastifyReply, message: NimalaSpokenResponse): FastifyReply {
+async function renderEnd(reply: FastifyReply, message: NimalaSpokenResponse): Promise<FastifyReply> {
   const twiml = new VoiceResponse();
-  appendSpoken(twiml, reply.request, message);
+  await appendSpoken(twiml, reply.request, message);
   twiml.hangup();
   return reply.type('text/xml').send(twiml.toString());
 }
@@ -318,7 +339,16 @@ function requestSummary(session: NimalaSession): string {
   if (session.requestType === 'human') return 'Pacient žiada telefonický kontakt s človekom.';
   const service = session.appointmentType ? appointmentLabels[session.appointmentType] : 'nezistený typ vyšetrenia';
   const slot = session.selectedSlot ? formatSlot(session.selectedSlot) : 'termín nebol vybraný';
-  return `Pacient žiada objednanie na ${service}; ${slot}. Rezervácia nebola potvrdená Calendar API.`;
+  const bookingState = session.bookingStatus === 'created'
+    ? 'Rezervácia bola úspešne vytvorená cez Calendar API.'
+    : session.bookingStatus === 'uncertain'
+      ? 'Výsledok rezervácie sa nepodarilo spoľahlivo overiť; personál musí skontrolovať Calendar API.'
+      : session.bookingStatus === 'slot_unavailable'
+        ? 'Vybraný termín už nebol dostupný a pacient nedokončil výber náhradného termínu.'
+        : session.bookingStatus === 'failed'
+          ? 'Rezerváciu sa nepodarilo vytvoriť; požiadavka bola odovzdaná personálu.'
+          : 'Rezervácia nebola odoslaná do Calendar API, pretože pacient nedokončil jej potvrdenie.';
+  return `Pacient žiada objednanie na ${service}; ${slot}. ${bookingState}`;
 }
 
 function buildProblemTranscript(session: NimalaSession): string {
@@ -376,7 +406,11 @@ function dispatchRequest(fastify: FastifyInstance, session: NimalaSession, onSuc
   return true;
 }
 
-function completeRequest(fastify: FastifyInstance, reply: FastifyReply, session: NimalaSession): FastifyReply {
+async function completeRequest(
+  fastify: FastifyInstance,
+  reply: FastifyReply,
+  session: NimalaSession
+): Promise<FastifyReply> {
   session.outcome = 'completed';
   session.endedAt = new Date().toISOString();
   dispatchRequest(fastify, session);
@@ -385,12 +419,12 @@ function completeRequest(fastify: FastifyInstance, reply: FastifyReply, session:
   return renderEnd(reply, message);
 }
 
-function callbackFallback(
+async function callbackFallback(
   fastify: FastifyInstance,
   reply: FastifyReply,
   session: NimalaSession,
   message: NimalaSpokenResponse
-): FastifyReply {
+): Promise<FastifyReply> {
   session.outcome = 'completed';
   session.endedAt = new Date().toISOString();
   if (!session.requestType) session.requestType = 'human';
@@ -399,7 +433,11 @@ function callbackFallback(
   return renderEnd(reply, message);
 }
 
-function handoffToHuman(fastify: FastifyInstance, reply: FastifyReply, session: NimalaSession): FastifyReply {
+async function handoffToHuman(
+  fastify: FastifyInstance,
+  reply: FastifyReply,
+  session: NimalaSession
+): Promise<FastifyReply> {
   const destination = humanDestination();
   session.requestType = session.requestType || 'human';
   session.outcome = 'handoff';
@@ -414,7 +452,7 @@ function handoffToHuman(fastify: FastifyInstance, reply: FastifyReply, session: 
   }
   nimalaSessionService.save(session);
   const twiml = new VoiceResponse();
-  appendSpoken(twiml, reply.request, copy.transferStart);
+  await appendSpoken(twiml, reply.request, copy.transferStart);
   const dial = twiml.dial({
     action: '/voice/nimala/handoff-complete',
     method: 'POST',
@@ -425,7 +463,11 @@ function handoffToHuman(fastify: FastifyInstance, reply: FastifyReply, session: 
   return reply.type('text/xml').send(twiml.toString());
 }
 
-function retryOrHandoff(fastify: FastifyInstance, reply: FastifyReply, session: NimalaSession): FastifyReply {
+async function retryOrHandoff(
+  fastify: FastifyInstance,
+  reply: FastifyReply,
+  session: NimalaSession
+): Promise<FastifyReply> {
   session.attempts += 1;
   if (session.attempts >= 2) return handoffToHuman(fastify, reply, session);
   return renderPrompt(reply, session, copy.retry);
@@ -454,14 +496,16 @@ async function confirmBooking(fastify: FastifyInstance, reply: FastifyReply, ses
     result = await prixiCalendarService.createBooking(payload);
   }
   if (result.status === 'created') {
+    session.bookingStatus = 'created';
     session.outcome = 'booked';
     session.endedAt = new Date().toISOString();
     const doctor = session.selectedSlot!.calendarName || 'MUDr. Dávid Anovčin';
-    const message = spoken(`Termín ${formatSlot(session.selectedSlot!)} na ${appointmentLabels[session.appointmentType!]} u lekára ${doctor} je úspešne rezervovaný. ${copy.farewell.text}`);
+    const message = dynamicSpoken(`Termín ${formatSlot(session.selectedSlot!)} na ${appointmentLabels[session.appointmentType!]} u lekára ${doctor} je úspešne rezervovaný. ${copy.farewell.text}`);
     nimalaSessionService.delete(session.callSid);
     return renderEnd(reply, message);
   }
   if (result.status === 'slot_unavailable') {
+    session.bookingStatus = 'slot_unavailable';
     const hasSlots = await loadAvailableSlots(session);
     if (hasSlots) {
       session.step = 'slot';
@@ -469,6 +513,8 @@ async function confirmBooking(fastify: FastifyInstance, reply: FastifyReply, ses
       return renderPrompt(reply, session, copy.slotBecameUnavailable);
     }
   }
+  if (result.status === 'uncertain') session.bookingStatus = 'uncertain';
+  else if (result.status !== 'slot_unavailable') session.bookingStatus = 'failed';
   return callbackFallback(
     fastify,
     reply,
@@ -633,6 +679,7 @@ export async function nimalaVoiceBotRoutes(fastify: FastifyInstance): Promise<vo
       try {
         return await confirmBooking(fastify, reply, session);
       } catch (error) {
+        session.bookingStatus = 'failed';
         fastify.log.error(error, 'Failed to create Nimala booking');
         return callbackFallback(fastify, reply, session, copy.technical);
       }

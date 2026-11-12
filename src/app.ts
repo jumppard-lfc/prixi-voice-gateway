@@ -17,6 +17,7 @@ import { malakovaVoiceBotRoutes } from './routes/malakova-voice-bot.controller';
 import { nimalaVoiceBotRoutes } from './routes/nimala-voice-bot.controller';
 import { dentbodyAudioFileNames } from './config/dentbody-audio.config';
 import { nimalaAudioFileNames } from './config/nimala-audio.config';
+import { nimalaDynamicAudioService } from './services/nimala-dynamic-audio.service';
 
 const KLOSTERMANN_GREETING_PATH = resolve(__dirname, 'assets/audio/klostermann-greeting-v5.wav');
 const DOBROVODSKA_GREETING_PATH = resolve(__dirname, 'assets/audio/dobrovodska-1-greeting-v2.wav');
@@ -196,6 +197,16 @@ for (const audioFileName of nimalaAudioFileNames) {
     }
   });
 }
+
+app.get<{ Params: { token: string } }>('/media/nimala-dynamic/:token.ulaw', async (request, reply) => {
+  const audio = nimalaDynamicAudioService.get(request.params.token);
+  if (!audio) return reply.code(404).send();
+  return reply
+    .type('audio/ulaw')
+    .header('Content-Length', audio.length)
+    .header('Cache-Control', 'private, no-store, max-age=0')
+    .send(audio);
+});
 
 // Fastify preHandler to globally secure /voice routes with X-Twilio-Signature
 app.addHook('preHandler', async (request, reply) => {

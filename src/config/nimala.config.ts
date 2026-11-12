@@ -34,6 +34,18 @@ export const nimalaBotConfig = {
     availabilityDays: 30,
     offeredSlotCount: 3,
   },
+  tts: {
+    voiceId: 'zGjIP4SZlMnY9m93k97r',
+    modelId: 'eleven_flash_v2_5',
+    outputFormat: 'ulaw_8000',
+    voiceSettings: {
+      stability: 0.5,
+      similarityBoost: 0.75,
+      style: 0,
+      useSpeakerBoost: true,
+      speed: 1,
+    },
+  },
   handoff: {
     destinationEnv: 'NIMALA_HUMAN_TRANSFER_NUMBER',
   },

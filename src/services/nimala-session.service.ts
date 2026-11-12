@@ -27,6 +27,7 @@ export interface NimalaSession {
   birthYear?: string;
   detail?: string;
   bookingIdempotencyKey?: string;
+  bookingStatus?: 'created' | 'uncertain' | 'failed' | 'slot_unavailable';
   answers: Array<{ step: NimalaStep; text: string }>;
   attempts: number;
   outcome?: 'booked' | 'completed' | 'abandoned' | 'handoff';

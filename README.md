@@ -33,8 +33,13 @@ Statické Nimala hlášky používa gateway z `src/assets/audio` ako WAV súbory
 názvami `nimala-01-…-v1.wav` až `nimala-27-…-v1.wav`; presný zoznam a texty sú
 v [ElevenLabs skripte](docs/nimala-elevenlabs-prompts.md). Ak nahrávka chýba,
 bot automaticky použije Google slovenský hlas. Dynamická ponuka termínov,
-rekapitulácia a potvrdenie rezervácie sa vždy čítajú cez
-`Google.sk-SK-Wavenet-B`, pretože obsahujú aktuálne údaje z Calendar API.
+rekapitulácia a potvrdenie rezervácie sa generujú cez ElevenLabs API. Secret
+`ELEVENLABS_API_KEY` sa načíta z prostredia; hlas, model a jeho nastavenia sú
+súčasťou konfigurácie Nimala v `src/config/nimala.config.ts`. Výstup je telefónny μ-law 8 kHz
+a v pamäti sa uchováva najviac desať minút pod náhodným media tokenom. Text
+ani audio sa neukladajú do repozitára. Pri chýbajúcej konfigurácii alebo
+výpadku ElevenLabs sa dynamická hláška bezpečne prečíta cez
+`Google.sk-SK-Wavenet-B`.
 
 ## Personalised Voice Bot Framework
 

@@ -9,6 +9,7 @@ process.env.TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || 'test-auth-toke
 const app = require('../../src/app').default;
 const { prixiService } = require('../../src/services/prixi.service');
 const { prixiCalendarService } = require('../../src/services/prixi-calendar.service');
+const { elevenLabsTtsService } = require('../../src/services/elevenlabs-tts.service');
 const { nimalaAudioFiles, nimalaAudioFileNames } = require('../../src/config/nimala-audio.config');
 
 const originalGetConfig = prixiService.getConfig.bind(prixiService);
@@ -96,6 +97,7 @@ test.beforeEach(() => {
   sentEvents = [];
   bookingInputs = [];
   delete process.env.NIMALA_HUMAN_TRANSFER_NUMBER;
+  delete process.env.ELEVENLABS_API_KEY;
   prixiCalendarService.listServices = async () => services;
   prixiCalendarService.getAvailableSlots = async () => slots;
   prixiCalendarService.createBooking = async input => {
@@ -111,6 +113,7 @@ test.after(async () => {
   prixiCalendarService.getAvailableSlots = originalGetAvailableSlots;
   prixiCalendarService.createBooking = originalCreateBooking;
   delete process.env.NIMALA_HUMAN_TRANSFER_NUMBER;
+  delete process.env.ELEVENLABS_API_KEY;
   await app.close();
 });
 
@@ -178,7 +181,7 @@ test('preventívna prehliadka sa rezervuje iba po výbere a výslovnom potvrden�
   assert.match(confirmation.body, /v trvaní 30 minút/);
   assert.match(confirmation.body, /MUDr\. Dávid Anovčin/);
   assert.equal(bookingInputs.length, 0);
-  const completed = await answer(callSid, 'áno');
+  const completed = await answer(callSid, 'annon');
 
   assert.match(completed.body, /úspešne rezervovaný/);
   assert.match(completed.body, /prajem vám ešte príjemný zvyšok dňa/);
@@ -193,6 +196,40 @@ test('preventívna prehliadka sa rezervuje iba po výbere a výslovnom potvrden�
   assert.equal(bookingInputs[0].metadata.externalReference, callSid);
   assert.match(bookingInputs[0].idempotencyKey, /^[0-9a-f-]{36}$/i);
   assert.equal(sentEvents.length, 0);
+});
+
+test('dynamická ponuka termínov používa ElevenLabs a krátkodobý μ-law media endpoint', async () => {
+  const originalSynthesize = elevenLabsTtsService.synthesizeForPhone;
+  process.env.ELEVENLABS_API_KEY = 'test-key';
+  let synthesizedText = '';
+  let synthesizedConfig;
+  elevenLabsTtsService.synthesizeForPhone = async (text, config) => {
+    synthesizedText = text;
+    synthesizedConfig = config;
+    return Buffer.from([255, 127, 0, 42]);
+  };
+
+  try {
+    const callSid = 'CA-NIMALA-ELEVENLABS-0000000000001';
+    await incoming(callSid);
+    const offer = await answer(callSid, 'Chcem preventívnu prehliadku na urológii');
+    const mediaUrl = offer.body.match(/<Play>(https:[^<]+\/media\/nimala-dynamic\/[^<]+\.ulaw)<\/Play>/)?.[1];
+
+    assert.ok(mediaUrl);
+    assert.match(synthesizedText, /Mám pre vás tieto voľné termíny/);
+    assert.equal(synthesizedConfig.voiceId, 'zGjIP4SZlMnY9m93k97r');
+    assert.equal(synthesizedConfig.modelId, 'eleven_flash_v2_5');
+    assert.doesNotMatch(offer.body, /Google\.sk-SK-Wavenet-B/);
+
+    const media = await app.inject({ method: 'GET', url: new URL(mediaUrl).pathname });
+    assert.equal(media.statusCode, 200);
+    assert.match(media.headers['content-type'], /^audio\/ulaw/);
+    assert.deepEqual([...media.rawPayload], [255, 127, 0, 42]);
+    assert.equal(media.headers['cache-control'], 'private, no-store, max-age=0');
+  } finally {
+    elevenLabsTtsService.synthesizeForPhone = originalSynthesize;
+    delete process.env.ELEVENLABS_API_KEY;
+  }
 });
 
 test('e-recept zachytí identitu, rok narodenia a liek do PriXi požiadavky', async () => {
@@ -280,5 +317,27 @@ test('timeout rezervácie zopakuje identický payload a kľúč a potom nevyrob�
   assert.deepEqual(bookingInputs[1], bookingInputs[0]);
   assertStaticResponse(response, 'bookingStatusUncertain', /nevznikla duplicitná rezervácia/);
   assert.equal(sentEvents.length, 1);
+  assert.match(sentEvents[0].problemTranscript, /Výsledok rezervácie sa nepodarilo spoľahlivo overiť/);
+  assert.doesNotMatch(sentEvents[0].problemTranscript, /Rezervácia nebola potvrdená Calendar API/);
+});
+
+test('nedokončené potvrdenie presne vysvetlí, že rezervácia nebola odoslaná do Calendar API', async () => {
+  const callSid = 'CA-NIMALA-UNCONFIRMED-000000000001';
+  await incoming(callSid);
+  await answer(callSid, 'Chcem preventívnu prehliadku na urológii');
+  await answer(callSid, 'dva');
+  await answer(callSid, 'Matej Skok');
+  await answer(callSid, 'nejasná odpoveď');
+  await post('/voice/call-status', {
+    CallSid: callSid,
+    CallStatus: 'completed',
+    From: '+421905111222',
+  });
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(bookingInputs.length, 0);
+  assert.equal(sentEvents.length, 1);
+  assert.match(sentEvents[0].problemTranscript, /Rezervácia nebola odoslaná do Calendar API, pretože pacient nedokončil jej potvrdenie/);
+  assert.doesNotMatch(sentEvents[0].problemTranscript, /Rezervácia nebola potvrdená Calendar API/);
 });
 
