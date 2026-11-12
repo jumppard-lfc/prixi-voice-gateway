@@ -80,6 +80,7 @@ const copy = {
   transferNotAnswered: spoken('Pracovníka kliniky sa teraz nepodarilo zastihnúť. Vašu žiadosť o telefonický kontakt sme zaznamenali. Ďakujem a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'transferNotAnswered'),
   expired: spoken('Hovor sa nepodarilo dokončiť. Zavolajte, prosím, znova. Ďakujem a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'expired'),
   technical: spoken('Momentálne sa neviem bezpečne spojiť s rezervačným systémom. Vašu požiadavku odovzdám personálu kliniky. Ďakujem za pochopenie a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'technical'),
+  bookingFailed: dynamicSpoken('Rezerváciu sa momentálne nepodarilo dokončiť. Vašu požiadavku som odovzdala personálu kliniky, ktorý ju preverí. Ďakujem za pochopenie a prajem vám ešte príjemný zvyšok dňa. Dovidenia.'),
   startupTechnical: spoken('Momentálne máme technické problémy. Skúste, prosím, zavolať neskôr. Ďakujem za pochopenie a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'startupTechnical'),
   bookingStatusUncertain: spoken('Výsledok rezervácie sa mi nepodarilo spoľahlivo overiť. Aby nevznikla duplicitná rezervácia, požiadavku preverí personál kliniky a bude vás kontaktovať. Ďakujem a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'bookingStatusUncertain'),
   noSlotInSession: spoken('Momentálne som nenašla žiadny voľný termín.', 'noSlotInSession'),
@@ -276,6 +277,7 @@ async function renderPrompt(
   nimalaSessionService.save(session);
   const twiml = new VoiceResponse();
   const menuStep = ['intent', 'main_menu', 'appointment_type', 'slot', 'booking_confirmation'].includes(session.step);
+  const shortAnswerStep = menuStep || session.step === 'birth_year';
   // As in the Dentbody flow, finish speaking before listening. This avoids
   // capturing the bot's own prompt or ambient speech as the caller's answer.
   if (prefix) await appendSpoken(twiml, reply.request, prefix);
@@ -284,8 +286,8 @@ async function renderPrompt(
     input: ['speech', 'dtmf'],
     action: '/voice/nimala/answer',
     method: 'POST',
-    timeout: 6,
-    speechTimeout: 1,
+    timeout: shortAnswerStep ? 4 : 6,
+    speechTimeout: shortAnswerStep ? 'auto' : 1,
     language: 'sk-SK',
     hints: hintsFor(session),
     ...(menuStep ? { numDigits: 1 } : {}),
@@ -578,13 +580,16 @@ async function confirmBooking(fastify: FastifyInstance, reply: FastifyReply, ses
     bookingStatus: result.status,
     httpStatus: 'httpStatus' in result ? result.httpStatus : undefined,
     apiCode: 'code' in result ? result.code : undefined,
+    apiMessage: 'message' in result ? result.message : undefined,
+    validationFields: 'validationFields' in result ? result.validationFields : undefined,
+    validationDetails: 'validationDetails' in result ? result.validationDetails : undefined,
     diagnostic: 'diagnostic' in result ? result.diagnostic : undefined,
   }, 'Nimala Calendar booking was not confirmed');
   return callbackFallback(
     fastify,
     reply,
     session,
-    result.status === 'uncertain' ? copy.bookingStatusUncertain : copy.technical
+    result.status === 'uncertain' ? copy.bookingStatusUncertain : copy.bookingFailed
   );
 }
 

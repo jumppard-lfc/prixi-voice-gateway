@@ -34,7 +34,7 @@ export interface CreatePrixiBookingInput {
 export type PrixiBookingResult =
   | { status: 'created'; bookingId: string | number; startAt: string; endAt?: string }
   | { status: 'slot_unavailable'; httpStatus?: number; code?: string }
-  | { status: 'validation_error'; message?: string; httpStatus?: number; code?: string }
+  | { status: 'validation_error'; message?: string; httpStatus?: number; code?: string; validationFields?: string[]; validationDetails?: string[] }
   | { status: 'uncertain'; message?: string; httpStatus?: number; code?: string }
   | { status: 'failed'; message?: string; httpStatus?: number; code?: string; diagnostic?: string };
 
@@ -45,6 +45,21 @@ function asPositiveInteger(value: unknown): number | undefined {
 
 function firstString(...values: unknown[]): string | undefined {
   return values.find(value => typeof value === 'string' && value.trim()) as string | undefined;
+}
+
+function validationDetails(data: any): { fields?: string[]; details?: string[] } {
+  if (!data?.errors || typeof data.errors !== 'object' || Array.isArray(data.errors)) return {};
+  const fields = Object.keys(data.errors).sort();
+  const details = fields.flatMap(field => {
+    const messages = Array.isArray(data.errors[field]) ? data.errors[field] : [data.errors[field]];
+    return messages
+      .filter((message: unknown): message is string => typeof message === 'string')
+      .map((message: string) => `${field}: ${message.slice(0, 300)}`);
+  });
+  return {
+    ...(fields.length ? { fields } : {}),
+    ...(details.length ? { details } : {}),
+  };
 }
 
 export class PrixiCalendarServiceClient {
@@ -158,9 +173,23 @@ export class PrixiCalendarServiceClient {
       const axiosError = error as AxiosError<any>;
       const status = axiosError.response?.status;
       const code = firstString(axiosError.response?.data?.code, axiosError.response?.data?.error?.code);
-      const message = firstString(axiosError.response?.data?.message, axiosError.message);
+      const message = firstString(
+        axiosError.response?.data?.message,
+        axiosError.response?.data?.error?.message,
+        axiosError.message
+      );
       if (status === 409 && code === 'SLOT_UNAVAILABLE') return { status: 'slot_unavailable', httpStatus: status, code };
-      if (status === 422) return { status: 'validation_error', message, httpStatus: status, code };
+      if (status === 422) {
+        const validation = validationDetails(axiosError.response?.data);
+        return {
+          status: 'validation_error',
+          message,
+          httpStatus: status,
+          code,
+          validationFields: validation.fields,
+          validationDetails: validation.details,
+        };
+      }
       if (!axiosError.response || (status !== undefined && status >= 500)) return { status: 'uncertain', message, httpStatus: status, code };
       return { status: 'failed', message, httpStatus: status, code };
     }

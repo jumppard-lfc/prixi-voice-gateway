@@ -100,3 +100,38 @@ test('Calendar klient rozpozná produkčný data obal úspešnej rezervácie', a
   });
 });
 
+test('Calendar klient zachová bezpečnú diagnostiku validačnej chyby', async () => {
+  const client = new PrixiCalendarServiceClient({
+    post: async () => {
+      const error = new Error('Request failed with status code 422');
+      error.response = {
+        status: 422,
+        data: {
+          message: 'The given data was invalid.',
+          errors: {
+            patient: ['Kontaktné údaje patria pacientovi s iným menom.'],
+          },
+        },
+      };
+      throw error;
+    },
+  });
+  const result = await client.createBooking({
+    clinicId: 168,
+    calendarId: 7,
+    eventTypeUid: 'preventive-exam',
+    startAt: '2026-11-16T09:00:00+01:00',
+    patient: { name: 'Ján', surname: 'Novák', phone_number: '+421900000000' },
+    metadata: { source: 'voice_bot', externalReference: 'CA123' },
+    idempotencyKey: 'same-key',
+  });
+  assert.deepEqual(result, {
+    status: 'validation_error',
+    message: 'The given data was invalid.',
+    httpStatus: 422,
+    code: undefined,
+    validationFields: ['patient'],
+    validationDetails: ['patient: Kontaktné údaje patria pacientovi s iným menom.'],
+  });
+});
+

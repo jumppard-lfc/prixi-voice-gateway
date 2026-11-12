@@ -123,6 +123,8 @@ test('produkčný endpoint routuje autoritatívny Nimala DID aj pri cudzom Forwa
   assertStaticResponse(response, 'greeting', /som PriXi, virtuálna asistentka/);
   assert.match(response.body, /<\/(?:Say|Play)><Gather/);
   assert.match(response.body, /action="\/voice\/nimala\/answer"/);
+  assert.match(response.body, /timeout="4"/);
+  assert.match(response.body, /speechTimeout="auto"/);
   assert.doesNotMatch(response.body, /Vadkerti/);
 });
 
@@ -173,13 +175,19 @@ test('preventívna prehliadka sa rezervuje iba po výbere a výslovnom potvrden�
   assert.doesNotMatch(offer.body, /<Play>/);
   assert.match(offer.body, /Možnosť jedna/);
   assert.match(offer.body, /šestnásteho novembra/);
-  await answer(callSid, 'dva');
+  assert.match(offer.body, /timeout="4"/);
+  assert.match(offer.body, /speechTimeout="auto"/);
+  const namePrompt = await answer(callSid, 'dva');
+  assert.match(namePrompt.body, /timeout="6"/);
+  assert.match(namePrompt.body, /speechTimeout="1"/);
   const confirmation = await answer(callSid, 'Ján Novák');
   assert.match(confirmation.body, /Ďakujem\. Prosím, potvrďte rezerváciu/);
   assert.match(confirmation.body, /voice="Google\.sk-SK-Wavenet-B"/);
   assert.doesNotMatch(confirmation.body, /<Play>/);
   assert.match(confirmation.body, /v trvaní tridsať minút/);
   assert.match(confirmation.body, /MUDr\. Dávid Anovčin/);
+  assert.match(confirmation.body, /timeout="4"/);
+  assert.match(confirmation.body, /speechTimeout="auto"/);
   assert.equal(bookingInputs.length, 0);
   const completed = await answer(callSid, 'annon');
 
