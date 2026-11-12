@@ -1,5 +1,32 @@
 # PriXi Voice Gateway
 
+## Nimala urológia
+
+Bot pre urológiu MUDr. Dávida Anovčina používa Twilio DID
+`+420910921238`, verejné číslo kliniky `+421940621456` a PriXi clinic ID
+`168`. Obe čísla sú chránené proti cross-clinic routovaniu. Na Twilio DID
+nastavte tieto `POST` callbacky:
+
+- incoming voice: `/voice/incoming`
+- terminal status callback: `/voice/call-status`
+
+Úvod zodpovedá spoločnej recepcii kliniky: volajúci si najprv vyberie urológiu,
+estetiku, sonografiu, proktológiu alebo dermatológiu. Iba urológia je v tejto
+demo verzii aktívna; pri inom odbore bot pomenuje zvolenú ambulanciu, oznámi
+obmedzenie a nevytvorí urologickú požiadavku.
+
+Urologický flow obsluhuje objednanie, e-recept a výsledky. Pri objednaní načíta aktuálny
+katalóg a dostupnosť cez PriXi Calendar API a rezerváciu vytvorí až po
+výslovnom potvrdení pacienta. Štandardne používa existujúce `PRIXI_API_URL` a
+`PRIXI_API_KEY`; `PRIXI_CALENDAR_API_URL` a `PRIXI_CALENDAR_API_TOKEN` sú iba
+voliteľné overrides pre samostatný Calendar server alebo token.
+
+Voliteľné `NIMALA_HUMAN_TRANSFER_NUMBER` musí byť samostatné priame číslo na
+človeka. Gateway zámerne odmietne bot DID aj verejné číslo kliniky ako cieľ
+transferu, pretože číslo presmerované späť na Twilio by vytvorilo slučku. Bez
+bezpečného cieľa bot namiesto transferu zapíše do PriXi žiadosť o spätný
+kontakt.
+
 ## Personalised Voice Bot Framework
 
 `src/services/voice-bot-framework.service.ts` defines the reusable configuration contract for a clinic: brand and specialty, booking provider, its services and aliases, confirmation rules, DTMF fallback, terms and SMS. `bovClinicDemoConfig` is the reference template distilled from the BOV Clinic pilot.

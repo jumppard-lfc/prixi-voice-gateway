@@ -30,6 +30,8 @@ import { finalizeAbandonedMalakovaCall, startMalakovaVoiceBot } from './malakova
 import { malakovaBotConfig } from '../config/malakova.config';
 import { skripkovaBotConfig } from '../config/skripkova.config';
 import { gyncentrumBotConfig } from '../config/gyncentrum.config';
+import { finalizeAbandonedNimalaCall, startNimalaVoiceBot } from './nimala-voice-bot.controller';
+import { nimalaBotConfig } from '../config/nimala.config';
 import { DateTime } from 'luxon';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -81,6 +83,9 @@ const MALAKOVA_CLINIC_ID = malakovaBotConfig.clinic.clinicId;
 const SKRIPKOVA_TWILIO_PHONE_NUMBER = skripkovaBotConfig.clinic.inboundTwilioNumber;
 const SKRIPKOVA_ROUTING_PHONE_NUMBER = skripkovaBotConfig.clinic.routingPhoneNumber;
 const SKRIPKOVA_CLINIC_ID = skripkovaBotConfig.clinic.clinicId;
+const NIMALA_TWILIO_PHONE_NUMBER = nimalaBotConfig.clinic.inboundTwilioNumber;
+const NIMALA_ROUTING_PHONE_NUMBER = nimalaBotConfig.clinic.routingPhoneNumber;
+const NIMALA_CLINIC_ID = nimalaBotConfig.clinic.clinicId;
 const UNRESOLVED_CLINIC_IDS = new Set(['', 'orphan', 'fallback', 'local-dev']);
 const KLOSTERMANN_SK_GREETING = 'Dobrý deň, dovolali ste sa do Ortodoncia Klostermann. Aby ste nemuseli čakať, posielame Vám SMS správu s odkazom na objednanie. Ďakujeme.';
 const KLOSTERMANN_EN_GREETING = 'Hello, you have reached Klostermann Orthodontics. So that you don’t have to wait, we will send you an SMS with a link to order. Thank you.';
@@ -156,6 +161,8 @@ const PROTECTED_PRODUCTION_TWILIO_NUMBERS = new Set([
   MALAKOVA_ROUTING_PHONE_NUMBER,
   SKRIPKOVA_TWILIO_PHONE_NUMBER,
   SKRIPKOVA_ROUTING_PHONE_NUMBER,
+  NIMALA_TWILIO_PHONE_NUMBER,
+  NIMALA_ROUTING_PHONE_NUMBER,
   '+421800232793',
 ].filter(Boolean));
 
@@ -244,6 +251,8 @@ function assertClinicRoutingIsolation(
     [MALAKOVA_ROUTING_PHONE_NUMBER, MALAKOVA_CLINIC_ID],
     [SKRIPKOVA_TWILIO_PHONE_NUMBER, SKRIPKOVA_CLINIC_ID],
     [SKRIPKOVA_ROUTING_PHONE_NUMBER, SKRIPKOVA_CLINIC_ID],
+    [NIMALA_TWILIO_PHONE_NUMBER, NIMALA_CLINIC_ID],
+    [NIMALA_ROUTING_PHONE_NUMBER, NIMALA_CLINIC_ID],
     ...Array.from(POPRAD_ONCOLOGY_ROUTING_PHONE_NUMBERS, phoneNumber => [phoneNumber, POPRAD_ONCOLOGY_CLINIC_ID] as [string, string]),
   ]);
   const expectedClinicId = protectedRoutes.get(normalizedRoute);
@@ -347,12 +356,14 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     const isPopradOncologyDestination = isPopradOncologyRoute(body.To);
     const isMalakovaDedicatedDestination = normalizedTo === MALAKOVA_TWILIO_PHONE_NUMBER;
     const isSkripkovaDedicatedDestination = normalizedTo === SKRIPKOVA_TWILIO_PHONE_NUMBER;
+    const isNimalaDedicatedDestination = normalizedTo === NIMALA_TWILIO_PHONE_NUMBER;
     const isOtherDedicatedDestination = normalizedTo === CELKOVA_PHONE_NUMBER
       || normalizedTo === ELISSEA_TWILIO_PHONE_NUMBER
       || normalizedTo === KOLLAR_TWILIO_PHONE_NUMBER
       || normalizedTo === DENTBODY_TWILIO_PHONE_NUMBER
       || isMalakovaDedicatedDestination
       || isSkripkovaDedicatedDestination
+      || isNimalaDedicatedDestination
       || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
       || normalizedTo === KUTAKOVA_PHONE_NUMBER
       || normalizedTo === normalizeSlovakPhoneAddress(novotnyVoiceBotPhoneNumber)
@@ -369,6 +380,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       || normalizedTo === DENTBODY_TWILIO_PHONE_NUMBER
       || isMalakovaDedicatedDestination
       || isSkripkovaDedicatedDestination
+      || isNimalaDedicatedDestination
       || normalizedTo === CELKOVA_PHONE_NUMBER
       || normalizedTo === BENOVA_BALOGHOVA_PHONE_NUMBER
       || normalizedTo === KUTAKOVA_PHONE_NUMBER
@@ -380,6 +392,14 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       || isPopradOncologyDestination
       || normalizedTo === NEUROCENTRUM_ROUTING_PHONE_NUMBER
       || isDobrovodskaRoute(body.To);
+    const isNimalaCall = isNimalaDedicatedDestination
+      || normalizedTo === NIMALA_ROUTING_PHONE_NUMBER
+      || (!isExistingDedicatedDestination && normalizedCarrierForwardedFrom === NIMALA_ROUTING_PHONE_NUMBER);
+
+    if (isNimalaCall) {
+      fastify.log.info({ from: fromNumber, to: body.To, forwardedFrom: carrierForwardedFrom }, 'Routing call to Nimala urology production voice bot');
+      return startNimalaVoiceBot(fastify, reply, body);
+    }
     const isMalakovaCall = isMalakovaDedicatedDestination
       || normalizedTo === MALAKOVA_ROUTING_PHONE_NUMBER
       || (!isExistingDedicatedDestination && normalizedCarrierForwardedFrom === MALAKOVA_ROUTING_PHONE_NUMBER);
@@ -1025,5 +1045,6 @@ export async function voiceRoutes(fastify: FastifyInstance) {
     finalizeAbandonedKutakovaCall(body.CallSid);
     finalizeDentbodyCall(body.CallSid);
     finalizeAbandonedMalakovaCall(fastify, body.CallSid, new Date().toISOString());
+    finalizeAbandonedNimalaCall(fastify, body.CallSid, new Date().toISOString());
   });
 }

@@ -8,6 +8,7 @@ import { dentbodyBotConfig } from '../config/dentbody.config';
 import { malakovaBotConfig } from '../config/malakova.config';
 import { skripkovaBotConfig } from '../config/skripkova.config';
 import { gyncentrumBotConfig } from '../config/gyncentrum.config';
+import { nimalaBotConfig } from '../config/nimala.config';
 
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -84,6 +85,18 @@ export class PrixiService {
    * Provides a fallback configuration if the API call fails or times out.
    */
   async getConfig(phoneNumber: string): Promise<ClinicConfig> {
+    if (
+      phoneNumber === nimalaBotConfig.clinic.inboundTwilioNumber
+      || phoneNumber === nimalaBotConfig.clinic.routingPhoneNumber
+    ) {
+      return {
+        clinicId: nimalaBotConfig.clinic.clinicId,
+        voiceBotEnabled: true,
+        timezone: nimalaBotConfig.clinic.timezone,
+        pediatricMode: false,
+      };
+    }
+
     if (
       phoneNumber === gyncentrumBotConfig.clinic.inboundTwilioNumber
       || phoneNumber === gyncentrumBotConfig.clinic.routingPhoneNumber

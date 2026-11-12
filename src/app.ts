@@ -14,6 +14,7 @@ import { kollarVoiceBotRoutes } from './routes/kollar-voice-bot.controller';
 import { kutakovaVoiceBotRoutes } from './routes/kutakova-voice-bot.controller';
 import { dentbodyVoiceBotRoutes } from './routes/dentbody-voice-bot.controller';
 import { malakovaVoiceBotRoutes } from './routes/malakova-voice-bot.controller';
+import { nimalaVoiceBotRoutes } from './routes/nimala-voice-bot.controller';
 import { dentbodyAudioFileNames } from './config/dentbody-audio.config';
 
 const KLOSTERMANN_GREETING_PATH = resolve(__dirname, 'assets/audio/klostermann-greeting-v5.wav');
@@ -216,6 +217,7 @@ app.register(kollarVoiceBotRoutes, { prefix: '/voice' });
 app.register(kutakovaVoiceBotRoutes, { prefix: '/voice' });
 app.register(dentbodyVoiceBotRoutes, { prefix: '/voice' });
 app.register(malakovaVoiceBotRoutes, { prefix: '/voice' });
+app.register(nimalaVoiceBotRoutes, { prefix: '/voice' });
 app.register(voiceBotBuilderRoutes);
 
 const start = async () => {
