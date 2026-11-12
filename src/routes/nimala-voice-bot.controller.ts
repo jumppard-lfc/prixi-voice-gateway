@@ -33,8 +33,8 @@ const VoiceResponse = twilio.twiml.VoiceResponse;
 const sayOptions: any = { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-B' };
 
 const copy = {
-  greeting: 'Dobrý deň, dovolali ste sa do kliniky Nimala. Vyberte si, prosím, ambulanciu. Pre urológiu stlačte jednotku. Pre estetiku dvojku. Pre sonografiu trojku. Pre proktológiu štvorku. Pre dermatológiu päťku. Táto demo verzia je zatiaľ aktívna iba pre urologickú ambulanciu pána doktora Dávida Anovčina.',
-  urologyMenu: 'Ak ide o náhly život ohrozujúci stav, volajte tiesňovú linku 155 alebo 112. Ak sa chcete objednať na urologické vyšetrenie, stlačte jednotku. Pre e-recept stlačte dvojku. Pre informácie o výsledkoch urologického vyšetrenia stlačte trojku. Ak chcete hovoriť s človekom, stlačte nulu.',
+  greeting: 'Dobrý deň, som PriXi, virtuálna asistentka kliniky Nimala. V tejto demo verzii vám viem pomôcť s urologickou ambulanciou. Povedzte mi, prosím, kvôli čomu voláte. Ak voláte kvôli inému odboru, povedzte jeho názov.',
+  urologyMenu: 'Rozumiem, ide o urológiu. Potrebujete sa objednať, požiadať o e-recept, informovať sa o výsledkoch, alebo hovoriť s človekom?',
   appointmentType: 'Vyberte si typ vyšetrenia. Pre VIP termín urológia stlačte jednotku. Pre preventívnu prehliadku dvojku. Pre konzultáciu trojku. Pre kontrolu po operácii štvorku. Pre konzultáciu k operácii prostaty vodnou parou päťku. Pre U F M stlačte šestku.',
   name: 'Povedzte, prosím, svoje meno a priezvisko.',
   birthYear: 'Povedzte, prosím, svoj rok narodenia.',
@@ -101,7 +101,7 @@ function bookingConfirmation(session: NimalaSession): string {
 
 function promptFor(session: NimalaSession): string {
   switch (session.step) {
-    case 'department': return copy.greeting;
+    case 'intent': return copy.greeting;
     case 'main_menu': return copy.urologyMenu;
     case 'appointment_type': return copy.appointmentType;
     case 'slot': return slotOffer(session);
@@ -112,20 +112,39 @@ function promptFor(session: NimalaSession): string {
   }
 }
 
+function hintsFor(session: NimalaSession): string {
+  if (session.step === 'intent' || session.step === 'main_menu') {
+    return 'objednať sa, rezervovať termín, preventívna prehliadka, konzultácia, e-recept, predpísať liek, výsledky vyšetrenia, urológia, estetika, sonografia, proktológia, dermatológia, hovoriť s človekom';
+  }
+  if (session.step === 'appointment_type') {
+    return 'VIP termín urológia, preventívna prehliadka, konzultácia, kontrola po operácii, operácia prostaty vodnou parou, UFM, uroflowmetria, jedna, dva, tri, štyri, päť, šesť';
+  }
+  if (session.step === 'slot') {
+    return 'možnosť jedna, možnosť dva, možnosť tri, prvý termín, druhý termín, tretí termín, jedna, dva, tri';
+  }
+  if (session.step === 'booking_confirmation') {
+    return 'áno, súhlasím, potvrdzujem, správne, platí, nie, iný termín, zmeniť termín';
+  }
+  return '';
+}
+
 function renderPrompt(reply: FastifyReply, session: NimalaSession, prefix = ''): FastifyReply {
   nimalaSessionService.save(session);
   const twiml = new VoiceResponse();
-  const menuStep = ['department', 'main_menu', 'appointment_type', 'slot', 'booking_confirmation'].includes(session.step);
-  const gather = twiml.gather({
+  const menuStep = ['intent', 'main_menu', 'appointment_type', 'slot', 'booking_confirmation'].includes(session.step);
+  // As in the Dentbody flow, finish speaking before listening. This avoids
+  // capturing the bot's own prompt or ambient speech as the caller's answer.
+  twiml.say(sayOptions, `${prefix}${promptFor(session)}`.trim());
+  twiml.gather({
     input: ['speech', 'dtmf'],
     action: '/voice/nimala/answer',
     method: 'POST',
     timeout: 6,
-    speechTimeout: 'auto',
+    speechTimeout: 1,
     language: 'sk-SK',
+    hints: hintsFor(session),
     ...(menuStep ? { numDigits: 1 } : {}),
   } as any);
-  gather.say(sayOptions, `${prefix}${promptFor(session)}`.trim());
   twiml.redirect('/voice/nimala/prompt');
   return reply.type('text/xml').send(twiml.toString());
 }
@@ -204,6 +223,27 @@ async function loadAvailableSlots(session: NimalaSession): Promise<boolean> {
   session.offeredSlots = [...unique.values()].slice(0, nimalaBotConfig.booking.offeredSlotCount);
   session.selectedSlot = undefined;
   return session.offeredSlots.length > 0;
+}
+
+async function continueWithAppointmentType(
+  fastify: FastifyInstance,
+  reply: FastifyReply,
+  session: NimalaSession,
+  appointmentType: NimalaAppointmentType
+): Promise<FastifyReply> {
+  session.appointmentType = appointmentType;
+  session.attempts = 0;
+  try {
+    const hasSlots = await loadAvailableSlots(session);
+    if (!hasSlots) {
+      return callbackFallback(fastify, reply, session, 'Pre tento typ vyšetrenia momentálne nevidím voľný termín. Vašu požiadavku odovzdám klinike, ktorá vás bude kontaktovať. Dovidenia.');
+    }
+    session.step = 'slot';
+    return renderPrompt(reply, session);
+  } catch (error) {
+    fastify.log.error(error, 'Failed to load Nimala availability');
+    return callbackFallback(fastify, reply, session, copy.technical);
+  }
 }
 
 function requestSummary(session: NimalaSession): string {
@@ -433,15 +473,33 @@ export async function nimalaVoiceBotRoutes(fastify: FastifyInstance): Promise<vo
     if (!answer) return retryOrHandoff(fastify, reply, session);
     session.answers.push({ step: session.step, text: answer });
 
-    if (session.step === 'department') {
+    if (session.step === 'intent') {
       const department = parseNimalaDepartment(answer);
-      if (!department) return retryOrHandoff(fastify, reply, session);
-      session.attempts = 0;
-      if (department !== 'urology') {
+      if (department && department !== 'urology') {
         nimalaSessionService.delete(session.callSid);
         return renderEnd(reply, unsupportedDepartmentMessage(department));
       }
-      session.step = 'main_menu';
+
+      const requestType = parseNimalaMainMenu(answer);
+      if (!requestType) {
+        if (department === 'urology') {
+          session.attempts = 0;
+          session.step = 'main_menu';
+          return renderPrompt(reply, session);
+        }
+        return retryOrHandoff(fastify, reply, session);
+      }
+
+      session.requestType = requestType;
+      session.attempts = 0;
+      if (requestType === 'human') return handoffToHuman(fastify, reply, session);
+      if (requestType === 'appointment') {
+        const appointmentType = parseNimalaAppointmentType(answer);
+        if (appointmentType) return continueWithAppointmentType(fastify, reply, session, appointmentType);
+        session.step = 'appointment_type';
+        return renderPrompt(reply, session);
+      }
+      session.step = 'name';
       return renderPrompt(reply, session);
     }
 
@@ -458,19 +516,7 @@ export async function nimalaVoiceBotRoutes(fastify: FastifyInstance): Promise<vo
     if (session.step === 'appointment_type') {
       const appointmentType = parseNimalaAppointmentType(answer);
       if (!appointmentType) return retryOrHandoff(fastify, reply, session);
-      session.appointmentType = appointmentType;
-      session.attempts = 0;
-      try {
-        const hasSlots = await loadAvailableSlots(session);
-        if (!hasSlots) {
-          return callbackFallback(fastify, reply, session, 'Pre tento typ vyšetrenia momentálne nevidím voľný termín. Vašu požiadavku odovzdám klinike, ktorá vás bude kontaktovať. Dovidenia.');
-        }
-        session.step = 'slot';
-        return renderPrompt(reply, session);
-      } catch (error) {
-        fastify.log.error(error, 'Failed to load Nimala availability');
-        return callbackFallback(fastify, reply, session, copy.technical);
-      }
+      return continueWithAppointmentType(fastify, reply, session, appointmentType);
     }
 
     if (session.step === 'slot') {

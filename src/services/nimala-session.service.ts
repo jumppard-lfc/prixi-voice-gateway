@@ -2,7 +2,7 @@ import { NimalaAppointmentType, NimalaRequestType } from '../config/nimala.confi
 import { PrixiCalendarSlot } from './prixi-calendar.service';
 
 export type NimalaStep =
-  | 'department'
+  | 'intent'
   | 'main_menu'
   | 'appointment_type'
   | 'slot'
@@ -45,7 +45,7 @@ export class NimalaSessionService {
       callSid,
       phone,
       clinicId,
-      step: 'department',
+      step: 'intent',
       answers: [],
       attempts: 0,
       startedAt: new Date().toISOString(),

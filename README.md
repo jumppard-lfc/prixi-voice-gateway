@@ -10,10 +10,12 @@ nastavte tieto `POST` callbacky:
 - incoming voice: `/voice/incoming`
 - terminal status callback: `/voice/call-status`
 
-Úvod zodpovedá spoločnej recepcii kliniky: volajúci si najprv vyberie urológiu,
-estetiku, sonografiu, proktológiu alebo dermatológiu. Iba urológia je v tejto
-demo verzii aktívna; pri inom odbore bot pomenuje zvolenú ambulanciu, oznámi
-obmedzenie a nevytvorí urologickú požiadavku.
+PriXi sa v úvode stručne predstaví a otvorenou otázkou zistí dôvod volania.
+Prirodzenou odpoveďou rozpozná objednanie, recept, výsledky alebo žiadosť o
+človeka. Z odborov kliniky rozumie urológii, estetike, sonografii, proktológii
+a dermatológii. Iba urológia je v tejto demo verzii aktívna; pri inom odbore
+bot pomenuje zvolenú ambulanciu, oznámi obmedzenie a nevytvorí urologickú
+požiadavku.
 
 Urologický flow obsluhuje objednanie, e-recept a výsledky. Pri objednaní načíta aktuálny
 katalóg a dostupnosť cez PriXi Calendar API a rezerváciu vytvorí až po

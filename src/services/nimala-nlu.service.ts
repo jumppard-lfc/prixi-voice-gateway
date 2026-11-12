@@ -15,38 +15,40 @@ export type NimalaDepartment = 'urology' | 'aesthetics' | 'ultrasound' | 'procto
 
 export function parseNimalaDepartment(value: string): NimalaDepartment | undefined {
   const text = normalizeNimalaSpeech(value);
-  if (text === '1' || /(urolog|anovcin|prostat|ufm|uroflow)/.test(text)) return 'urology';
-  if (text === '2' || /estet/.test(text)) return 'aesthetics';
-  if (text === '3' || /(sonograf|ultrazvuk|sono)/.test(text)) return 'ultrasound';
-  if (text === '4' || /proktolog/.test(text)) return 'proctology';
-  if (text === '5' || /dermatolog/.test(text)) return 'dermatology';
+  if (/^(1|jeden|jedna|jednotka)$/.test(text) || /(urolog|anovcin|prostat|ufm|uroflow)/.test(text)) return 'urology';
+  if (/^(2|dva|dvojka)$/.test(text) || /estet/.test(text)) return 'aesthetics';
+  if (/^(3|tri|trojka)$/.test(text) || /(sonograf|ultrazvuk|sono)/.test(text)) return 'ultrasound';
+  if (/^(4|styri|stvorka)$/.test(text) || /proktolog/.test(text)) return 'proctology';
+  if (/^(5|pat|patka)$/.test(text) || /dermatolog/.test(text)) return 'dermatology';
   return undefined;
 }
 
 export function parseNimalaMainMenu(value: string): NimalaRequestType | undefined {
   const text = normalizeNimalaSpeech(value);
-  if (text === '1' || /(objedna|termin|vysetren|kontrol|konzult|ufm)/.test(text)) return 'appointment';
-  if (text === '2' || /(recept|predpis|liek)/.test(text)) return 'prescription';
-  if (text === '3' || /vysled/.test(text)) return 'results';
-  if (text === '0' || /(clovek|recepci|spojit|personal|sestra)/.test(text)) return 'human';
+  // Specific administrative intents must win over generic words such as
+  // "vyšetrenie" (for example in "výsledky vyšetrenia").
+  if (/^(0|nula)$/.test(text) || /(clovek|recepci|spojit|personal|sestra)/.test(text)) return 'human';
+  if (/^(2|dva|dvojka)$/.test(text) || /(recept|predpis|liek)/.test(text)) return 'prescription';
+  if (/^(3|tri|trojka)$/.test(text) || /vysled/.test(text)) return 'results';
+  if (/^(1|jeden|jedna|jednotka)$/.test(text) || /(objedna|rezerv|termin|vysetren|prehliad|kontrol|konzult|ufm)/.test(text)) return 'appointment';
   return undefined;
 }
 
 export function parseNimalaAppointmentType(value: string): NimalaAppointmentType | undefined {
   const text = normalizeNimalaSpeech(value);
-  if (text === '1' || /(vip)/.test(text)) return 'vip_urology';
-  if (text === '2' || /preventiv/.test(text)) return 'preventive_exam';
-  if (text === '3' || (/konzult/.test(text) && !/(para|prostat|operaci)/.test(text))) return 'consultation';
-  if (text === '4' || /(kontrol.*operaci|pooperac)/.test(text)) return 'postoperative_control';
-  if (text === '5' || /(vodn.*par|para|rezum|prostat.*operaci)/.test(text)) return 'steam_prostate_consultation';
-  if (text === '6' || /(ufm|uroflow)/.test(text)) return 'ufm';
+  if (/^(1|jeden|jedna|jednotka)$/.test(text) || /(vip)/.test(text)) return 'vip_urology';
+  if (/^(2|dva|dvojka)$/.test(text) || /preventiv/.test(text)) return 'preventive_exam';
+  if (/^(3|tri|trojka)$/.test(text) || (/konzult/.test(text) && !/(para|prostat|operaci)/.test(text))) return 'consultation';
+  if (/^(4|styri|stvorka)$/.test(text) || /(kontrol.*operaci|pooperac)/.test(text)) return 'postoperative_control';
+  if (/^(5|pat|patka)$/.test(text) || /(vodn.*par|para|rezum|prostat.*operaci)/.test(text)) return 'steam_prostate_consultation';
+  if (/^(6|sest|sestka)$/.test(text) || /(ufm|uroflow)/.test(text)) return 'ufm';
   return undefined;
 }
 
 export function parseNimalaYesNo(value: string): boolean | undefined {
   const text = normalizeNimalaSpeech(value);
-  if (/^(1|ano|hej|suhlasim|potvrdzujem|dobre)(\s|$)/.test(text)) return true;
-  if (/^(2|nie|nesuhlasim|iny|ine)(\s|$)/.test(text)) return false;
+  if (/^(1|ano|hej|suhlasim|potvrdzujem|dobre|spravne|plati|moze byt)(\s|$)/.test(text)) return true;
+  if (/^(2|nie|nesuhlasim|iny|ine|zmenit|chcem iny)(\s|$)/.test(text)) return false;
   return undefined;
 }
 
@@ -54,9 +56,9 @@ export function parseNimalaSlotChoice(value: string, slots: PrixiCalendarSlot[])
   const text = normalizeNimalaSpeech(value);
   const numeric = text.match(/(?:^|\s)([1-3])(?:\s|$)/)?.[1];
   if (numeric && slots[Number(numeric) - 1]) return Number(numeric) - 1;
-  if (/prv/.test(text) && slots[0]) return 0;
-  if (/druh/.test(text) && slots[1]) return 1;
-  if (/tret/.test(text) && slots[2]) return 2;
+  if (/\b(jeden|jedna|jednotka|prv\p{L}*)\b/u.test(text) && slots[0]) return 0;
+  if (/\b(dva|dvojka|druh\p{L}*)\b/u.test(text) && slots[1]) return 1;
+  if (/\b(tri|trojka|tret\p{L}*)\b/u.test(text) && slots[2]) return 2;
   return undefined;
 }
 

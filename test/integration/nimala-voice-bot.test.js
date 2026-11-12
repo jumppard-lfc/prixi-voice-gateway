@@ -52,11 +52,6 @@ async function answer(callSid, value, digits = false) {
   });
 }
 
-async function enterUrology(callSid) {
-  await incoming(callSid);
-  return answer(callSid, '1', true);
-}
-
 const services = [{
   eventTypeUid: 'preventive-exam',
   name: 'Preventívna prehliadka (30 min.)',
@@ -110,10 +105,9 @@ test('produkčný endpoint routuje autoritatívny Nimala DID aj pri cudzom Forwa
   const response = await incoming('CA-NIMALA-ROUTE-000000000000000001', { ForwardedFrom: '+421902647072' });
   assert.equal(response.statusCode, 200);
   assert.match(response.body, /kliniky Nimala/);
-  assert.match(response.body, /Pre estetiku dvojku/);
-  assert.match(response.body, /Pre sonografiu trojku/);
-  assert.match(response.body, /Pre proktológiu štvorku/);
-  assert.match(response.body, /Pre dermatológiu päťku/);
+  assert.match(response.body, /som PriXi, virtuálna asistentka/);
+  assert.match(response.body, /kvôli čomu voláte/);
+  assert.match(response.body, /<\/Say><Gather/);
   assert.match(response.body, /action="\/voice\/nimala\/answer"/);
   assert.doesNotMatch(response.body, /Vadkerti/);
 });
@@ -142,13 +136,11 @@ test('nesprávny clinicId zastaví Nimala flow pred spracovaním údajov pacient
 
 test('preventívna prehliadka sa rezervuje iba po výbere a výslovnom potvrdení', async () => {
   const callSid = 'CA-NIMALA-BOOKING-00000000000000001';
-  const urologyMenu = await enterUrology(callSid);
-  assert.match(urologyMenu.body, /urologické vyšetrenie/);
-  await answer(callSid, '1', true);
-  const offer = await answer(callSid, '2', true);
+  await incoming(callSid);
+  const offer = await answer(callSid, 'Chcem preventívnu prehliadku na urológii');
   assert.match(offer.body, /Možnosť 1/);
   assert.match(offer.body, /16\. novembra/);
-  await answer(callSid, '1', true);
+  await answer(callSid, 'dva');
   const confirmation = await answer(callSid, 'Ján Novák');
   assert.match(confirmation.body, /Prosím potvrďte rezerváciu/);
   assert.match(confirmation.body, /v trvaní 30 minút/);
@@ -161,6 +153,7 @@ test('preventívna prehliadka sa rezervuje iba po výbere a výslovnom potvrden�
   assert.equal(bookingInputs[0].clinicId, 168);
   assert.equal(bookingInputs[0].calendarId, 7);
   assert.equal(bookingInputs[0].eventTypeUid, 'preventive-exam');
+  assert.equal(bookingInputs[0].startAt, '2026-11-17T10:30:00+01:00');
   assert.deepEqual(bookingInputs[0].patient, { name: 'Ján', surname: 'Novák', phone_number: '+421905111222' });
   assert.equal(bookingInputs[0].metadata.externalReference, callSid);
   assert.match(bookingInputs[0].idempotencyKey, /^[0-9a-f-]{36}$/i);
@@ -169,8 +162,8 @@ test('preventívna prehliadka sa rezervuje iba po výbere a výslovnom potvrden�
 
 test('e-recept zachytí identitu, rok narodenia a liek do PriXi požiadavky', async () => {
   const callSid = 'CA-NIMALA-PRESCRIPTION-000000000001';
-  await enterUrology(callSid);
-  await answer(callSid, '2', true);
+  await incoming(callSid);
+  await answer(callSid, 'Potrebujem e-recept z urológie');
   await answer(callSid, 'Eva Horváthová');
   await answer(callSid, '1984');
   const completed = await answer(callSid, 'Omnic 0,4 miligramu, dve balenia');
@@ -197,6 +190,20 @@ test('iná ambulancia oznámi obmedzenie dema bez falošnej požiadavky pod urol
   assert.equal(bookingInputs.length, 0);
 });
 
+test('otvorená úvodná otázka rozlíši samotnú urológiu aj výsledky vyšetrenia', async () => {
+  const urologyCallSid = 'CA-NIMALA-NATURAL-UROLOGY-000000001';
+  await incoming(urologyCallSid);
+  const urologyMenu = await answer(urologyCallSid, 'Volám na urológiu');
+  assert.match(urologyMenu.body, /Rozumiem, ide o urológiu/);
+  assert.match(urologyMenu.body, /Potrebujete sa objednať/);
+
+  const resultsCallSid = 'CA-NIMALA-NATURAL-RESULTS-0000000001';
+  await incoming(resultsCallSid);
+  const namePrompt = await answer(resultsCallSid, 'Volám kvôli výsledkom urologického vyšetrenia');
+  assert.match(namePrompt.body, /svoje meno a priezvisko/);
+  assert.doesNotMatch(namePrompt.body, /Vyberte si typ vyšetrenia/);
+});
+
 test('po dvoch nerozpoznaných odpovediach prepojí iba na oddelené bezpečné číslo', async () => {
   process.env.NIMALA_HUMAN_TRANSFER_NUMBER = '+421900123456';
   const callSid = 'CA-NIMALA-HANDOFF-0000000000000001';
@@ -213,8 +220,8 @@ test('po dvoch nerozpoznaných odpovediach prepojí iba na oddelené bezpečné 
 test('hlavné číslo kliniky sa ako transfer cieľ odmietne, aby nevznikla slučka', async () => {
   process.env.NIMALA_HUMAN_TRANSFER_NUMBER = '+421940621456';
   const callSid = 'CA-NIMALA-LOOP-GUARD-0000000000001';
-  await enterUrology(callSid);
-  const fallback = await answer(callSid, 'človek');
+  await incoming(callSid);
+  const fallback = await answer(callSid, 'Chcem hovoriť s človekom');
   await new Promise(resolve => setImmediate(resolve));
 
   assert.doesNotMatch(fallback.body, /<Dial/);
@@ -229,10 +236,9 @@ test('timeout rezervácie zopakuje identický payload a kľúč a potom nevyrob�
     return { status: 'uncertain', message: 'timeout' };
   };
   const callSid = 'CA-NIMALA-TIMEOUT-0000000000000001';
-  await enterUrology(callSid);
-  await answer(callSid, '1', true);
-  await answer(callSid, '2', true);
-  await answer(callSid, '1', true);
+  await incoming(callSid);
+  await answer(callSid, 'Chcem preventívnu prehliadku na urológii');
+  await answer(callSid, 'dva');
   await answer(callSid, 'Ján Novák');
   const response = await answer(callSid, 'áno');
   await new Promise(resolve => setImmediate(resolve));
