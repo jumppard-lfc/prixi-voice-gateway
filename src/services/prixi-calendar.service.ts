@@ -33,10 +33,10 @@ export interface CreatePrixiBookingInput {
 
 export type PrixiBookingResult =
   | { status: 'created'; bookingId: string | number; startAt: string; endAt?: string }
-  | { status: 'slot_unavailable' }
-  | { status: 'validation_error'; message?: string }
-  | { status: 'uncertain'; message?: string }
-  | { status: 'failed'; message?: string };
+  | { status: 'slot_unavailable'; httpStatus?: number; code?: string }
+  | { status: 'validation_error'; message?: string; httpStatus?: number; code?: string }
+  | { status: 'uncertain'; message?: string; httpStatus?: number; code?: string }
+  | { status: 'failed'; message?: string; httpStatus?: number; code?: string; diagnostic?: string };
 
 function asPositiveInteger(value: unknown): number | undefined {
   const parsed = typeof value === 'number' ? value : Number(value);
@@ -134,25 +134,35 @@ export class PrixiCalendarServiceClient {
       }, {
         headers: { 'Idempotency-Key': idempotencyKey },
       });
-      const booking = response.data?.booking;
-      if (response.data?.success === true && booking?.id !== undefined) {
+      const booking = response.data?.booking
+        || response.data?.data?.booking
+        || response.data?.data
+        || (response.status === 201 ? response.data : undefined);
+      const bookingId = booking?.id ?? response.data?.bookingId ?? response.data?.booking_id;
+      const responseIndicatesCreated = response.data?.success === true || response.status === 201;
+      if (responseIndicatesCreated && bookingId !== undefined && bookingId !== null) {
         return {
           status: 'created',
-          bookingId: booking.id,
+          bookingId,
           startAt: firstString(booking.startAt, booking.start_at) || input.startAt,
           endAt: firstString(booking.endAt, booking.end_at),
         };
       }
-      return { status: 'failed', message: 'PriXi Calendar API returned an invalid success response' };
+      return {
+        status: 'failed',
+        message: 'PriXi Calendar API returned an invalid success response',
+        httpStatus: response.status,
+        diagnostic: `response_keys:${Object.keys(response.data || {}).sort().join(',') || 'none'}`,
+      };
     } catch (error) {
       const axiosError = error as AxiosError<any>;
       const status = axiosError.response?.status;
       const code = firstString(axiosError.response?.data?.code, axiosError.response?.data?.error?.code);
       const message = firstString(axiosError.response?.data?.message, axiosError.message);
-      if (status === 409 && code === 'SLOT_UNAVAILABLE') return { status: 'slot_unavailable' };
-      if (status === 422) return { status: 'validation_error', message };
-      if (!axiosError.response || (status !== undefined && status >= 500)) return { status: 'uncertain', message };
-      return { status: 'failed', message };
+      if (status === 409 && code === 'SLOT_UNAVAILABLE') return { status: 'slot_unavailable', httpStatus: status, code };
+      if (status === 422) return { status: 'validation_error', message, httpStatus: status, code };
+      if (!axiosError.response || (status !== undefined && status >= 500)) return { status: 'uncertain', message, httpStatus: status, code };
+      return { status: 'failed', message, httpStatus: status, code };
     }
   }
 }

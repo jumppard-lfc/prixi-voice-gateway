@@ -69,6 +69,34 @@ test('Calendar klient posiela idempotency kľúč a mapuje obsadený slot', asyn
       throw error;
     },
   });
-  assert.deepEqual(await conflictClient.createBooking(input), { status: 'slot_unavailable' });
+  assert.deepEqual(await conflictClient.createBooking(input), {
+    status: 'slot_unavailable',
+    httpStatus: 409,
+    code: 'SLOT_UNAVAILABLE',
+  });
+});
+
+test('Calendar klient rozpozná produkčný data obal úspešnej rezervácie', async () => {
+  const client = new PrixiCalendarServiceClient({
+    post: async () => ({
+      status: 201,
+      data: { data: { id: 'booking-789', start_at: '2026-11-16T09:00:00+01:00' } },
+    }),
+  });
+  const result = await client.createBooking({
+    clinicId: 168,
+    calendarId: 7,
+    eventTypeUid: 'preventive-exam',
+    startAt: '2026-11-16T09:00:00+01:00',
+    patient: { name: 'Ján', surname: 'Novák', phone_number: '+421900000000' },
+    metadata: { source: 'voice_bot', externalReference: 'CA123' },
+    idempotencyKey: 'same-key',
+  });
+  assert.deepEqual(result, {
+    status: 'created',
+    bookingId: 'booking-789',
+    startAt: '2026-11-16T09:00:00+01:00',
+    endAt: undefined,
+  });
 });
 

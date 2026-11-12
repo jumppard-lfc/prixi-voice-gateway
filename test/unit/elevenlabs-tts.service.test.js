@@ -21,6 +21,8 @@ test('ElevenLabs TTS posiela telefónny μ-law formát a nakonfigurovaný hlas',
     const audio = await service.synthesizeForPhone('Voľný termín je v piatok o ôsmej.', {
       voiceId: 'slovak-voice',
       modelId: 'eleven_flash_v2_5',
+      languageCode: 'sk',
+      applyTextNormalization: 'on',
       outputFormat: 'ulaw_8000',
       voiceSettings: {
         stability: 0.5,
@@ -34,6 +36,8 @@ test('ElevenLabs TTS posiela telefónny μ-law formát a nakonfigurovaný hlas',
     assert.deepEqual([...audio], [255, 127, 0]);
     assert.equal(request[0], '/v1/text-to-speech/slovak-voice/stream');
     assert.equal(request[1].model_id, 'eleven_flash_v2_5');
+    assert.equal(request[1].language_code, 'sk');
+    assert.equal(request[1].apply_text_normalization, 'on');
     assert.equal(request[1].text, 'Voľný termín je v piatok o ôsmej.');
     assert.equal(request[2].headers['xi-api-key'], 'test-key');
     assert.equal(request[2].params.output_format, 'ulaw_8000');

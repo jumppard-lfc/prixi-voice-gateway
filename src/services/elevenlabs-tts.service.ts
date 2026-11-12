@@ -3,6 +3,8 @@ import axios, { AxiosInstance } from 'axios';
 export interface ElevenLabsPhoneVoiceConfig {
   voiceId: string;
   modelId: string;
+  languageCode: string;
+  applyTextNormalization: 'auto' | 'on' | 'off';
   outputFormat: string;
   voiceSettings: {
     stability: number;
@@ -36,6 +38,8 @@ export class ElevenLabsTtsService {
       {
         text,
         model_id: config.modelId,
+        language_code: config.languageCode,
+        apply_text_normalization: config.applyTextNormalization,
         voice_settings: {
           stability: config.voiceSettings.stability,
           similarity_boost: config.voiceSettings.similarityBoost,

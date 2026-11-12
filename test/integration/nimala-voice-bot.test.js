@@ -171,14 +171,14 @@ test('preventívna prehliadka sa rezervuje iba po výbere a výslovnom potvrden�
   assert.match(offer.body, /Ďakujem\. Mám pre vás tieto voľné termíny/);
   assert.match(offer.body, /voice="Google\.sk-SK-Wavenet-B"/);
   assert.doesNotMatch(offer.body, /<Play>/);
-  assert.match(offer.body, /Možnosť 1/);
-  assert.match(offer.body, /16\. novembra/);
+  assert.match(offer.body, /Možnosť jedna/);
+  assert.match(offer.body, /šestnásteho novembra/);
   await answer(callSid, 'dva');
   const confirmation = await answer(callSid, 'Ján Novák');
   assert.match(confirmation.body, /Ďakujem\. Prosím, potvrďte rezerváciu/);
   assert.match(confirmation.body, /voice="Google\.sk-SK-Wavenet-B"/);
   assert.doesNotMatch(confirmation.body, /<Play>/);
-  assert.match(confirmation.body, /v trvaní 30 minút/);
+  assert.match(confirmation.body, /v trvaní tridsať minút/);
   assert.match(confirmation.body, /MUDr\. Dávid Anovčin/);
   assert.equal(bookingInputs.length, 0);
   const completed = await answer(callSid, 'annon');
@@ -217,8 +217,12 @@ test('dynamická ponuka termínov používa ElevenLabs a krátkodobý μ-law med
 
     assert.ok(mediaUrl);
     assert.match(synthesizedText, /Mám pre vás tieto voľné termíny/);
+    assert.match(synthesizedText, /Možnosť jedna\. Termín je v pondelok, šestnásteho novembra, o deviatej/);
+    assert.match(synthesizedText, /Možnosť dva\. Termín je v utorok, sedemnásteho novembra, o desiatej tridsať/);
     assert.equal(synthesizedConfig.voiceId, 'zGjIP4SZlMnY9m93k97r');
     assert.equal(synthesizedConfig.modelId, 'eleven_flash_v2_5');
+    assert.equal(synthesizedConfig.languageCode, 'sk');
+    assert.equal(synthesizedConfig.voiceSettings.speed, 0.92);
     assert.doesNotMatch(offer.body, /Google\.sk-SK-Wavenet-B/);
 
     const media = await app.inject({ method: 'GET', url: new URL(mediaUrl).pathname });

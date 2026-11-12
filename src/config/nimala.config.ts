@@ -37,13 +37,15 @@ export const nimalaBotConfig = {
   tts: {
     voiceId: 'zGjIP4SZlMnY9m93k97r',
     modelId: 'eleven_flash_v2_5',
+    languageCode: 'sk',
+    applyTextNormalization: 'on',
     outputFormat: 'ulaw_8000',
     voiceSettings: {
       stability: 0.5,
       similarityBoost: 0.75,
       style: 0,
       useSpeakerBoost: true,
-      speed: 1,
+      speed: 0.92,
     },
   },
   handoff: {

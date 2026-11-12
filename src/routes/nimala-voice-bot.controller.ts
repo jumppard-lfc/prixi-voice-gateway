@@ -122,19 +122,77 @@ function formatSlot(slot: PrixiCalendarSlot): string {
   }).format(new Date(slot.startAt));
 }
 
+const spokenWeekdays = [
+  'v pondelok',
+  'v utorok',
+  'v stredu',
+  'vo štvrtok',
+  'v piatok',
+  'v sobotu',
+  'v nedeľu',
+];
+
+const spokenMonths = [
+  'januára',
+  'februára',
+  'marca',
+  'apríla',
+  'mája',
+  'júna',
+  'júla',
+  'augusta',
+  'septembra',
+  'októbra',
+  'novembra',
+  'decembra',
+];
+
+const spokenMonthDays = [
+  '',
+  'prvého', 'druhého', 'tretieho', 'štvrtého', 'piateho', 'šiesteho', 'siedmeho', 'ôsmeho', 'deviateho', 'desiateho',
+  'jedenásteho', 'dvanásteho', 'trinásteho', 'štrnásteho', 'pätnásteho', 'šestnásteho', 'sedemnásteho', 'osemnásteho', 'devätnásteho', 'dvadsiateho',
+  'dvadsiateho prvého', 'dvadsiateho druhého', 'dvadsiateho tretieho', 'dvadsiateho štvrtého', 'dvadsiateho piateho', 'dvadsiateho šiesteho', 'dvadsiateho siedmeho', 'dvadsiateho ôsmeho', 'dvadsiateho deviateho', 'tridsiateho', 'tridsiateho prvého',
+];
+
+const spokenHours = [
+  'polnoci', 'jednej', 'druhej', 'tretej', 'štvrtej', 'piatej', 'šiestej', 'siedmej', 'ôsmej', 'deviatej', 'desiatej', 'jedenástej',
+  'dvanástej', 'trinástej', 'štrnástej', 'pätnástej', 'šestnástej', 'sedemnástej', 'osemnástej', 'devätnástej', 'dvadsiatej', 'dvadsiatej prvej', 'dvadsiatej druhej', 'dvadsiatej tretej',
+];
+
+const smallCardinals = [
+  'nula', 'jeden', 'dva', 'tri', 'štyri', 'päť', 'šesť', 'sedem', 'osem', 'deväť', 'desať',
+  'jedenásť', 'dvanásť', 'trinásť', 'štrnásť', 'pätnásť', 'šestnásť', 'sedemnásť', 'osemnásť', 'devätnásť',
+];
+
+function spokenCardinal(value: number): string {
+  if (value < 20) return smallCardinals[value];
+  const tens = value < 30 ? 'dvadsať' : value < 40 ? 'tridsať' : value < 50 ? 'štyridsať' : 'päťdesiat';
+  return value % 10 ? `${tens}${smallCardinals[value % 10]}` : tens;
+}
+
+export function formatNimalaSlotForSpeech(slot: PrixiCalendarSlot): string {
+  const date = DateTime.fromISO(slot.startAt, { setZone: true }).setZone(nimalaBotConfig.clinic.timezone);
+  if (!date.isValid) return formatSlot(slot);
+  const minute = date.minute === 0
+    ? ''
+    : ` ${date.minute < 10 ? `nula ${spokenCardinal(date.minute)}` : spokenCardinal(date.minute)}`;
+  return `${spokenWeekdays[date.weekday - 1]}, ${spokenMonthDays[date.day]} ${spokenMonths[date.month - 1]}, o ${spokenHours[date.hour]}${minute}`;
+}
+
 function slotOffer(session: NimalaSession): NimalaSpokenResponse {
   const slots = session.offeredSlots || [];
   if (!slots.length) return copy.noSlotInSession;
-  return dynamicSpoken(`Ďakujem. Mám pre vás tieto voľné termíny. ${slots.map((slot, index) => `Možnosť ${index + 1}: ${formatSlot(slot)}.`).join(' ')} Povedzte číslo možnosti alebo ho stlačte na klávesnici.`);
+  const optionNames = ['jedna', 'dva', 'tri'];
+  return dynamicSpoken(`Ďakujem. Mám pre vás tieto voľné termíny. ${slots.map((slot, index) => `Možnosť ${optionNames[index] || index + 1}. Termín je ${formatNimalaSlotForSpeech(slot)}.`).join(' ')} Povedzte číslo možnosti alebo ho stlačte na klávesnici.`);
 }
 
 function bookingConfirmation(session: NimalaSession): NimalaSpokenResponse {
   const service = session.appointmentType ? appointmentLabels[session.appointmentType] : 'vyšetrenie';
-  const slot = session.selectedSlot ? formatSlot(session.selectedSlot) : 'vybraný termín';
+  const slot = session.selectedSlot ? formatNimalaSlotForSpeech(session.selectedSlot) : 'vybraný termín';
   const doctor = session.selectedSlot?.calendarName || 'MUDr. Dávid Anovčin';
   const duration = session.selectedSlot?.durationMinutes
     || (session.appointmentType ? serviceDefinition(session.appointmentType).durationMinutes : undefined);
-  return dynamicSpoken(`Ďakujem. Prosím, potvrďte rezerváciu: ${service}${duration ? ` v trvaní ${duration} minút` : ''}, ${slot}, u lekára ${doctor}. Ak sú údaje správne, povedzte áno alebo stlačte jednotku. Ak chcete vybrať iný termín, povedzte nie alebo stlačte dvojku.`);
+  return dynamicSpoken(`Ďakujem. Prosím, potvrďte rezerváciu: ${service}${duration ? ` v trvaní ${spokenCardinal(duration)} minút` : ''}, ${slot}, u lekára ${doctor}. Ak sú údaje správne, povedzte áno alebo stlačte jednotku. Ak chcete vybrať iný termín, povedzte nie alebo stlačte dvojku.`);
 }
 
 function promptFor(session: NimalaSession): NimalaSpokenResponse {
@@ -500,7 +558,7 @@ async function confirmBooking(fastify: FastifyInstance, reply: FastifyReply, ses
     session.outcome = 'booked';
     session.endedAt = new Date().toISOString();
     const doctor = session.selectedSlot!.calendarName || 'MUDr. Dávid Anovčin';
-    const message = dynamicSpoken(`Termín ${formatSlot(session.selectedSlot!)} na ${appointmentLabels[session.appointmentType!]} u lekára ${doctor} je úspešne rezervovaný. ${copy.farewell.text}`);
+    const message = dynamicSpoken(`Termín ${formatNimalaSlotForSpeech(session.selectedSlot!)} na ${appointmentLabels[session.appointmentType!]} u lekára ${doctor} je úspešne rezervovaný. ${copy.farewell.text}`);
     nimalaSessionService.delete(session.callSid);
     return renderEnd(reply, message);
   }
@@ -515,6 +573,13 @@ async function confirmBooking(fastify: FastifyInstance, reply: FastifyReply, ses
   }
   if (result.status === 'uncertain') session.bookingStatus = 'uncertain';
   else if (result.status !== 'slot_unavailable') session.bookingStatus = 'failed';
+  fastify.log.warn({
+    callSid: session.callSid,
+    bookingStatus: result.status,
+    httpStatus: 'httpStatus' in result ? result.httpStatus : undefined,
+    apiCode: 'code' in result ? result.code : undefined,
+    diagnostic: 'diagnostic' in result ? result.diagnostic : undefined,
+  }, 'Nimala Calendar booking was not confirmed');
   return callbackFallback(
     fastify,
     reply,
