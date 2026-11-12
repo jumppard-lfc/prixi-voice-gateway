@@ -29,6 +29,13 @@ transferu, pretože číslo presmerované späť na Twilio by vytvorilo slučku.
 bezpečného cieľa bot namiesto transferu zapíše do PriXi žiadosť o spätný
 kontakt.
 
+Statické Nimala hlášky používa gateway z `src/assets/audio` ako WAV súbory s
+názvami `nimala-01-…-v1.wav` až `nimala-27-…-v1.wav`; presný zoznam a texty sú
+v [ElevenLabs skripte](docs/nimala-elevenlabs-prompts.md). Ak nahrávka chýba,
+bot automaticky použije Google slovenský hlas. Dynamická ponuka termínov,
+rekapitulácia a potvrdenie rezervácie sa vždy čítajú cez
+`Google.sk-SK-Wavenet-B`, pretože obsahujú aktuálne údaje z Calendar API.
+
 ## Personalised Voice Bot Framework
 
 `src/services/voice-bot-framework.service.ts` defines the reusable configuration contract for a clinic: brand and specialty, booking provider, its services and aliases, confirmation rules, DTMF fallback, terms and SMS. `bovClinicDemoConfig` is the reference template distilled from the BOV Clinic pilot.

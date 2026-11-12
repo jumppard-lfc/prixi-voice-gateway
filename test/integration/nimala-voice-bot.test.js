@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { existsSync } = require('node:fs');
+const { resolve } = require('node:path');
 const twilio = require('twilio');
 
 process.env.NODE_ENV = 'test';
@@ -7,6 +9,7 @@ process.env.TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || 'test-auth-toke
 const app = require('../../src/app').default;
 const { prixiService } = require('../../src/services/prixi.service');
 const { prixiCalendarService } = require('../../src/services/prixi-calendar.service');
+const { nimalaAudioFiles, nimalaAudioFileNames } = require('../../src/config/nimala-audio.config');
 
 const originalGetConfig = prixiService.getConfig.bind(prixiService);
 const originalSendEvent = prixiService.sendEvent.bind(prixiService);
@@ -15,6 +18,16 @@ const originalGetAvailableSlots = prixiCalendarService.getAvailableSlots.bind(pr
 const originalCreateBooking = prixiCalendarService.createBooking.bind(prixiCalendarService);
 let sentEvents = [];
 let bookingInputs = [];
+
+function assertStaticResponse(response, audioKey, fallbackPattern) {
+  const fileName = nimalaAudioFiles[audioKey];
+  const filePath = resolve(__dirname, '../../src/assets/audio', fileName);
+  if (existsSync(filePath)) {
+    assert.match(response.body, new RegExp(`<Play>[^<]*/media/${fileName}</Play>`));
+  } else {
+    assert.match(response.body, fallbackPattern);
+  }
+}
 
 function signature(url, params) {
   return twilio.getExpectedTwilioSignature(process.env.TWILIO_AUTH_TOKEN, url, params);
@@ -104,12 +117,26 @@ test.after(async () => {
 test('produkčný endpoint routuje autoritatívny Nimala DID aj pri cudzom ForwardedFrom', async () => {
   const response = await incoming('CA-NIMALA-ROUTE-000000000000000001', { ForwardedFrom: '+421902647072' });
   assert.equal(response.statusCode, 200);
-  assert.match(response.body, /kliniky Nimala/);
-  assert.match(response.body, /som PriXi, virtuálna asistentka/);
-  assert.match(response.body, /kvôli čomu voláte/);
-  assert.match(response.body, /<\/Say><Gather/);
+  assertStaticResponse(response, 'greeting', /som PriXi, virtuálna asistentka/);
+  assert.match(response.body, /<\/(?:Say|Play)><Gather/);
   assert.match(response.body, /action="\/voice\/nimala\/answer"/);
   assert.doesNotMatch(response.body, /Vadkerti/);
+});
+
+test('všetky statické Nimala nahrávky majú stabilný názov ako pri Dentbody', () => {
+  assert.equal(nimalaAudioFileNames.length, 27);
+  nimalaAudioFileNames.forEach((fileName, index) => {
+    assert.match(fileName, new RegExp(`^nimala-${String(index + 1).padStart(2, '0')}-[a-z0-9-]+-v1\\.wav$`));
+  });
+});
+
+test('všetkých 27 Nimala WAV súborov je dostupných pre Twilio', async () => {
+  for (const fileName of nimalaAudioFileNames) {
+    const response = await app.inject({ method: 'GET', url: `/media/${fileName}` });
+    assert.equal(response.statusCode, 200, fileName);
+    assert.match(response.headers['content-type'], /^audio\/wav/);
+    assert.ok(Number(response.headers['content-length']) > 0, fileName);
+  }
 });
 
 test('volanie presmerované z čísla kliniky tiež spustí Nimala flow', async () => {
@@ -118,7 +145,7 @@ test('volanie presmerované z čísla kliniky tiež spustí Nimala flow', async 
     ForwardedFrom: '+421940621456',
   });
   assert.equal(response.statusCode, 200);
-  assert.match(response.body, /kliniky Nimala/);
+  assertStaticResponse(response, 'greeting', /kliniky Nimala/);
 });
 
 test('nesprávny clinicId zastaví Nimala flow pred spracovaním údajov pacienta', async () => {
@@ -126,7 +153,7 @@ test('nesprávny clinicId zastaví Nimala flow pred spracovaním údajov pacient
   prixiService.getConfig = async () => ({ clinicId: '999', voiceBotEnabled: true, timezone: 'Europe/Bratislava' });
   try {
     const response = await incoming('CA-NIMALA-WRONG-CLINIC-00000000001');
-    assert.match(response.body, /Momentálne máme technické problémy/);
+    assertStaticResponse(response, 'startupTechnical', /Momentálne máme technické problémy/);
     assert.doesNotMatch(response.body, /\/voice\/nimala\/answer/);
     assert.equal(sentEvents.length, 0);
   } finally {
@@ -138,17 +165,25 @@ test('preventívna prehliadka sa rezervuje iba po výbere a výslovnom potvrden�
   const callSid = 'CA-NIMALA-BOOKING-00000000000000001';
   await incoming(callSid);
   const offer = await answer(callSid, 'Chcem preventívnu prehliadku na urológii');
+  assert.match(offer.body, /Ďakujem\. Mám pre vás tieto voľné termíny/);
+  assert.match(offer.body, /voice="Google\.sk-SK-Wavenet-B"/);
+  assert.doesNotMatch(offer.body, /<Play>/);
   assert.match(offer.body, /Možnosť 1/);
   assert.match(offer.body, /16\. novembra/);
   await answer(callSid, 'dva');
   const confirmation = await answer(callSid, 'Ján Novák');
-  assert.match(confirmation.body, /Prosím potvrďte rezerváciu/);
+  assert.match(confirmation.body, /Ďakujem\. Prosím, potvrďte rezerváciu/);
+  assert.match(confirmation.body, /voice="Google\.sk-SK-Wavenet-B"/);
+  assert.doesNotMatch(confirmation.body, /<Play>/);
   assert.match(confirmation.body, /v trvaní 30 minút/);
   assert.match(confirmation.body, /MUDr\. Dávid Anovčin/);
   assert.equal(bookingInputs.length, 0);
   const completed = await answer(callSid, 'áno');
 
   assert.match(completed.body, /úspešne rezervovaný/);
+  assert.match(completed.body, /prajem vám ešte príjemný zvyšok dňa/);
+  assert.match(completed.body, /voice="Google\.sk-SK-Wavenet-B"/);
+  assert.doesNotMatch(completed.body, /<Play>/);
   assert.equal(bookingInputs.length, 1);
   assert.equal(bookingInputs[0].clinicId, 168);
   assert.equal(bookingInputs[0].calendarId, 7);
@@ -169,7 +204,7 @@ test('e-recept zachytí identitu, rok narodenia a liek do PriXi požiadavky', as
   const completed = await answer(callSid, 'Omnic 0,4 miligramu, dve balenia');
   await new Promise(resolve => setImmediate(resolve));
 
-  assert.match(completed.body, /Požiadavku na e-recept sme zaznamenali/);
+  assertStaticResponse(completed, 'prescriptionComplete', /Požiadavku na e-recept sme zaznamenali/);
   assert.equal(sentEvents.length, 1);
   assert.equal(sentEvents[0].clinicId, '168');
   assert.equal(sentEvents[0].routingPhoneNumber, '+421940621456');
@@ -184,8 +219,7 @@ test('iná ambulancia oznámi obmedzenie dema bez falošnej požiadavky pod urol
   const response = await answer(callSid, 'potrebujem dermatológiu');
   await new Promise(resolve => setImmediate(resolve));
 
-  assert.match(response.body, /Vybrali ste odbor dermatológia/);
-  assert.match(response.body, /zatiaľ nie je v demo verzii hlasovej asistentky aktívna/);
+  assertStaticResponse(response, 'dermatologyUnavailable', /Vybrali ste odbor dermatológia/);
   assert.equal(sentEvents.length, 0);
   assert.equal(bookingInputs.length, 0);
 });
@@ -194,14 +228,13 @@ test('otvorená úvodná otázka rozlíši samotnú urológiu aj výsledky vyše
   const urologyCallSid = 'CA-NIMALA-NATURAL-UROLOGY-000000001';
   await incoming(urologyCallSid);
   const urologyMenu = await answer(urologyCallSid, 'Volám na urológiu');
-  assert.match(urologyMenu.body, /Rozumiem, ide o urológiu/);
-  assert.match(urologyMenu.body, /Potrebujete sa objednať/);
+  assertStaticResponse(urologyMenu, 'urologyMenu', /Rozumiem, ide o urológiu/);
 
   const resultsCallSid = 'CA-NIMALA-NATURAL-RESULTS-0000000001';
   await incoming(resultsCallSid);
   const namePrompt = await answer(resultsCallSid, 'Volám kvôli výsledkom urologického vyšetrenia');
-  assert.match(namePrompt.body, /svoje meno a priezvisko/);
-  assert.doesNotMatch(namePrompt.body, /Vyberte si typ vyšetrenia/);
+  assertStaticResponse(namePrompt, 'askName', /svoje meno a priezvisko/);
+  assert.doesNotMatch(namePrompt.body, /Vyberte si typ vyšetrenia|nimala-03-appointment-type-v1\.wav/);
 });
 
 test('po dvoch nerozpoznaných odpovediach prepojí iba na oddelené bezpečné číslo', async () => {
@@ -225,7 +258,7 @@ test('hlavné číslo kliniky sa ako transfer cieľ odmietne, aby nevznikla slu�
   await new Promise(resolve => setImmediate(resolve));
 
   assert.doesNotMatch(fallback.body, /<Dial/);
-  assert.match(fallback.body, /žiadosť o telefonický kontakt/);
+  assertStaticResponse(fallback, 'transferUnavailable', /žiadosť o telefonický kontakt/);
   assert.equal(sentEvents.length, 1);
   assert.match(sentEvents[0].problemTranscript, /spojenie s človekom/);
 });
@@ -245,7 +278,7 @@ test('timeout rezervácie zopakuje identický payload a kľúč a potom nevyrob�
 
   assert.equal(bookingInputs.length, 2);
   assert.deepEqual(bookingInputs[1], bookingInputs[0]);
-  assert.match(response.body, /nevznikla duplicitná rezervácia/);
+  assertStaticResponse(response, 'bookingStatusUncertain', /nevznikla duplicitná rezervácia/);
   assert.equal(sentEvents.length, 1);
 });
 

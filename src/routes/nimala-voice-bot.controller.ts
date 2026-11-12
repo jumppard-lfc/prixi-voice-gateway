@@ -1,7 +1,14 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { DateTime } from 'luxon';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import twilio from 'twilio';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  NimalaAudioKey,
+  nimalaAudioFiles,
+  nimalaAudioMediaPath,
+} from '../config/nimala-audio.config';
 import {
   nimalaBotConfig,
   NimalaAppointmentType,
@@ -32,18 +39,43 @@ import { claimVoiceEvent, completeVoiceEvent, createVoiceEventKey, failVoiceEven
 const VoiceResponse = twilio.twiml.VoiceResponse;
 const sayOptions: any = { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-B' };
 
+interface NimalaSpokenResponse {
+  text: string;
+  audioKeys: NimalaAudioKey[];
+}
+
+function spoken(text: string, ...audioKeys: NimalaAudioKey[]): NimalaSpokenResponse {
+  return { text, audioKeys };
+}
+
 const copy = {
-  greeting: 'Dobrý deň, som PriXi, virtuálna asistentka kliniky Nimala. V tejto demo verzii vám viem pomôcť s urologickou ambulanciou. Povedzte mi, prosím, kvôli čomu voláte. Ak voláte kvôli inému odboru, povedzte jeho názov.',
-  urologyMenu: 'Rozumiem, ide o urológiu. Potrebujete sa objednať, požiadať o e-recept, informovať sa o výsledkoch, alebo hovoriť s človekom?',
-  appointmentType: 'Vyberte si typ vyšetrenia. Pre VIP termín urológia stlačte jednotku. Pre preventívnu prehliadku dvojku. Pre konzultáciu trojku. Pre kontrolu po operácii štvorku. Pre konzultáciu k operácii prostaty vodnou parou päťku. Pre U F M stlačte šestku.',
-  name: 'Povedzte, prosím, svoje meno a priezvisko.',
-  birthYear: 'Povedzte, prosím, svoj rok narodenia.',
-  prescriptionDetail: 'Povedzte, prosím, názov lieku, jeho silu a počet balení.',
-  resultsDetail: 'Povedzte, prosím, o aké výsledky ide a približný dátum vyšetrenia.',
-  retry: 'Prepáčte, nerozumela som. Skúste to, prosím, ešte raz. ',
-  expired: 'Hovor sa nepodarilo dokončiť. Zavolajte, prosím, znova. Dovidenia.',
-  technical: 'Momentálne sa neviem bezpečne spojiť s rezervačným systémom. Vašu požiadavku odovzdám personálu kliniky. Dovidenia.',
-  startupTechnical: 'Momentálne máme technické problémy. Skúste, prosím, zavolať neskôr. Dovidenia.',
+  greeting: spoken('Dobrý deň, som PriXi, virtuálna asistentka kliniky Nimala. V tejto demo verzii vám viem pomôcť s urologickou ambulanciou. Povedzte mi, prosím, kvôli čomu voláte. Ak voláte kvôli inému odboru, povedzte jeho názov.', 'greeting'),
+  urologyMenu: spoken('Rozumiem, ide o urológiu. Potrebujete sa objednať, požiadať o e-recept, informovať sa o výsledkoch, alebo hovoriť s človekom?', 'urologyMenu'),
+  appointmentType: spoken('Rozumiem, rada vám pomôžem s objednaním. Vyberte si, prosím, typ vyšetrenia. Pre VIP termín urológia stlačte jednotku. Pre preventívnu prehliadku dvojku. Pre konzultáciu trojku. Pre kontrolu po operácii štvorku. Pre konzultáciu k operácii prostaty vodnou parou päťku. Pre U F M stlačte šestku.', 'appointmentType'),
+  name: spoken('Ďakujem. Povedzte, prosím, svoje meno a priezvisko.', 'askName'),
+  birthYear: spoken('Ďakujem. Povedzte, prosím, svoj rok narodenia.', 'askBirthYear'),
+  prescriptionDetail: spoken('Ďakujem. Povedzte, prosím, názov lieku, jeho silu a počet balení.', 'prescriptionDetail'),
+  resultsDetail: spoken('Ďakujem. Povedzte, prosím, o aké výsledky ide a približný dátum vyšetrenia.', 'resultsDetail'),
+  retry: spoken('Prepáčte, nerozumela som. Skúste to, prosím, ešte raz.', 'retry'),
+  selectDifferentSlot: spoken('Rozumiem. Vyberte si, prosím, iný termín.', 'selectDifferentSlot'),
+  slotBecameUnavailable: spoken('Tento termín sa medzitým obsadil. Pozrime sa na ďalšie voľné možnosti.', 'slotBecameUnavailable'),
+  transferStart: spoken('Rozumiem. Prepájam vás na pracovníka kliniky. Prosím, zostaňte na linke.', 'transferStart'),
+  farewell: spoken('Ďakujem a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'farewell'),
+  prescriptionComplete: spoken('Požiadavku na e-recept sme zaznamenali. Klinika ju po overení spracuje a bude vás informovať. Ďakujem a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'prescriptionComplete'),
+  resultsComplete: spoken('Požiadavku na informácie o výsledkoch sme zaznamenali. Klinika vás bude kontaktovať. Ďakujem a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'resultsComplete'),
+  transferComplete: spoken('Ďakujem za zavolanie a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'transferComplete'),
+  aestheticsUnavailable: spoken('Ďakujem. Vybrali ste odbor estetika. Táto ambulancia zatiaľ nie je v demo verzii hlasovej asistentky aktívna. Momentálne môžete pokračovať iba s urologickou ambulanciou. Ďakujem za pochopenie a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'aestheticsUnavailable'),
+  ultrasoundUnavailable: spoken('Ďakujem. Vybrali ste odbor sonografia. Táto ambulancia zatiaľ nie je v demo verzii hlasovej asistentky aktívna. Momentálne môžete pokračovať iba s urologickou ambulanciou. Ďakujem za pochopenie a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'ultrasoundUnavailable'),
+  proctologyUnavailable: spoken('Ďakujem. Vybrali ste odbor proktológia. Táto ambulancia zatiaľ nie je v demo verzii hlasovej asistentky aktívna. Momentálne môžete pokračovať iba s urologickou ambulanciou. Ďakujem za pochopenie a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'proctologyUnavailable'),
+  dermatologyUnavailable: spoken('Ďakujem. Vybrali ste odbor dermatológia. Táto ambulancia zatiaľ nie je v demo verzii hlasovej asistentky aktívna. Momentálne môžete pokračovať iba s urologickou ambulanciou. Ďakujem za pochopenie a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'dermatologyUnavailable'),
+  noFreeSlot: spoken('Pre tento typ vyšetrenia momentálne nevidím voľný termín. Vašu požiadavku odovzdám klinike, ktorá vás bude kontaktovať. Ďakujem a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'noFreeSlot'),
+  transferUnavailable: spoken('Momentálne vás neviem bezpečne prepojiť. Vašu žiadosť o telefonický kontakt som odovzdala klinike. Ďakujem a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'transferUnavailable'),
+  transferNotAnswered: spoken('Pracovníka kliniky sa teraz nepodarilo zastihnúť. Vašu žiadosť o telefonický kontakt sme zaznamenali. Ďakujem a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'transferNotAnswered'),
+  expired: spoken('Hovor sa nepodarilo dokončiť. Zavolajte, prosím, znova. Ďakujem a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'expired'),
+  technical: spoken('Momentálne sa neviem bezpečne spojiť s rezervačným systémom. Vašu požiadavku odovzdám personálu kliniky. Ďakujem za pochopenie a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'technical'),
+  startupTechnical: spoken('Momentálne máme technické problémy. Skúste, prosím, zavolať neskôr. Ďakujem za pochopenie a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'startupTechnical'),
+  bookingStatusUncertain: spoken('Výsledok rezervácie sa mi nepodarilo spoľahlivo overiť. Aby nevznikla duplicitná rezervácia, požiadavku preverí personál kliniky a bude vás kontaktovať. Ďakujem a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'bookingStatusUncertain'),
+  noSlotInSession: spoken('Momentálne som nenašla žiadny voľný termín.', 'noSlotInSession'),
 };
 
 const requestLabels: Record<NimalaRequestType, string> = {
@@ -57,15 +89,14 @@ const appointmentLabels: Record<NimalaAppointmentType, string> = Object.fromEntr
   Object.entries(nimalaBotConfig.booking.services).map(([key, service]) => [key, service.label])
 ) as Record<NimalaAppointmentType, string>;
 
-const departmentLabels: Record<Exclude<NimalaDepartment, 'urology'>, string> = {
-  aesthetics: 'estetika',
-  ultrasound: 'sonografia',
-  proctology: 'proktológia',
-  dermatology: 'dermatológia',
-};
-
-function unsupportedDepartmentMessage(department: Exclude<NimalaDepartment, 'urology'>): string {
-  return `Ďakujem. Vybrali ste odbor ${departmentLabels[department]}. Táto ambulancia zatiaľ nie je v demo verzii hlasovej asistentky aktívna. Momentálne môžete pokračovať iba s urologickou ambulanciou. Ďakujeme za pochopenie a dovidenia.`;
+function unsupportedDepartmentMessage(department: Exclude<NimalaDepartment, 'urology'>): NimalaSpokenResponse {
+  const messages = {
+    aesthetics: copy.aestheticsUnavailable,
+    ultrasound: copy.ultrasoundUnavailable,
+    proctology: copy.proctologyUnavailable,
+    dermatology: copy.dermatologyUnavailable,
+  };
+  return messages[department];
 }
 
 function answerFrom(request: FastifyRequest): string {
@@ -84,22 +115,22 @@ function formatSlot(slot: PrixiCalendarSlot): string {
   }).format(new Date(slot.startAt));
 }
 
-function slotOffer(session: NimalaSession): string {
+function slotOffer(session: NimalaSession): NimalaSpokenResponse {
   const slots = session.offeredSlots || [];
-  if (!slots.length) return 'Momentálne som nenašla žiadny voľný termín.';
-  return `Mám pre vás tieto voľné termíny. ${slots.map((slot, index) => `Možnosť ${index + 1}: ${formatSlot(slot)}.`).join(' ')} Povedzte číslo možnosti alebo ho stlačte na klávesnici.`;
+  if (!slots.length) return copy.noSlotInSession;
+  return spoken(`Ďakujem. Mám pre vás tieto voľné termíny. ${slots.map((slot, index) => `Možnosť ${index + 1}: ${formatSlot(slot)}.`).join(' ')} Povedzte číslo možnosti alebo ho stlačte na klávesnici.`);
 }
 
-function bookingConfirmation(session: NimalaSession): string {
+function bookingConfirmation(session: NimalaSession): NimalaSpokenResponse {
   const service = session.appointmentType ? appointmentLabels[session.appointmentType] : 'vyšetrenie';
   const slot = session.selectedSlot ? formatSlot(session.selectedSlot) : 'vybraný termín';
   const doctor = session.selectedSlot?.calendarName || 'MUDr. Dávid Anovčin';
   const duration = session.selectedSlot?.durationMinutes
     || (session.appointmentType ? serviceDefinition(session.appointmentType).durationMinutes : undefined);
-  return `Prosím potvrďte rezerváciu: ${service}${duration ? ` v trvaní ${duration} minút` : ''}, ${slot}, u lekára ${doctor}, pre pacienta ${session.patientName}. Ak sú údaje správne, povedzte áno alebo stlačte jednotku. Ak chcete vybrať iný termín, povedzte nie alebo stlačte dvojku.`;
+  return spoken(`Ďakujem. Prosím, potvrďte rezerváciu: ${service}${duration ? ` v trvaní ${duration} minút` : ''}, ${slot}, u lekára ${doctor}, pre pacienta ${session.patientName}. Ak sú údaje správne, povedzte áno alebo stlačte jednotku. Ak chcete vybrať iný termín, povedzte nie alebo stlačte dvojku.`);
 }
 
-function promptFor(session: NimalaSession): string {
+function promptFor(session: NimalaSession): NimalaSpokenResponse {
   switch (session.step) {
     case 'intent': return copy.greeting;
     case 'main_menu': return copy.urologyMenu;
@@ -109,6 +140,36 @@ function promptFor(session: NimalaSession): string {
     case 'birth_year': return copy.birthYear;
     case 'detail': return session.requestType === 'prescription' ? copy.prescriptionDetail : copy.resultsDetail;
     case 'booking_confirmation': return bookingConfirmation(session);
+  }
+}
+
+function firstHeader(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value?.split(',')[0]?.trim();
+}
+
+function publicBaseUrl(request: FastifyRequest): string {
+  const protocol = firstHeader(request.headers['x-forwarded-proto']) || 'https';
+  const host = firstHeader(request.headers['x-forwarded-host']) || firstHeader(request.headers.host) || 'localhost';
+  return (process.env.PUBLIC_BASE_URL || `${protocol}://${host}`).replace(/\/$/, '');
+}
+
+function hasAudioFiles(audioKeys: NimalaAudioKey[]): boolean {
+  return audioKeys.every(key => existsSync(resolve(__dirname, '../assets/audio', nimalaAudioFiles[key])));
+}
+
+function appendSpoken(
+  twiml: InstanceType<typeof VoiceResponse>,
+  request: FastifyRequest,
+  content: NimalaSpokenResponse
+): void {
+  if (!content.audioKeys.length || !hasAudioFiles(content.audioKeys)) {
+    twiml.say(sayOptions, content.text);
+    return;
+  }
+
+  const baseUrl = publicBaseUrl(request);
+  for (const audioKey of content.audioKeys) {
+    twiml.play(`${baseUrl}${nimalaAudioMediaPath(audioKey)}`);
   }
 }
 
@@ -128,13 +189,18 @@ function hintsFor(session: NimalaSession): string {
   return '';
 }
 
-function renderPrompt(reply: FastifyReply, session: NimalaSession, prefix = ''): FastifyReply {
+function renderPrompt(
+  reply: FastifyReply,
+  session: NimalaSession,
+  prefix?: NimalaSpokenResponse
+): FastifyReply {
   nimalaSessionService.save(session);
   const twiml = new VoiceResponse();
   const menuStep = ['intent', 'main_menu', 'appointment_type', 'slot', 'booking_confirmation'].includes(session.step);
   // As in the Dentbody flow, finish speaking before listening. This avoids
   // capturing the bot's own prompt or ambient speech as the caller's answer.
-  twiml.say(sayOptions, `${prefix}${promptFor(session)}`.trim());
+  if (prefix) appendSpoken(twiml, reply.request, prefix);
+  appendSpoken(twiml, reply.request, promptFor(session));
   twiml.gather({
     input: ['speech', 'dtmf'],
     action: '/voice/nimala/answer',
@@ -149,9 +215,9 @@ function renderPrompt(reply: FastifyReply, session: NimalaSession, prefix = ''):
   return reply.type('text/xml').send(twiml.toString());
 }
 
-function renderEnd(reply: FastifyReply, message: string): FastifyReply {
+function renderEnd(reply: FastifyReply, message: NimalaSpokenResponse): FastifyReply {
   const twiml = new VoiceResponse();
-  twiml.say(sayOptions, message);
+  appendSpoken(twiml, reply.request, message);
   twiml.hangup();
   return reply.type('text/xml').send(twiml.toString());
 }
@@ -236,7 +302,7 @@ async function continueWithAppointmentType(
   try {
     const hasSlots = await loadAvailableSlots(session);
     if (!hasSlots) {
-      return callbackFallback(fastify, reply, session, 'Pre tento typ vyšetrenia momentálne nevidím voľný termín. Vašu požiadavku odovzdám klinike, ktorá vás bude kontaktovať. Dovidenia.');
+      return callbackFallback(fastify, reply, session, copy.noFreeSlot);
     }
     session.step = 'slot';
     return renderPrompt(reply, session);
@@ -315,13 +381,16 @@ function completeRequest(fastify: FastifyInstance, reply: FastifyReply, session:
   session.endedAt = new Date().toISOString();
   dispatchRequest(fastify, session);
   nimalaSessionService.delete(session.callSid);
-  const message = session.requestType === 'prescription'
-    ? 'Ďakujem. Požiadavku na e-recept sme zaznamenali. Klinika ju po overení spracuje a bude vás informovať. Dovidenia.'
-    : 'Ďakujem. Požiadavku na informácie o výsledkoch sme zaznamenali. Klinika vás bude kontaktovať. Dovidenia.';
+  const message = session.requestType === 'prescription' ? copy.prescriptionComplete : copy.resultsComplete;
   return renderEnd(reply, message);
 }
 
-function callbackFallback(fastify: FastifyInstance, reply: FastifyReply, session: NimalaSession, message: string): FastifyReply {
+function callbackFallback(
+  fastify: FastifyInstance,
+  reply: FastifyReply,
+  session: NimalaSession,
+  message: NimalaSpokenResponse
+): FastifyReply {
   session.outcome = 'completed';
   session.endedAt = new Date().toISOString();
   if (!session.requestType) session.requestType = 'human';
@@ -340,12 +409,12 @@ function handoffToHuman(fastify: FastifyInstance, reply: FastifyReply, session: 
       fastify,
       reply,
       session,
-      'Momentálne vás neviem bezpečne prepojiť. Vašu žiadosť o telefonický kontakt som odovzdala klinike. Dovidenia.'
+      copy.transferUnavailable
     );
   }
   nimalaSessionService.save(session);
   const twiml = new VoiceResponse();
-  twiml.say(sayOptions, 'Rozumiem. Prepájam vás na pracovníka kliniky. Prosím, zostaňte na linke.');
+  appendSpoken(twiml, reply.request, copy.transferStart);
   const dial = twiml.dial({
     action: '/voice/nimala/handoff-complete',
     method: 'POST',
@@ -388,7 +457,7 @@ async function confirmBooking(fastify: FastifyInstance, reply: FastifyReply, ses
     session.outcome = 'booked';
     session.endedAt = new Date().toISOString();
     const doctor = session.selectedSlot!.calendarName || 'MUDr. Dávid Anovčin';
-    const message = `Ďakujem. Termín ${formatSlot(session.selectedSlot!)} na ${appointmentLabels[session.appointmentType!]} u lekára ${doctor} je úspešne rezervovaný. Dovidenia.`;
+    const message = spoken(`Termín ${formatSlot(session.selectedSlot!)} na ${appointmentLabels[session.appointmentType!]} u lekára ${doctor} je úspešne rezervovaný. ${copy.farewell.text}`);
     nimalaSessionService.delete(session.callSid);
     return renderEnd(reply, message);
   }
@@ -397,16 +466,14 @@ async function confirmBooking(fastify: FastifyInstance, reply: FastifyReply, ses
     if (hasSlots) {
       session.step = 'slot';
       session.attempts = 0;
-      return renderPrompt(reply, session, 'Tento termín sa medzitým obsadil. Pozrime sa na ďalšie voľné možnosti. ');
+      return renderPrompt(reply, session, copy.slotBecameUnavailable);
     }
   }
   return callbackFallback(
     fastify,
     reply,
     session,
-    result.status === 'uncertain'
-      ? 'Výsledok rezervácie sa mi nepodarilo spoľahlivo overiť. Aby nevznikla duplicitná rezervácia, požiadavku preverí personál kliniky a bude vás kontaktovať. Dovidenia.'
-      : copy.technical
+    result.status === 'uncertain' ? copy.bookingStatusUncertain : copy.technical
   );
 }
 
@@ -452,16 +519,16 @@ export async function nimalaVoiceBotRoutes(fastify: FastifyInstance): Promise<vo
   fastify.post('/nimala/handoff-complete', async (request, reply) => {
     const body = request.body as Record<string, string>;
     const session = nimalaSessionService.get(body.CallSid);
-    if (!session) return renderEnd(reply, 'Dovidenia.');
+    if (!session) return renderEnd(reply, copy.farewell);
     if (body.DialCallStatus === 'completed') {
       nimalaSessionService.delete(session.callSid);
-      return renderEnd(reply, 'Ďakujeme za zavolanie. Dovidenia.');
+      return renderEnd(reply, copy.transferComplete);
     }
     return callbackFallback(
       fastify,
       reply,
       session,
-      'Pracovníka kliniky sa teraz nepodarilo zastihnúť. Vašu žiadosť o telefonický kontakt sme zaznamenali. Dovidenia.'
+      copy.transferNotAnswered
     );
   });
 
@@ -561,7 +628,7 @@ export async function nimalaVoiceBotRoutes(fastify: FastifyInstance): Promise<vo
         session.step = 'slot';
         session.selectedSlot = undefined;
         session.bookingIdempotencyKey = undefined;
-        return renderPrompt(reply, session, 'Rozumiem. Vyberte si, prosím, iný termín. ');
+        return renderPrompt(reply, session, copy.selectDifferentSlot);
       }
       try {
         return await confirmBooking(fastify, reply, session);
