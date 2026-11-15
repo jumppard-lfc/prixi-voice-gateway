@@ -1574,7 +1574,7 @@ test('MUDr. Dobrovodska pouziva dvojkrokovy audio flow', async () => {
   }
 });
 
-test('MUDr. Dobrovodska ma 23. oktobra automaticky dovolenkovy flow', async () => {
+test('MUDr. Dobrovodska ma dovolenkovy flow iba od 15. novembra do 8. decembra 2026', async () => {
   const originalGetConfig = prixiService.getConfig;
   const originalSendEventForVacation = prixiService.sendEvent;
   const originalTranscribeForVacation = sttService.transcribeAudioUrl;
@@ -1586,10 +1586,24 @@ test('MUDr. Dobrovodska ma 23. oktobra automaticky dovolenkovy flow', async () =
   });
   prixiService.sendEvent = async () => { };
   sttService.transcribeAudioUrl = async () => 'Jana Nováková, potřebuji předepsat léky.';
-  const vacationTimestamp = DateTime.fromISO('2026-10-23T18:00:00+02:00').toMillis();
-  const mondayTimestamp = DateTime.fromISO('2026-10-26T09:00:00+01:00').toMillis();
+  const sundayStartTimestamp = DateTime.fromISO('2026-11-15T09:00:00+01:00').toMillis();
+  const vacationTimestamp = DateTime.fromISO('2026-11-16T09:00:00+01:00').toMillis();
+  const vacationEndTimestamp = DateTime.fromISO('2026-12-08T09:00:00+01:00').toMillis();
+  const afterVacationTimestamp = DateTime.fromISO('2026-12-09T09:00:00+01:00').toMillis();
+  const nextYearTimestamp = DateTime.fromISO('2027-11-16T09:00:00+01:00').toMillis();
 
   try {
+    Settings.now = () => sundayStartTimestamp;
+    const sundayIncoming = await signedVoicePost('/voice/incoming', {
+      From: '+420700000087',
+      To: '+421800232793',
+      CallSid: 'CA-DOBROVODSKA-SUNDAY-00000000000001',
+    });
+
+    assert.equal(sundayIncoming.statusCode, 200);
+    assert.match(sundayIncoming.body, /Toto číslo je momentálne nedostupné/);
+    assert.doesNotMatch(sundayIncoming.body, /Paní doktorka má do 8\. prosince dovolenou/);
+
     Settings.now = () => vacationTimestamp;
     const vacationIncoming = await signedVoicePost('/voice/incoming', {
       From: '+420700000088',
@@ -1599,9 +1613,10 @@ test('MUDr. Dobrovodska ma 23. oktobra automaticky dovolenkovy flow', async () =
 
     assert.equal(vacationIncoming.statusCode, 200);
     assert.match(vacationIncoming.body, /language="cs-CZ" voice="Google\.cs-CZ-Wavenet-B"/);
-    assert.match(vacationIncoming.body, /Dnes má ordinace dovolenou/);
-    assert.match(vacationIncoming.body, /pondělí 26\. října/);
+    assert.match(vacationIncoming.body, /Paní doktorka má do 8\. prosince dovolenou/);
+    assert.match(vacationIncoming.body, /sestřička je však v ordinaci/);
     assert.match(vacationIncoming.body, /Prosím nezavěšujte/);
+    assert.match(vacationIncoming.body, /Rozpis zastupování najdete na webu ordinace/);
     assert.match(vacationIncoming.body, /dobrovodskaVacation=true/);
     assert.doesNotMatch(vacationIncoming.body, /dobrovodska-1-greeting-v2\.wav/);
 
@@ -1615,20 +1630,44 @@ test('MUDr. Dobrovodska ma 23. oktobra automaticky dovolenkovy flow', async () =
 
     assert.equal(vacationCompletion.statusCode, 200);
     assert.match(vacationCompletion.body, /Vaši zprávu jsme zaznamenali/);
-    assert.match(vacationCompletion.body, /pondělí 26\. října/);
+    assert.match(vacationCompletion.body, /Sestřička se jí bude věnovat/);
+    assert.match(vacationCompletion.body, /zastupujícího lékaře/);
     assert.doesNotMatch(vacationCompletion.body, /dobrovodska-2-completion-v2\.wav/);
 
-    Settings.now = () => mondayTimestamp;
-    const mondayIncoming = await signedVoicePost('/voice/incoming', {
+    Settings.now = () => vacationEndTimestamp;
+    const vacationEndIncoming = await signedVoicePost('/voice/incoming', {
       From: '+420700000089',
       To: '+421800232793',
-      CallSid: 'CA-DOBROVODSKA-MONDAY-0000000000001',
+      CallSid: 'CA-DOBROVODSKA-VACATION-END-000000001',
     });
 
-    assert.equal(mondayIncoming.statusCode, 200);
-    assert.match(mondayIncoming.body, /dobrovodska-1-greeting-v2\.wav/);
-    assert.match(mondayIncoming.body, /dobrovodskaVacation=false/);
-    assert.doesNotMatch(mondayIncoming.body, /Dnes má ordinace dovolenou/);
+    assert.equal(vacationEndIncoming.statusCode, 200);
+    assert.match(vacationEndIncoming.body, /dobrovodskaVacation=true/);
+    assert.match(vacationEndIncoming.body, /Paní doktorka má do 8\. prosince dovolenou/);
+
+    Settings.now = () => afterVacationTimestamp;
+    const afterVacationIncoming = await signedVoicePost('/voice/incoming', {
+      From: '+420700000090',
+      To: '+421800232793',
+      CallSid: 'CA-DOBROVODSKA-AFTER-VACATION-0000001',
+    });
+
+    assert.equal(afterVacationIncoming.statusCode, 200);
+    assert.match(afterVacationIncoming.body, /dobrovodska-1-greeting-v2\.wav/);
+    assert.match(afterVacationIncoming.body, /dobrovodskaVacation=false/);
+    assert.doesNotMatch(afterVacationIncoming.body, /Paní doktorka má do 8\. prosince dovolenou/);
+
+    Settings.now = () => nextYearTimestamp;
+    const nextYearIncoming = await signedVoicePost('/voice/incoming', {
+      From: '+420700000091',
+      To: '+421800232793',
+      CallSid: 'CA-DOBROVODSKA-NEXT-YEAR-00000000001',
+    });
+
+    assert.equal(nextYearIncoming.statusCode, 200);
+    assert.match(nextYearIncoming.body, /dobrovodska-1-greeting-v2\.wav/);
+    assert.match(nextYearIncoming.body, /dobrovodskaVacation=false/);
+    assert.doesNotMatch(nextYearIncoming.body, /Paní doktorka má do 8\. prosince dovolenou/);
     await new Promise(resolve => setImmediate(resolve));
   } finally {
     prixiService.getConfig = originalGetConfig;

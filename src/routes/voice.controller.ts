@@ -94,9 +94,10 @@ const KLOSTERMANN_GREETING_MEDIA_PATH = '/media/klostermann-greeting-v5.wav';
 const KLOSTERMANN_GREETING_FILE = resolve(__dirname, '../assets/audio/klostermann-greeting-v5.wav');
 const DOBROVODSKA_GREETING_FILE = resolve(__dirname, '../assets/audio/dobrovodska-1-greeting-v2.wav');
 const DOBROVODSKA_COMPLETION_FILE = resolve(__dirname, '../assets/audio/dobrovodska-2-completion-v2.wav');
-const DOBROVODSKA_VACATION_DATE = '2026-10-23';
-const DOBROVODSKA_VACATION_GREETING = 'Dobrý den, tady virtuální sestra PriXi paní doktorky Dobrovodské. Dnes má ordinace dovolenou, takže vašemu požadavku se budeme věnovat v pondělí dvacátého šestého října. Prosím nezavěšujte. Po zaznění signálu mi řekněte své jméno a s čím vám můžeme pomoci.';
-const DOBROVODSKA_VACATION_COMPLETION = 'Děkuji. Vaši zprávu jsme zaznamenali a budeme se jí věnovat v pondělí dvacátého šestého října. Na shledanou.';
+const DOBROVODSKA_VACATION_START_DATE = '2026-11-15';
+const DOBROVODSKA_VACATION_END_DATE = '2026-12-08';
+const DOBROVODSKA_VACATION_GREETING = 'Dobrý den, tady je virtuální sestra PriXi paní doktorky Dobrovodské. Prosím nezavěšujte. Paní doktorka má do 8. prosince dovolenou, sestřička je však v ordinaci. Po zaznění signálu řekněte své jméno a požadavek. Sestřička jej vyřídí, nebo vás odkáže na zastupujícího lékaře. Rozpis zastupování najdete na webu ordinace.';
+const DOBROVODSKA_VACATION_COMPLETION = 'Děkuji. Vaši zprávu jsme zaznamenali. Sestřička se jí bude věnovat a v případě potřeby vás odkáže na zastupujícího lékaře. Na shledanou.';
 const HMIRA_GREETING_FILE = resolve(__dirname, '../assets/audio/hmira-1-greeting-v1.wav');
 const HMIRA_COMPLETION_FILE = resolve(__dirname, '../assets/audio/hmira-2-completion-v1.wav');
 const SKRIPKOVA_GREETING_FILE = resolve(__dirname, '../assets/audio/skripkova-1-greeting-v1.wav');
@@ -120,7 +121,13 @@ function isDobrovodskaRoute(phone?: string): boolean {
 
 function isDobrovodskaVacationDay(): boolean {
   const now = DateTime.now().setZone('Europe/Prague');
-  return now.isValid && now.toISODate() === DOBROVODSKA_VACATION_DATE;
+  const date = now.toISODate();
+  return Boolean(
+    now.isValid
+    && date
+    && date >= DOBROVODSKA_VACATION_START_DATE
+    && date <= DOBROVODSKA_VACATION_END_DATE
+  );
 }
 
 const DEFAULT_GREETING = 'Dobrý deň, dovolali ste sa do ambulancie. Pre zanechanie odkazu popíšte po zaznení tónu najprv váš problém a po skončení stlačte hociktoré tlačidlo.';
@@ -639,7 +646,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       const isDobrovodskaVacation = isDobrovodskaNumber && isDobrovodskaVacationDay();
       const isDedicatedVoiceBotNumber = isCelkovaNumber || isBenovaBaloghovaNumber || isNovotnyNumber || isHmiraNumber || isZdrahalovaNumber || isSkripkovaNumber || isPopradOncologyNumber;
 
-      if (!isDedicatedVoiceBotNumber && !isDobrovodskaVacation && !ivrService.shouldAllowCall(config, forwardedFrom)) {
+      if (!isDedicatedVoiceBotNumber && !ivrService.shouldAllowCall(config, forwardedFrom)) {
         twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Toto číslo je momentálne nedostupné.');
         twiml.reject();
         return reply.type('text/xml').send(twiml.toString());
