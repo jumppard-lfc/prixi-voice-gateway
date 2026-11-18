@@ -24,7 +24,7 @@ function event(overrides = {}) {
     problemUrl: 'https://api.twilio.test/recording.mp3',
     nameTranscript: '',
     birthYearTranscript: '',
-    problemTranscript: 'Kategória: predpis / recept\nPožiadavka: Prosím predpísať lieky.',
+    problemTranscript: '[Voice-bot pediatrická ambulancia MUDr. Zdráhalovej]\nKategória: predpis / recept\nPožiadavka: Prosím predpísať lieky.',
     ...overrides,
   };
 }
@@ -67,11 +67,61 @@ test('zaradí požiadavku MUDr. Zdráhalovej do MailerSend fronty', async () => 
     email: 'matoskok1@gmail.com',
     name: 'Detská ambulancia Maneli',
   }]);
+  assert.equal(captured.data.subject, '🔵 Predpis / recept – PriXi telefonická požiadavka');
   assert.match(captured.data.text, /Telefón volajúceho: \+421900123456/);
-  assert.match(captured.data.text, /Kategória: predpis \/ recept/);
-  assert.match(captured.data.text, /Nahrávka: https:\/\/api\.twilio\.test\/recording\.mp3/);
+  assert.match(captured.data.text, /Typ požiadavky: Predpis \/ recept/);
+  assert.match(captured.data.text, /POŽIADAVKA\nProsím predpísať lieky\./);
+  assert.doesNotMatch(captured.data.text, /\[Voice-bot/);
+  assert.doesNotMatch(captured.data.text, /Nahrávka:/);
+  assert.match(captured.data.text, /Prosím, neodpovedajte na tento e-mail\./);
+  assert.match(captured.data.html, /font-size:20px;font-weight:700/);
+  assert.match(captured.data.html, /href="tel:\+421900123456"/);
+  assert.doesNotMatch(captured.data.html, /\[Voice-bot/);
+  assert.doesNotMatch(captured.data.html, /Nahrávka:/);
   assert.equal(captured.config.headers.Authorization, 'Bearer test-mailersend-token');
   assert.equal(captured.config.timeout, 10_000);
+});
+
+test('použije odlišnú farebnú ikonu pre každý typ požiadavky', async () => {
+  const cases = [
+    ['predpis / recept', '🔵 Predpis / recept'],
+    ['konzultácia', '🟠 Konzultácia'],
+    ['preobjednanie preventívnej prehliadky', '🟣 Preobjednanie preventívnej prehliadky'],
+    ['predoperačné vyšetrenie / kontrolné odbery', '🟢 Predoperačné vyšetrenie / kontrolné odbery'],
+  ];
+
+  for (const [category, expectedSubjectStart] of cases) {
+    let payload;
+    const service = new MailerSendService({
+      post: async (_url, data) => {
+        payload = data;
+        return { status: 202, headers: { 'x-message-id': `mailer-${category}` } };
+      },
+    }, async () => { });
+
+    await service.sendZdrahalovaRequest(event({
+      problemTranscript: `Kategória: ${category}\nPožiadavka: Testovacia požiadavka.`,
+    }));
+
+    assert.ok(payload.subject.startsWith(expectedSubjectStart));
+  }
+});
+
+test('bezpečne escapuje prepis v HTML e-maile', async () => {
+  let payload;
+  const service = new MailerSendService({
+    post: async (_url, data) => {
+      payload = data;
+      return { status: 202, headers: { 'x-message-id': 'mailer-escaped-html' } };
+    },
+  }, async () => { });
+
+  await service.sendZdrahalovaRequest(event({
+    problemTranscript: 'Kategória: konzultácia\nPožiadavka: Dieťa má <strong>teplotu</strong> & kašeľ.',
+  }));
+
+  assert.match(payload.html, /Dieťa má &lt;strong&gt;teplotu&lt;\/strong&gt; &amp; kašeľ\./);
+  assert.doesNotMatch(payload.html, /<strong>teplotu<\/strong>/);
 });
 
 test('dočasnú chybu MailerSend API zopakuje najviac trikrát', async () => {
