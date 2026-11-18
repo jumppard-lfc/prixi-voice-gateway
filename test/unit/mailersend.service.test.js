@@ -1,0 +1,125 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+
+const { MailerSendService } = require('../../src/services/mailersend.service');
+
+const originalEnv = {
+  token: process.env.MAILERSEND_API_TOKEN,
+  fromEmail: process.env.MAILERSEND_FROM_EMAIL,
+  fromName: process.env.MAILERSEND_FROM_NAME,
+};
+
+function event(overrides = {}) {
+  return {
+    event: 'voicemail_recorded',
+    clinicId: '152',
+    phone: '+421900123456',
+    routingPhoneNumber: '+421911135193',
+    durationSeconds: 12,
+    callStartedAt: '2026-11-18T10:30:00.000Z',
+    callEndedAt: '2026-11-18T10:30:12.000Z',
+    providerCallId: 'CAtest-mailersend',
+    nameUrl: '',
+    birthYearUrl: '',
+    problemUrl: 'https://api.twilio.test/recording.mp3',
+    nameTranscript: '',
+    birthYearTranscript: '',
+    problemTranscript: 'Kategória: predpis / recept\nPožiadavka: Prosím predpísať lieky.',
+    ...overrides,
+  };
+}
+
+test.beforeEach(() => {
+  process.env.MAILERSEND_API_TOKEN = 'test-mailersend-token';
+  process.env.MAILERSEND_FROM_EMAIL = 'voice@verified.example';
+  process.env.MAILERSEND_FROM_NAME = 'PriXi test';
+});
+
+test.after(() => {
+  for (const [key, value] of Object.entries({
+    MAILERSEND_API_TOKEN: originalEnv.token,
+    MAILERSEND_FROM_EMAIL: originalEnv.fromEmail,
+    MAILERSEND_FROM_NAME: originalEnv.fromName,
+  })) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+});
+
+test('zaradí požiadavku MUDr. Zdráhalovej do MailerSend fronty', async () => {
+  let captured;
+  const service = new MailerSendService({
+    post: async (url, data, config) => {
+      captured = { url, data, config };
+      return { status: 202, headers: { 'x-message-id': 'mailer-message-152' } };
+    },
+  }, async () => { });
+
+  const messageId = await service.sendZdrahalovaRequest(event());
+
+  assert.equal(messageId, 'mailer-message-152');
+  assert.equal(captured.url, 'https://api.mailersend.com/v1/email');
+  assert.deepEqual(captured.data.from, {
+    email: 'voice@verified.example',
+    name: 'PriXi test',
+  });
+  assert.deepEqual(captured.data.to, [{
+    email: 'matoskok1@gmail.com',
+    name: 'Detská ambulancia Maneli',
+  }]);
+  assert.match(captured.data.text, /Telefón volajúceho: \+421900123456/);
+  assert.match(captured.data.text, /Kategória: predpis \/ recept/);
+  assert.match(captured.data.text, /Nahrávka: https:\/\/api\.twilio\.test\/recording\.mp3/);
+  assert.equal(captured.config.headers.Authorization, 'Bearer test-mailersend-token');
+  assert.equal(captured.config.timeout, 10_000);
+});
+
+test('dočasnú chybu MailerSend API zopakuje najviac trikrát', async () => {
+  let attempts = 0;
+  const waits = [];
+  const service = new MailerSendService({
+    post: async () => {
+      attempts += 1;
+      if (attempts < 3) throw { response: { status: 503 } };
+      return { status: 202, headers: { 'x-message-id': 'mailer-after-retry' } };
+    },
+  }, async milliseconds => waits.push(milliseconds));
+
+  assert.equal(await service.sendZdrahalovaRequest(event()), 'mailer-after-retry');
+  assert.equal(attempts, 3);
+  assert.deepEqual(waits, [250, 500]);
+});
+
+test('validačnú chybu neopakuje a do chyby nevloží API token', async () => {
+  let attempts = 0;
+  const service = new MailerSendService({
+    post: async () => {
+      attempts += 1;
+      throw { response: { status: 422 } };
+    },
+  }, async () => assert.fail('validation failure must not wait for retry'));
+
+  await assert.rejects(
+    service.sendZdrahalovaRequest(event()),
+    error => {
+      assert.match(error.message, /failed \(422\)/);
+      assert.doesNotMatch(error.message, /test-mailersend-token/);
+      return true;
+    }
+  );
+  assert.equal(attempts, 1);
+});
+
+test('bez tokenu alebo overeného odosielateľa nič neodošle', async () => {
+  delete process.env.MAILERSEND_API_TOKEN;
+  delete process.env.MAILERSEND_FROM_EMAIL;
+  const service = new MailerSendService({
+    post: async () => assert.fail('HTTP request must not run'),
+  });
+
+  assert.equal(service.isConfigured(), false);
+  await assert.rejects(
+    service.sendZdrahalovaRequest(event()),
+    /credentials and sender are not configured/
+  );
+});

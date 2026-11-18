@@ -109,10 +109,26 @@ Run verification with `npm test`.
 The Zdráhalová pediatric bot uses the dedicated Twilio DID `+420910926126` and
 the clinic's public routing number `+421911135193`. The public number remains
 the stable PriXi configuration key and both numbers are pinned to clinic `152`.
-The bot asks the parent for the child's
-name and their request in one short recording, then confirms the handoff and
-ends the call. It deliberately does not add separate name, birth year,
+During office hours, the bot tells the parent that the clinic is currently
+working but cannot answer, then asks for the child's name and the request in one
+short recording. It classifies the resulting PriXi request as a prescription,
+consultation, preventive-check rescheduling, or pre-operative examination /
+control blood draw. It deliberately does not add separate name, birth year,
 office-hours or service-list prompts.
+
+The gateway reads `workingHours`, `availability` and the after-hours message
+from the PriXi voice-assistant configuration. If a complete schedule cannot be
+loaded, it falls back to Monday-Wednesday 07:00-15:00, Thursday 10:00-17:00,
+Friday 07:00-13:00, with weekends closed. Outside those hours it points callers
+to `www.mudrzdrahalova.sk`, does not record a request, and ends the call.
+
+Every accepted call is sent to PriXi as a `voicemail_recorded` event for clinic
+`152`. After PriXi accepts the event, the gateway independently queues the same
+request through MailerSend. Configure `MAILERSEND_API_TOKEN` and a verified
+`MAILERSEND_FROM_EMAIL` in the deployment secret store. The recipient is fixed
+to `matoskok1@gmail.com` in the Zdráhalová integration. MailerSend failures
+never discard the request already stored in PriXi; transient API failures are
+attempted up to three times.
 
 Configure the Twilio DID's incoming voice webhook and terminal status callback
 as `POST /voice/incoming` and `POST /voice/call-status`.

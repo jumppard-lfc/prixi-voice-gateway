@@ -12,16 +12,21 @@ const appModule = require('../../src/app');
 const serviceModule = require('../../src/services/prixi.service');
 const sttModule = require('../../src/services/stt.service');
 const neurocentrumEdsModule = require('../../src/services/neurocentrum-eds.service');
+const mailerSendModule = require('../../src/services/mailersend.service');
 
 const app = appModule.default;
 const prixiService = serviceModule.prixiService;
 const sttService = sttModule.sttService;
 const neurocentrumEdsService = neurocentrumEdsModule.neurocentrumEdsService;
+const mailerSendService = mailerSendModule.mailerSendService;
 const projectRoot = path.join(__dirname, '../..');
 
 const originalGetConfig = prixiService.getConfig.bind(prixiService);
+const originalGetVoiceAssistantConfig = prixiService.getVoiceAssistantConfig.bind(prixiService);
 const originalSendEvent = prixiService.sendEvent.bind(prixiService);
 const originalTranscribeAudioUrl = sttService.transcribeAudioUrl.bind(sttService);
+const originalMailerSendIsConfigured = mailerSendService.isConfigured.bind(mailerSendService);
+const originalSendZdrahalovaRequest = mailerSendService.sendZdrahalovaRequest.bind(mailerSendService);
 const originalResolveNeurocentrum = neurocentrumEdsService.resolveByInboundPhoneNumber.bind(neurocentrumEdsService);
 const originalGetNeurocentrumConfig = neurocentrumEdsService.getConfig.bind(neurocentrumEdsService);
 
@@ -53,8 +58,11 @@ test.before(() => {
 });
 test.after(async () => {
   prixiService.getConfig = originalGetConfig;
+  prixiService.getVoiceAssistantConfig = originalGetVoiceAssistantConfig;
   prixiService.sendEvent = originalSendEvent;
   sttService.transcribeAudioUrl = originalTranscribeAudioUrl;
+  mailerSendService.isConfigured = originalMailerSendIsConfigured;
+  mailerSendService.sendZdrahalovaRequest = originalSendZdrahalovaRequest;
   neurocentrumEdsService.resolveByInboundPhoneNumber = originalResolveNeurocentrum;
   neurocentrumEdsService.getConfig = originalGetNeurocentrumConfig;
   await app.close();
@@ -1324,9 +1332,13 @@ test('Dedikovane Twilio cislo MDDr. Hmiru routuje a dokonci poziadavku iba pre j
 });
 
 test('MUDr. Zdrahalova sa opyta iba raz a po poziadavke hovor ukonci', async () => {
+  const originalNow = Settings.now;
+  const officeHoursTimestamp = DateTime.fromISO('2026-11-18T10:00:00+01:00').toMillis();
+  Settings.now = () => officeHoursTimestamp;
   sttService.transcribeAudioUrl = async () => 'Ema Zelená, potrebujem predpísať lieky.';
   let requestedPhoneNumber = null;
   let sentEvent = null;
+  let emailedEvent = null;
   prixiService.getConfig = async (phoneNumber) => {
     requestedPhoneNumber = phoneNumber;
     return {
@@ -1340,6 +1352,31 @@ test('MUDr. Zdrahalova sa opyta iba raz a po poziadavke hovor ukonci', async () 
   prixiService.sendEvent = async (event) => {
     sentEvent = event;
   };
+  mailerSendService.isConfigured = () => true;
+  mailerSendService.sendZdrahalovaRequest = async (event) => {
+    emailedEvent = event;
+    return 'mailer-message-152';
+  };
+  prixiService.getVoiceAssistantConfig = async (phoneNumber) => {
+    assert.equal(phoneNumber, '+421911135193');
+    return {
+      clinicId: '152',
+      assistantType: 'zdrahalova',
+      enabled: true,
+      voiceBotEnabled: true,
+      timezone: 'Europe/Bratislava',
+      availability: { status: 'open' },
+      workingHours: {
+        monday: { enabled: true, from: '07:00', to: '15:00' },
+        tuesday: { enabled: true, from: '07:00', to: '15:00' },
+        wednesday: { enabled: true, from: '07:00', to: '15:00' },
+        thursday: { enabled: true, from: '10:00', to: '17:00' },
+        friday: { enabled: true, from: '07:00', to: '13:00' },
+        saturday: { enabled: false, from: null, to: null },
+        sunday: { enabled: false, from: null, to: null },
+      },
+    };
+  };
 
   try {
     const incoming = await signedVoicePost('/voice/incoming', {
@@ -1352,6 +1389,7 @@ test('MUDr. Zdrahalova sa opyta iba raz a po poziadavke hovor ukonci', async () 
     assert.equal(incoming.statusCode, 200);
     assert.equal(requestedPhoneNumber, '+421911135193');
     assert.match(incoming.body, /virtuálna sestra PriXi z ambulancie doktorky Zdráhalovej/);
+    assert.match(incoming.body, /práve ordinujeme, ale momentálne nemôžeme zdvihnúť/);
     assert.match(incoming.body, /meno dieťaťa a s čím vám môžeme pomôcť/);
     assert.doesNotMatch(incoming.body, /dlhá všeobecná hláška/);
     assert.doesNotMatch(incoming.body, /život ohrozujúci stav|ordinačné|rok narodenia/);
@@ -1385,17 +1423,83 @@ test('MUDr. Zdrahalova sa opyta iba raz a po poziadavke hovor ukonci', async () 
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(sentEvent.clinicId, '152');
     assert.equal(sentEvent.routingPhoneNumber, '+421911135193');
-    assert.equal(sentEvent.problemTranscript, 'Ema Zelená, potrebujem predpísať lieky.');
+    assert.match(sentEvent.problemTranscript, /Kategória: predpis \/ recept/);
+    assert.match(sentEvent.problemTranscript, /Požiadavka: Ema Zelená, potrebujem predpísať lieky\./);
     assert.equal(sentEvent.nameTranscript, '');
     assert.equal(sentEvent.birthYearTranscript, '');
+    assert.equal(emailedEvent, sentEvent);
   } finally {
+    Settings.now = originalNow;
     prixiService.getConfig = async () => ({
       clinicId: 'test-clinic',
       voiceBotEnabled: false,
       timezone: 'Europe/Bratislava',
     });
     prixiService.sendEvent = originalSendEvent;
+    prixiService.getVoiceAssistantConfig = originalGetVoiceAssistantConfig;
     sttService.transcribeAudioUrl = originalTranscribeAudioUrl;
+    mailerSendService.isConfigured = originalMailerSendIsConfigured;
+    mailerSendService.sendZdrahalovaRequest = originalSendZdrahalovaRequest;
+  }
+});
+
+test('MUDr. Zdrahalova mimo ordinačných hodín iba odkáže na web a neprijme požiadavku', async () => {
+  const originalNow = Settings.now;
+  const afterHoursTimestamp = DateTime.fromISO('2026-11-16T16:00:00+01:00').toMillis();
+  Settings.now = () => afterHoursTimestamp;
+  prixiService.getConfig = async () => ({
+    clinicId: '152',
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+    pediatricMode: true,
+  });
+  prixiService.getVoiceAssistantConfig = async () => ({
+    clinicId: '152',
+    assistantType: 'zdrahalova',
+    enabled: true,
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+    availability: { status: 'open' },
+    workingHours: {
+      monday: { enabled: true, from: '07:00', to: '15:00' },
+      tuesday: { enabled: true, from: '07:00', to: '15:00' },
+      wednesday: { enabled: true, from: '07:00', to: '15:00' },
+      thursday: { enabled: true, from: '10:00', to: '17:00' },
+      friday: { enabled: true, from: '07:00', to: '13:00' },
+      saturday: { enabled: false, from: null, to: null },
+      sunday: { enabled: false, from: null, to: null },
+    },
+  });
+  let emailAttempts = 0;
+  mailerSendService.isConfigured = () => true;
+  mailerSendService.sendZdrahalovaRequest = async () => {
+    emailAttempts += 1;
+    return 'unexpected-message';
+  };
+
+  try {
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000195',
+      To: '+420910926126',
+      CallSid: 'CA99999999999999999999999999999195',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body, /momentálne neordinuje/);
+    assert.match(response.body, /www\.mudrzdrahalova\.sk/);
+    assert.match(response.body, /<Hangup\/>/);
+    assert.doesNotMatch(response.body, /<Record|record-problem/);
+    assert.equal(emailAttempts, 0);
+  } finally {
+    Settings.now = originalNow;
+    prixiService.getVoiceAssistantConfig = originalGetVoiceAssistantConfig;
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+    mailerSendService.isConfigured = originalMailerSendIsConfigured;
+    mailerSendService.sendZdrahalovaRequest = originalSendZdrahalovaRequest;
   }
 });
 

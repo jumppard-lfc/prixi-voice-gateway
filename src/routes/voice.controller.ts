@@ -33,6 +33,12 @@ import { gyncentrumBotConfig } from '../config/gyncentrum.config';
 import { finalizeAbandonedNimalaCall, startNimalaVoiceBot } from './nimala-voice-bot.controller';
 import { nimalaBotConfig } from '../config/nimala.config';
 import { DateTime } from 'luxon';
+import {
+  buildZdrahalovaClosedMessage,
+  formatZdrahalovaProblemTranscript,
+  isZdrahalovaAcceptingRequests,
+} from '../services/zdrahalova-call-context.service';
+import { mailerSendService } from '../services/mailersend.service';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
@@ -137,7 +143,7 @@ const NOVOTNY_DENTAL_GREETING = 'Prepáčte za zdržanie. Tu je virtuálna sestr
 const NOVOTNY_DENTAL_COMPLETION = 'Rozumiem. Vašu požiadavku odovzdám doktorovi Novotnému a ozveme sa vám späť do 24 hodín. Ďakujem a dovidenia.';
 const HMIRA_DENTAL_GREETING = 'Prepáčte za zdržanie. Tu je virtuálna sestra PriXi z ambulancie doktora Hmiru. Povedzte mi, prosím, svoje meno a s čím vám môžem pomôcť.';
 const HMIRA_DENTAL_COMPLETION = 'Rozumiem. Vašu požiadavku odovzdám doktorovi Hmirovi a ozveme sa vám späť do 24 hodín. Ďakujem a dovidenia.';
-const ZDRAHALOVA_PEDIATRIC_GREETING = 'Dobrý deň, tu je virtuálna sestra PriXi z ambulancie doktorky Zdráhalovej. Povedzte mi, prosím, meno dieťaťa a s čím vám môžeme pomôcť.';
+const ZDRAHALOVA_PEDIATRIC_GREETING = 'Dobrý deň, tu je virtuálna sestra PriXi z ambulancie doktorky Zdráhalovej. V ambulancii práve ordinujeme, ale momentálne nemôžeme zdvihnúť. Povedzte mi, prosím, meno dieťaťa a s čím vám môžeme pomôcť.';
 const ZDRAHALOVA_PEDIATRIC_COMPLETION = 'Ďakujem. Vašu požiadavku odovzdám ambulancii doktorky Zdráhalovej a ozveme sa vám späť. Dovidenia.';
 const POPRAD_ONCOLOGY_GREETING = 'Dobrý deň, tu je virtuálna sestra PriXi z oddelenia klinickej onkológie v Poprade. Povedzte mi prosím svoje meno a s čím vám môžeme pomôcť.';
 const POPRAD_ONCOLOGY_COMPLETION = 'Ďakujem. Vašu požiadavku odovzdám oddeleniu klinickej onkológie a ozveme sa vám späť. Dovidenia.';
@@ -221,6 +227,59 @@ function isGyncentrumRoute(value?: string): boolean {
 
 function getDentalCompletion(routingPhoneNumber: string): string {
   return isHmiraRoute(routingPhoneNumber) ? HMIRA_DENTAL_COMPLETION : NOVOTNY_DENTAL_COMPLETION;
+}
+
+async function resolveZdrahalovaCallAvailability(fastify: FastifyInstance): Promise<{
+  acceptingRequests: boolean;
+  closedMessage: string;
+}> {
+  try {
+    const config = await prixiService.getVoiceAssistantConfig(ZDRAHALOVA_ROUTING_PHONE_NUMBER);
+    if (String(config.clinicId) !== ZDRAHALOVA_CLINIC_ID) {
+      throw new Error(`Expected clinic ${ZDRAHALOVA_CLINIC_ID}, received ${config.clinicId || '<missing>'}`);
+    }
+    return {
+      acceptingRequests: isZdrahalovaAcceptingRequests(config),
+      closedMessage: buildZdrahalovaClosedMessage(config),
+    };
+  } catch (error) {
+    fastify.log.warn(
+      { err: error, clinicId: ZDRAHALOVA_CLINIC_ID },
+      'Failed to load MUDr. Zdrahalova working hours from PriXi; using the reviewed fallback schedule'
+    );
+    return {
+      acceptingRequests: isZdrahalovaAcceptingRequests(undefined),
+      closedMessage: buildZdrahalovaClosedMessage(),
+    };
+  }
+}
+
+async function notifyZdrahalovaByEmail(
+  fastify: FastifyInstance,
+  event: VoicemailRecordedEvent
+): Promise<void> {
+  if (!isZdrahalovaRoute(event.routingPhoneNumber)) return;
+
+  if (!mailerSendService.isConfigured()) {
+    fastify.log.warn(
+      { providerCallId: event.providerCallId, clinicId: event.clinicId },
+      'MailerSend is not configured; MUDr. Zdrahalova request was stored in PriXi without email notification'
+    );
+    return;
+  }
+
+  try {
+    const messageId = await mailerSendService.sendZdrahalovaRequest(event);
+    fastify.log.info(
+      { providerCallId: event.providerCallId, clinicId: event.clinicId, messageId },
+      'MUDr. Zdrahalova request queued in MailerSend'
+    );
+  } catch (error) {
+    fastify.log.error(
+      { err: error, providerCallId: event.providerCallId, clinicId: event.clinicId },
+      'Failed to queue MUDr. Zdrahalova email notification; request remains stored in PriXi'
+    );
+  }
 }
 
 function assertClinicRoutingIsolation(
@@ -646,6 +705,18 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       const isDobrovodskaVacation = isDobrovodskaNumber && isDobrovodskaVacationDay();
       const isDedicatedVoiceBotNumber = isCelkovaNumber || isBenovaBaloghovaNumber || isNovotnyNumber || isHmiraNumber || isZdrahalovaNumber || isSkripkovaNumber || isPopradOncologyNumber;
 
+      if (isZdrahalovaNumber) {
+        const availability = await resolveZdrahalovaCallAvailability(fastify);
+        if (!availability.acceptingRequests) {
+          twiml.say(
+            { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
+            availability.closedMessage
+          );
+          twiml.hangup();
+          return reply.type('text/xml').send(twiml.toString());
+        }
+      }
+
       if (!isDedicatedVoiceBotNumber && !ivrService.shouldAllowCall(config, forwardedFrom)) {
         twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Toto číslo je momentálne nedostupné.');
         twiml.reject();
@@ -931,10 +1002,13 @@ export async function voiceRoutes(fastify: FastifyInstance) {
           problemUrl,
           nameTranscript,
           birthYearTranscript,
-          problemTranscript
+          problemTranscript: isZdrahalovaRoute(forwardedFrom)
+            ? formatZdrahalovaProblemTranscript(problemTranscript)
+            : problemTranscript
         };
 
         await prixiService.sendEvent(event, 3, eventKey);
+        await notifyZdrahalovaByEmail(fastify, event);
         completeVoiceEvent(eventKey);
       } catch (err) {
         fastify.log.error(err, 'STT processing failed, sending event without transcript');
@@ -957,6 +1031,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
         try {
           await prixiService.sendEvent(fallbackEvent, 3, eventKey);
+          await notifyZdrahalovaByEmail(fastify, fallbackEvent);
           completeVoiceEvent(eventKey);
         } catch (reportErr) {
           failVoiceEvent(eventKey);
