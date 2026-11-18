@@ -133,6 +133,51 @@ attempted up to three times.
 Configure the Twilio DID's incoming voice webhook and terminal status callback
 as `POST /voice/incoming` and `POST /voice/call-status`.
 
+## MUDr. Ján Štefančík production bot
+
+The Stupava urology/andrology bot uses the dedicated Twilio DID
+`+420910927214`, public clinic number `+421907875703`, and clinic `171`. It uses
+the same shared production webhooks as the existing bots:
+`POST /voice/incoming` and `POST /voice/call-status`. The DID is an authoritative
+protected routing key and the flow starts only when `/api/voice/config` returns
+clinic `171` with `assistantType: "stefancik"`.
+
+Configure the PriXi **Hlasová asistentka** record with `enabled` and
+`voiceBotEnabled`, timezone `Europe/Bratislava`, `assistantType: "stefancik"`,
+the clinic's `healthcareProviderId`, and these `workingHours`:
+
+```text
+Monday     07:30–12:00
+Tuesday    13:00–16:00
+Wednesday  07:30–12:00
+Thursday   07:30–12:00
+Friday     07:30–12:00
+Weekend    closed
+```
+
+The values above are also the reviewed fallback transcribed from the supplied
+office-hours notice. Changes saved in PriXi take precedence. The flow groups
+calls as appointment, results, prescription, or office-hours requests.
+Appointments always receive the eČakáreň link (by SMS when
+`healthcareProviderId` is available), results callers are directed to call on a
+working day from 10:30 to 12:00, and prescription details are accepted only on
+working days from 07:30 to 10:30. Outside that window no medication message is
+accepted.
+
+Only calls classified during the current working day's 07:30–10:30 intake
+window are stored in PriXi. Evening, overnight and weekend calls can still hear
+the appropriate information or receive the eČakáreň SMS, but they are not
+recorded and never appear in a later email.
+
+The daily email is intentionally not aggregated inside this gateway. A future
+authenticated cron job must call an idempotent PriXi backend endpoint at 10:30
+Europe/Bratislava. That endpoint queries clinic `171` requests for the current
+day, groups them as A–D, sorts each group by creation time, sends one email to
+`urolinestupava@gmail.com`, and records the delivery date in the database. This
+keeps the gateway stateless and requires no Render persistent disk. The agreed
+backend contract is documented in
+[`docs/stefancik-daily-digest-contract.md`](docs/stefancik-daily-digest-contract.md).
+
 ### PriXi presentation demo
 
 `configs/demo-voice-bots/prixi-prezentacia-demo.json` routes the flyer number
