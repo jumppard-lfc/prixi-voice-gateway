@@ -125,8 +125,9 @@ to `www.mudrzdrahalova.sk`, does not record a request, and ends the call.
 Every accepted call is sent to PriXi as a `voicemail_recorded` event for clinic
 `152`. After PriXi accepts the event, the gateway independently queues the same
 request through MailerSend. Configure `MAILERSEND_API_TOKEN` and a verified
-`MAILERSEND_FROM_EMAIL` in the deployment secret store. The recipient is fixed
-to `matoskok1@gmail.com` in the Zdráhalová integration. MailerSend failures
+`MAILERSEND_FROM_EMAIL` in the deployment secret store. Production uses
+`no-reply@prixi.sk`, and the recipient is fixed to `pediatriamaneli@gmail.com`
+in the Zdráhalová integration. MailerSend failures
 never discard the request already stored in PriXi; transient API failures are
 attempted up to three times.
 

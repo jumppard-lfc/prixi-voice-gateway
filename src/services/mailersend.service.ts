@@ -3,7 +3,7 @@ import { DateTime } from 'luxon';
 import { VoicemailRecordedEvent } from '../types';
 
 const MAILERSEND_EMAIL_URL = 'https://api.mailersend.com/v1/email';
-const ZDRAHALOVA_NOTIFICATION_EMAIL = 'matoskok1@gmail.com';
+const ZDRAHALOVA_NOTIFICATION_EMAIL = 'pediatriamaneli@gmail.com';
 const MAX_ATTEMPTS = 3;
 
 type RequestPresentation = {

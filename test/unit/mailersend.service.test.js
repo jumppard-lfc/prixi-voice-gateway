@@ -31,7 +31,7 @@ function event(overrides = {}) {
 
 test.beforeEach(() => {
   process.env.MAILERSEND_API_TOKEN = 'test-mailersend-token';
-  process.env.MAILERSEND_FROM_EMAIL = 'voice@verified.example';
+  process.env.MAILERSEND_FROM_EMAIL = 'no-reply@prixi.sk';
   process.env.MAILERSEND_FROM_NAME = 'PriXi test';
 });
 
@@ -60,11 +60,11 @@ test('zaradí požiadavku MUDr. Zdráhalovej do MailerSend fronty', async () => 
   assert.equal(messageId, 'mailer-message-152');
   assert.equal(captured.url, 'https://api.mailersend.com/v1/email');
   assert.deepEqual(captured.data.from, {
-    email: 'voice@verified.example',
+    email: 'no-reply@prixi.sk',
     name: 'PriXi test',
   });
   assert.deepEqual(captured.data.to, [{
-    email: 'matoskok1@gmail.com',
+    email: 'pediatriamaneli@gmail.com',
     name: 'Detská ambulancia Maneli',
   }]);
   assert.equal(captured.data.subject, '🔵 Predpis / recept – PriXi telefonická požiadavka');
