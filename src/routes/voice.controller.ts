@@ -41,6 +41,7 @@ import {
   isZdrahalovaAcceptingRequests,
 } from '../services/zdrahalova-call-context.service';
 import { mailerSendService } from '../services/mailersend.service';
+import { zdrahalovaAudioFiles, ZdrahalovaAudioKey } from '../config/zdrahalova-audio.config';
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
@@ -113,6 +114,18 @@ const HMIRA_GREETING_FILE = resolve(__dirname, '../assets/audio/hmira-1-greeting
 const HMIRA_COMPLETION_FILE = resolve(__dirname, '../assets/audio/hmira-2-completion-v1.wav');
 const SKRIPKOVA_GREETING_FILE = resolve(__dirname, '../assets/audio/skripkova-1-greeting-v1.wav');
 const SKRIPKOVA_COMPLETION_FILE = resolve(__dirname, '../assets/audio/skripkova-2-completion-v1.wav');
+
+function hasZdrahalovaAudio(key: ZdrahalovaAudioKey): boolean {
+  return existsSync(resolve(__dirname, '../assets/audio', zdrahalovaAudioFiles[key]));
+}
+
+function playZdrahalovaAudio(
+  twiml: InstanceType<typeof VoiceResponse>,
+  request: FastifyRequest,
+  key: ZdrahalovaAudioKey
+): void {
+  twiml.play(`${getPublicBaseUrl(request)}/media/${zdrahalovaAudioFiles[key]}`);
+}
 
 function getPublicBaseUrl(request: FastifyRequest): string {
   const forwardedProto = String(request.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
@@ -239,6 +252,7 @@ function getDentalCompletion(routingPhoneNumber: string): string {
 async function resolveZdrahalovaCallAvailability(fastify: FastifyInstance): Promise<{
   acceptingRequests: boolean;
   closedMessage: string;
+  closedAudio: ZdrahalovaAudioKey;
 }> {
   try {
     const config = await prixiService.getVoiceAssistantConfig(ZDRAHALOVA_ROUTING_PHONE_NUMBER);
@@ -248,6 +262,13 @@ async function resolveZdrahalovaCallAvailability(fastify: FastifyInstance): Prom
     return {
       acceptingRequests: isZdrahalovaAcceptingRequests(config),
       closedMessage: buildZdrahalovaClosedMessage(config),
+      closedAudio: config.availability?.status === 'vacation'
+        ? 'vacation'
+        : config.enabled === false
+          || config.voiceBotEnabled === false
+          || config.availability?.status === 'disabled'
+          ? 'unavailable'
+          : 'afterHours',
     };
   } catch (error) {
     fastify.log.warn(
@@ -257,6 +278,7 @@ async function resolveZdrahalovaCallAvailability(fastify: FastifyInstance): Prom
     return {
       acceptingRequests: isZdrahalovaAcceptingRequests(undefined),
       closedMessage: buildZdrahalovaClosedMessage(),
+      closedAudio: 'afterHours',
     };
   }
 }
@@ -724,10 +746,18 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       if (isZdrahalovaNumber) {
         const availability = await resolveZdrahalovaCallAvailability(fastify);
         if (!availability.acceptingRequests) {
-          twiml.say(
-            { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
-            availability.closedMessage
-          );
+          if (hasZdrahalovaAudio(availability.closedAudio)) {
+            playZdrahalovaAudio(twiml, request, availability.closedAudio);
+          } else {
+            fastify.log.error(
+              { audioKey: availability.closedAudio },
+              'MUDr. Zdrahalova closed-state audio is missing; using TTS fallback'
+            );
+            twiml.say(
+              { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any },
+              availability.closedMessage
+            );
+          }
           twiml.hangup();
           return reply.type('text/xml').send(twiml.toString());
         }
@@ -769,6 +799,8 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         twiml.play(`${getPublicBaseUrl(request)}/media/dobrovodska-1-greeting-v2.wav`);
       } else if (isHmiraNumber && existsSync(HMIRA_GREETING_FILE)) {
         twiml.play(`${getPublicBaseUrl(request)}/media/hmira-1-greeting-v1.wav`);
+      } else if (isZdrahalovaNumber && hasZdrahalovaAudio('greeting')) {
+        playZdrahalovaAudio(twiml, request, 'greeting');
       } else if (isSkripkovaNumber && existsSync(SKRIPKOVA_GREETING_FILE)) {
         twiml.play(`${getPublicBaseUrl(request)}${skripkovaBotConfig.copy.greetingAudioPath}`);
       } else if (isGyncentrumNumber) {
@@ -800,8 +832,13 @@ export async function voiceRoutes(fastify: FastifyInstance) {
       return reply.type('text/xml').send(twiml.toString());
     } catch (err) {
       fastify.log.error(err, 'Error in /incoming');
-      twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Momentálne máme technické problémy.');
-      twiml.reject();
+      if (isZdrahalovaRoute(forwardedFrom) && hasZdrahalovaAudio('technicalError')) {
+        playZdrahalovaAudio(twiml, request, 'technicalError');
+        twiml.hangup();
+      } else {
+        twiml.say({ language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-A' as any }, 'Momentálne máme technické problémy.');
+        twiml.reject();
+      }
       return reply.type('text/xml').send(twiml.toString());
     }
   });
@@ -853,6 +890,8 @@ export async function voiceRoutes(fastify: FastifyInstance) {
         twiml.play(`${getPublicBaseUrl(request)}/media/dobrovodska-2-completion-v2.wav`);
       } else if (isHmiraRoute(forwardedFrom) && existsSync(HMIRA_COMPLETION_FILE)) {
         twiml.play(`${getPublicBaseUrl(request)}/media/hmira-2-completion-v1.wav`);
+      } else if (isZdrahalovaNumber && hasZdrahalovaAudio('completion')) {
+        playZdrahalovaAudio(twiml, request, 'completion');
       } else if (isSkripkovaNumber && existsSync(SKRIPKOVA_COMPLETION_FILE)) {
         twiml.play(`${getPublicBaseUrl(request)}${skripkovaBotConfig.copy.completionAudioPath}`);
       } else {

@@ -18,6 +18,7 @@ import { nimalaVoiceBotRoutes } from './routes/nimala-voice-bot.controller';
 import { stefancikVoiceBotRoutes } from './routes/stefancik-voice-bot.controller';
 import { dentbodyAudioFileNames } from './config/dentbody-audio.config';
 import { nimalaAudioFileNames } from './config/nimala-audio.config';
+import { zdrahalovaAudioFileNames } from './config/zdrahalova-audio.config';
 import { nimalaDynamicAudioService } from './services/nimala-dynamic-audio.service';
 
 const KLOSTERMANN_GREETING_PATH = resolve(__dirname, 'assets/audio/klostermann-greeting-v5.wav');
@@ -184,6 +185,22 @@ for (const audioFileName of dentbodyAudioFileNames) {
 }
 
 for (const audioFileName of nimalaAudioFileNames) {
+  const audioFilePath = resolve(__dirname, 'assets/audio', audioFileName);
+  app.get(`/media/${audioFileName}`, async (_request, reply) => {
+    try {
+      const audioStats = statSync(audioFilePath);
+      return reply
+        .type('audio/wav')
+        .header('Content-Length', audioStats.size)
+        .header('Cache-Control', 'public, max-age=31536000, immutable')
+        .send(createReadStream(audioFilePath));
+    } catch {
+      return reply.code(404).send();
+    }
+  });
+}
+
+for (const audioFileName of zdrahalovaAudioFileNames) {
   const audioFilePath = resolve(__dirname, 'assets/audio', audioFileName);
   app.get(`/media/${audioFileName}`, async (_request, reply) => {
     try {

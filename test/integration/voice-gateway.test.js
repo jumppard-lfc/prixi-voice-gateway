@@ -118,6 +118,26 @@ test('Hmira audio hlasky su dostupne v Twilio-kompatibilnom WAV formate', async 
   }
 });
 
+test('všetky hlášky MUDr. Zdráhalovej sú dostupné v Twilio-kompatibilnom WAV formáte', async () => {
+  const fileNames = [
+    'zdrahalova-01-greeting-v1.wav',
+    'zdrahalova-02-completion-v1.wav',
+    'zdrahalova-03-after-hours-v1.wav',
+    'zdrahalova-04-vacation-v1.wav',
+    'zdrahalova-05-technical-error-v1.wav',
+    'zdrahalova-06-unavailable-v1.wav',
+  ];
+
+  for (const fileName of fileNames) {
+    const response = await app.inject({ method: 'GET', url: `/media/${fileName}` });
+    assert.equal(response.statusCode, 200, fileName);
+    assert.match(response.headers['content-type'], /^audio\/wav/, fileName);
+    assert.equal(response.headers['cache-control'], 'public, max-age=31536000, immutable', fileName);
+    assert.ok(response.rawPayload.length > 20_000, fileName);
+    assert.equal(response.rawPayload.subarray(0, 4).toString('ascii'), 'RIFF', fileName);
+  }
+});
+
 test('POST /voice/incoming s neplatnym podpisom vrati 403', async () => {
   const endpoint = '/voice/incoming';
   const params = {
@@ -1388,9 +1408,8 @@ test('MUDr. Zdrahalova sa opyta iba raz a po poziadavke hovor ukonci', async () 
 
     assert.equal(incoming.statusCode, 200);
     assert.equal(requestedPhoneNumber, '+421911135193');
-    assert.match(incoming.body, /virtuálna sestra PriXi z ambulancie doktorky Zdráhalovej/);
-    assert.match(incoming.body, /práve ordinujeme, ale momentálne nemôžeme zdvihnúť/);
-    assert.match(incoming.body, /meno dieťaťa a s čím vám môžeme pomôcť/);
+    assert.match(incoming.body, /<Play>https:\/\/127\.0\.0\.1:3000\/media\/zdrahalova-01-greeting-v1\.wav<\/Play>/);
+    assert.doesNotMatch(incoming.body, /<Say/);
     assert.doesNotMatch(incoming.body, /dlhá všeobecná hláška/);
     assert.doesNotMatch(incoming.body, /život ohrozujúci stav|ordinačné|rok narodenia/);
     assert.match(incoming.body, /timeout="3"/);
@@ -1406,7 +1425,7 @@ test('MUDr. Zdrahalova sa opyta iba raz a po poziadavke hovor ukonci', async () 
 
     assert.equal(forwardedIncoming.statusCode, 200);
     assert.equal(requestedPhoneNumber, '+421911135193');
-    assert.match(forwardedIncoming.body, /ambulancie doktorky Zdráhalovej/);
+    assert.match(forwardedIncoming.body, /zdrahalova-01-greeting-v1\.wav/);
     assert.match(forwardedIncoming.body, /forwardedFrom=%2B421911135193/);
 
     const problem = await signedVoicePost('/voice/record-problem?forwardedFrom=%2B421911135193&pediatricMode=true&dentalMode=false', {
@@ -1417,7 +1436,8 @@ test('MUDr. Zdrahalova sa opyta iba raz a po poziadavke hovor ukonci', async () 
     });
 
     assert.equal(problem.statusCode, 200);
-    assert.match(problem.body, /Vašu požiadavku odovzdám ambulancii doktorky Zdráhalovej/);
+    assert.match(problem.body, /<Play>https:\/\/127\.0\.0\.1:3000\/media\/zdrahalova-02-completion-v1\.wav<\/Play>/);
+    assert.doesNotMatch(problem.body, /<Say/);
     assert.doesNotMatch(problem.body, /record-name|recording-complete|rok narodenia/);
     assert.match(problem.body, /<Hangup\/>/);
     await new Promise(resolve => setImmediate(resolve));
@@ -1485,8 +1505,8 @@ test('MUDr. Zdrahalova mimo ordinačných hodín iba odkáže na web a neprijme 
     });
 
     assert.equal(response.statusCode, 200);
-    assert.match(response.body, /momentálne neordinuje/);
-    assert.match(response.body, /www\.mudrzdrahalova\.sk/);
+    assert.match(response.body, /zdrahalova-03-after-hours-v1\.wav/);
+    assert.doesNotMatch(response.body, /<Say/);
     assert.match(response.body, /<Hangup\/>/);
     assert.doesNotMatch(response.body, /<Record|record-problem/);
     assert.equal(emailAttempts, 0);
@@ -1500,6 +1520,115 @@ test('MUDr. Zdrahalova mimo ordinačných hodín iba odkáže na web a neprijme 
     });
     mailerSendService.isConfigured = originalMailerSendIsConfigured;
     mailerSendService.sendZdrahalovaRequest = originalSendZdrahalovaRequest;
+  }
+});
+
+test('MUDr. Zdráhalová použije samostatnú nahrávku pre dovolenku a vypnutú asistentku', async () => {
+  const originalNow = Settings.now;
+  const officeHoursTimestamp = DateTime.fromISO('2026-11-19T11:00:00+01:00').toMillis();
+  Settings.now = () => officeHoursTimestamp;
+  prixiService.getConfig = async () => ({
+    clinicId: '152',
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+    pediatricMode: true,
+  });
+  const baseConfig = {
+    clinicId: '152',
+    assistantType: 'zdrahalova',
+    enabled: true,
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+    workingHours: {
+      monday: { enabled: true, from: '07:00', to: '15:00' },
+      tuesday: { enabled: true, from: '07:00', to: '15:00' },
+      wednesday: { enabled: true, from: '07:00', to: '15:00' },
+      thursday: { enabled: true, from: '10:00', to: '17:00' },
+      friday: { enabled: true, from: '07:00', to: '13:00' },
+      saturday: { enabled: false, from: null, to: null },
+      sunday: { enabled: false, from: null, to: null },
+    },
+  };
+
+  try {
+    prixiService.getVoiceAssistantConfig = async () => ({
+      ...baseConfig,
+      availability: { status: 'vacation', message: 'Máme dovolenku.' },
+    });
+    const vacation = await signedVoicePost('/voice/incoming', {
+      From: '+421900000196',
+      To: '+420910926126',
+      CallSid: 'CA99999999999999999999999999999196',
+    });
+    assert.match(vacation.body, /zdrahalova-04-vacation-v1\.wav/);
+    assert.match(vacation.body, /<Hangup\/>/);
+
+    prixiService.getVoiceAssistantConfig = async () => ({
+      ...baseConfig,
+      enabled: false,
+      voiceBotEnabled: false,
+      availability: { status: 'disabled' },
+    });
+    const unavailable = await signedVoicePost('/voice/incoming', {
+      From: '+421900000197',
+      To: '+420910926126',
+      CallSid: 'CA99999999999999999999999999999197',
+    });
+    assert.match(unavailable.body, /zdrahalova-06-unavailable-v1\.wav/);
+    assert.match(unavailable.body, /<Hangup\/>/);
+  } finally {
+    Settings.now = originalNow;
+    prixiService.getVoiceAssistantConfig = originalGetVoiceAssistantConfig;
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
+  }
+});
+
+test('MUDr. Zdráhalová pri technickej chybe prehrá ElevenLabs nahrávku', async () => {
+  const originalNow = Settings.now;
+  const officeHoursTimestamp = DateTime.fromISO('2026-11-19T11:00:00+01:00').toMillis();
+  Settings.now = () => officeHoursTimestamp;
+  prixiService.getVoiceAssistantConfig = async () => ({
+    clinicId: '152',
+    assistantType: 'zdrahalova',
+    enabled: true,
+    voiceBotEnabled: true,
+    timezone: 'Europe/Bratislava',
+    availability: { status: 'open' },
+    workingHours: {
+      monday: { enabled: true, from: '07:00', to: '15:00' },
+      tuesday: { enabled: true, from: '07:00', to: '15:00' },
+      wednesday: { enabled: true, from: '07:00', to: '15:00' },
+      thursday: { enabled: true, from: '10:00', to: '17:00' },
+      friday: { enabled: true, from: '07:00', to: '13:00' },
+      saturday: { enabled: false, from: null, to: null },
+      sunday: { enabled: false, from: null, to: null },
+    },
+  });
+  prixiService.getConfig = async () => {
+    throw new Error('Test PriXi failure');
+  };
+
+  try {
+    const response = await signedVoicePost('/voice/incoming', {
+      From: '+421900000198',
+      To: '+420910926126',
+      CallSid: 'CA99999999999999999999999999999198',
+    });
+    assert.match(response.body, /zdrahalova-05-technical-error-v1\.wav/);
+    assert.match(response.body, /<Hangup\/>/);
+    assert.doesNotMatch(response.body, /<Say/);
+  } finally {
+    Settings.now = originalNow;
+    prixiService.getVoiceAssistantConfig = originalGetVoiceAssistantConfig;
+    prixiService.getConfig = async () => ({
+      clinicId: 'test-clinic',
+      voiceBotEnabled: false,
+      timezone: 'Europe/Bratislava',
+    });
   }
 });
 
