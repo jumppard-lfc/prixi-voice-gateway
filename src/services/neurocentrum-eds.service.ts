@@ -28,10 +28,7 @@ export interface NeurocentrumRuntimeConfig {
   messages: NeurocentrumMessages;
 }
 
-export interface EdsPatientRequestEvent<
-  RequestType extends string = NeurocentrumRequestType | 'pre_registration',
-  ExistingPatient extends boolean = boolean,
-> {
+export interface NeurocentrumPatientRequestEvent {
   event: 'patient_request.created';
   version: 1;
   clinicId: string;
@@ -42,19 +39,16 @@ export interface EdsPatientRequestEvent<
     durationSeconds: number;
   };
   patient: {
-    existingPatient: ExistingPatient;
+    existingPatient: true;
     firstName: string;
     lastName: string;
     birthDate: string;
   };
   request: {
-    type: RequestType;
+    type: NeurocentrumRequestType;
     detail: string;
   };
 }
-
-export type NeurocentrumPatientRequestEvent = EdsPatientRequestEvent<NeurocentrumRequestType, true>;
-export type PreRegistrationPatientRequestEvent = EdsPatientRequestEvent<'pre_registration', false>;
 
 interface ConfigCacheEntry {
   config: NeurocentrumRuntimeConfig;
@@ -201,7 +195,7 @@ export class NeurocentrumEdsService {
     return config;
   }
 
-  async sendPatientRequest(event: EdsPatientRequestEvent): Promise<'created' | 'duplicate'> {
+  async sendPatientRequest(event: NeurocentrumPatientRequestEvent): Promise<'created' | 'duplicate'> {
     const timeout = positiveInteger(process.env.EDS_VOICE_API_TIMEOUT_MS, DEFAULT_API_TIMEOUT_MS);
     let lastError: unknown;
 

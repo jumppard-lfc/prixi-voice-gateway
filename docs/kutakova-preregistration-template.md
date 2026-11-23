@@ -22,16 +22,17 @@ ambulancia bezpečne doplniť po overení pacienta.
 
 ## EDS/Curo kontrakt
 
-Gateway používa rovnakú idempotentnú udalosť
+Gateway používa bez úprav EDS rovnakú idempotentnú udalosť
 `patient_request.created` ako Neurocentrum a posiela ju na existujúce rozhranie
-`POST /api/voice/event`. Predregistrácia sa prenesie ako samostatný typ
-`pre_registration`, ktorý sa v PriXi zobrazí ako „Predregistrácia pacienta“.
+`POST /api/voice/event`. Predregistrácia sa prenesie ako podporovaný typ
+`follow_up`; jej skutočný účel je výrazne označený v texte požiadavky pre Curo.
 `CallSid` je zároveň `Idempotency-Key`. Úspech pacientovi potvrdí až po tom, čo
 EDS potvrdí uloženie.
 
-Príznak `existingPatient: false` vyjadruje, že ide o predregistráciu nového
-pacienta. EDS pacienta naďalej priraďuje iba podľa mena a dátumu narodenia v
-rámci konkrétnej ambulancie.
+Súčasný EDS kontrakt vyžaduje kompatibilitný príznak `existingPatient: true`.
+Neznamená to však, že musí ísť o existujúceho pacienta: EDS pacienta vyhľadá
+podľa mena a dátumu narodenia a pri nenájdení ho vytvorí. Vďaka tomu netreba
+meniť validáciu, databázu ani Curo integráciu v EDS.
 
 ```json
 {
@@ -45,13 +46,13 @@ rámci konkrétnej ambulancie.
     "durationSeconds": 74
   },
   "patient": {
-    "existingPatient": false,
+    "existingPatient": true,
     "firstName": "Jana",
     "lastName": "Nováková",
     "birthDate": "1985-04-12"
   },
   "request": {
-    "type": "pre_registration",
+    "type": "follow_up",
     "detail": "PREDREGISTRÁCIA NOVÉHO PACIENTA pred otvorením ambulancie.\nNejde o potvrdenú registráciu ani objednanie na vyšetrenie.\nPoisťovňa: Dôvera.\nBydlisko: Bratislava.\nSúhlas so zaznamenaním údajov a spätným kontaktom: áno (2026-10-20T11:59:20.000Z)."
   }
 }
@@ -61,8 +62,9 @@ EDS túto udalosť spracuje existujúcou cestou. Ak má ambulancia zapnutú Curo
 integráciu a nastaveného vlastného príjemcu, EDS ju odošle aj do Curo; dovtedy
 zostane požiadavka bezpečne uložená pod ambulanciou 158 v EDS. Gateway
 nevytvára pacienta v Curo priamo, takže validácia, deduplikácia a audit zostanú
-na jednom mieste rovnako ako pri Neurocentre. Po zapnutí Curo sa typ zobrazí ako
-„Predregistrácia pacienta“.
+na jednom mieste rovnako ako pri Neurocentre. Po zapnutí Curo bude systémový typ
+stále zobrazený ako „Objednanie na kontrolu“; prvý riadok textu preto
+jednoznačne označuje, že ide o predregistráciu nového pacienta.
 
 ## Otázky pre pani doktorku
 

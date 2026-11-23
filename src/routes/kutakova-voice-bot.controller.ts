@@ -4,7 +4,7 @@ import twilio from 'twilio';
 import { kutakovaBotConfig } from '../config/kutakova.config';
 import { parseKutakovaHealthInsurer } from '../services/kutakova-nlu.service';
 import { KutakovaSession, kutakovaSessionService } from '../services/kutakova-session.service';
-import { PreRegistrationPatientRequestEvent, neurocentrumEdsService } from '../services/neurocentrum-eds.service';
+import { NeurocentrumPatientRequestEvent, neurocentrumEdsService } from '../services/neurocentrum-eds.service';
 import {
   isNeurocentrumUrgent,
   normalizeNeurocentrumDateOfBirth,
@@ -68,7 +68,7 @@ function birthDateForEds(value: string): string {
   return parsed.isValid ? parsed.toFormat('yyyy-MM-dd') : value;
 }
 
-function buildPreRegistrationEvent(session: KutakovaSession): PreRegistrationPatientRequestEvent {
+function buildPreRegistrationEvent(session: KutakovaSession): NeurocentrumPatientRequestEvent {
   const names = patientNames(session.patientName || '');
   const healthInsurer = session.healthInsurer || '';
   const municipality = session.municipality || '';
@@ -84,13 +84,17 @@ function buildPreRegistrationEvent(session: KutakovaSession): PreRegistrationPat
       durationSeconds: Math.max(0, Math.floor((Date.now() - Date.parse(session.startedAt)) / 1_000)),
     },
     patient: {
-      existingPatient: false,
+      // The current EDS typed contract requires this compatibility flag. EDS
+      // still creates the patient when no name + date-of-birth match exists.
+      existingPatient: true,
       firstName: names.firstName,
       lastName: names.lastName,
       birthDate: birthDateForEds(session.dateOfBirth || ''),
     },
     request: {
-      type: 'pre_registration',
+      // Reuse the existing EDS/Curo contract; the explicit text below lets
+      // clinic staff distinguish this from an ordinary follow-up.
+      type: 'follow_up',
       detail: [
         'PREDREGISTRÁCIA NOVÉHO PACIENTA pred otvorením ambulancie.',
         'Nejde o potvrdenú registráciu ani objednanie na vyšetrenie.',
