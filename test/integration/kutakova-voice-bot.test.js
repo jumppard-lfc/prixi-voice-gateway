@@ -96,13 +96,13 @@ test('Kutakova bot vytvori potvrdenu predregistraciu pre clinic 158 cez EDS', as
       durationSeconds: sentEvents[0].call.durationSeconds,
     },
     patient: {
-      existingPatient: true,
+      existingPatient: false,
       firstName: 'Jana',
       lastName: 'Nováková',
       birthDate: '1985-04-12',
     },
     request: {
-      type: 'follow_up',
+      type: 'pre_registration',
       detail: [
         'PREDREGISTRÁCIA NOVÉHO PACIENTA pred otvorením ambulancie.',
         'Nejde o potvrdenú registráciu ani objednanie na vyšetrenie.',
