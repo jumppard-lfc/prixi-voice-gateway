@@ -1,5 +1,5 @@
 export const dentbodyAudioFiles = {
-  greeting: 'dentbody-01-greeting-v2.wav',
+  greeting: 'dentbody-01-greeting-v3.wav',
   followUp: 'dentbody-02-follow-up-v1.wav',
   continue: 'dentbody-03-continue-v1.wav',
   retry: 'dentbody-04-retry-v1.wav',
