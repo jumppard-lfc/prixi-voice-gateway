@@ -68,8 +68,8 @@ test('produkčný DID spustí prirodzený Dentbody informačný flow', async () 
   assert.doesNotMatch(response.body, /Kollára|Elissea|Vadkerti/);
 });
 
-test('všetkých 42 Dentbody nahrávok je dostupných v Twilio WAV formáte', async () => {
-  assert.equal(dentbodyAudioFileNames.length, 42);
+test('všetkých 43 Dentbody nahrávok je dostupných v Twilio WAV formáte', async () => {
+  assert.equal(dentbodyAudioFileNames.length, 43);
 
   for (const audioFileName of dentbodyAudioFileNames) {
     const response = await app.inject({ method: 'GET', url: `/media/${audioFileName}` });
@@ -86,6 +86,18 @@ test('všetkých 42 Dentbody nahrávok je dostupných v Twilio WAV formáte', as
     assert.equal(wav.readUInt16LE(fmtOffset + 10), 1, `${audioFileName}: expected mono`);
     assert.equal(wav.readUInt32LE(fmtOffset + 12), 8000, `${audioFileName}: expected 8 kHz`);
   }
+});
+
+test('žiadosť o zopakovanie e-mailu prehrá iba pomalú e-mailovú nahrávku', async () => {
+  const callSid = 'CA-DENTBODY-REPEAT-EMAIL-000000001';
+  await incoming(callSid);
+  await answer(callSid, 'Aký je váš kontakt?');
+  const response = await answer(callSid, 'Zopakujte mi e-mailovú adresu');
+
+  assert.match(response.body, /dentbody-43-email-repeat-v1\.wav/);
+  assert.doesNotMatch(response.body, /dentbody-11-address-v1\.wav/);
+  assert.doesNotMatch(response.body, /dentbody-20-contact-v2\.wav/);
+  assert.match(response.body, /dentbody-02-follow-up-v1\.wav/);
 });
 
 test('otázka kde sa nachádza ambulancia dostane konkrétnu adresu', async () => {

@@ -88,6 +88,9 @@ export function parseDentbodyIntents(value: string): DentbodyIntent[] {
   add('appointment', /(objedna|rezerv|termin|na pockanie|bez objednania|treba sa hlasit)/);
   add('referral', /(ziadank|vymenn|listok od lekar|papier od lekar|odporuc|bez listka|bez papier)/);
   add('floor', /(poschod|podlazi)/);
+  const mentionsEmail = /\b(email\p{L}*|e mail\p{L}*|mail\p{L}*)\b/u.test(text);
+  const asksToRepeat = /\b(zopak\p{L}*|opak\p{L}*|znovu|znova)\b/u.test(text) || /\beste raz\b/.test(text);
+  if (mentionsEmail && asksToRepeat) intents.push('email_repeat');
   const asksWhere = /\bkde\b/.test(text);
   const hasLocationSubject = /\b(ambulanc\p{L}*|pracovisk\p{L}*|rtg|rontgen\p{L}*|ste)\b/u.test(text);
   const hasLocationVerb = /\b(nachadz\p{L}*|sidl\p{L}*)\b/u.test(text);
@@ -100,11 +103,11 @@ export function parseDentbodyIntents(value: string): DentbodyIntent[] {
     && /\b(dostat|dostanem)\b/.test(text)
     && /\b(tam|vam|vas)\b/.test(text)
   );
-  const asksForAddress = /\badres\p{L}*\b/u.test(text)
+  const asksForAddress = !mentionsEmail && (/\badres\p{L}*\b/u.test(text)
     || (asksWhere && (hasLocationSubject || hasLocationVerb || (hasSearchVerb && refersToClinic)))
     || (hasLocationSubject && hasLocationVerb)
     || asksForDirections
-    || /(fedinov|petrzalk|zdravotn.*stredisk)/.test(text);
+    || /(fedinov|petrzalk|zdravotn.*stredisk)/.test(text));
   if (asksForAddress) intents.push('address');
   add('patients', /(diet|deti|dosp|imobil|vozick|pacientov prijimate|pre koho)/);
   add('payment', /(plat|kart|hotovost|cash|terminal)/);
@@ -113,7 +116,7 @@ export function parseDentbodyIntents(value: string): DentbodyIntent[] {
   add('dental_images', /(zubn|opan|opg|panoram).*\b(snim|rtg|r[eo]ntgen|fotopapier|email|mail|cede|cd)|\b(snim|rtg|r[eo]ntgen).*\b(zubn|opan|opg|panoram)/);
   add('general_images', /(vseobecn|pluc|hrudnik|kost|koncatin).*\b(snim|rtg|r[eo]ntgen|cede|cd)|\b(snim|rtg|r[eo]ntgen).*\b(vseobecn|pluc|hrudnik|kost|koncatin)/);
   add('pricing', /(cena|cennik|kolko (to|stoji|zaplatim)|poplatok|euro)/);
-  add('contact', /(kontakt|web|strank|dentbodyxray|aky.*(email|e mail|mail)|kde.*(email|e mail|mail)|emailov.*adres)/);
+  add('contact', /(kontakt|web|strank|dentbodyxray|aky.*(email|e mail|mail)|kde.*(email|e mail|mail)|(email|e mail|mail)\p{L}*.*adres)/u);
   add('medical_advice', /(aky|aku|ake|ktory|ktoru|ktore).*\b(rtg|r[eo]ntgen|snim|vysetren)|diagnoz|je to vhodne|mozem ist na (rtg|r[eo]ntgen)|potrebujem (rtg|r[eo]ntgen)/);
 
   if (intents.includes('floor')) {
@@ -122,6 +125,10 @@ export function parseDentbodyIntents(value: string): DentbodyIntent[] {
 
   if (intents.includes('retrospective_image')) {
     return intents.filter(intent => !['dental_images', 'general_images', 'contact', 'medical_advice'].includes(intent));
+  }
+
+  if (intents.includes('email_repeat')) {
+    return intents.filter(intent => !['address', 'contact'].includes(intent));
   }
 
   const asksAboutDelivery = /(email|mail|poslat|zaslat|dostat|vydat|vyhotov|cd|cede|fotopapier)/.test(text);
@@ -318,6 +325,7 @@ const answers: Record<Exclude<DentbodyIntent, 'office_hours'>, string> = {
   certificate: 'Na žiadosť pacienta bezplatne vystavujeme priepustku alebo potvrdenie o úhrade RTG vyšetrenia pre zahraničného zamestnávateľa.',
   retrospective_image: 'Ak potrebujete snímku poslať spätne, napíšte na e-mail ambulancia bodka er té gé zavináč dentbodyxray bodka es ká. Uveďte meno, priezvisko a rodné číslo pacienta. Tieto údaje mi prosím nehovorte telefonicky.',
   contact: 'Webová stránka je vé vé vé bodka dentbodyxray bodka es ká. E-mail je ambulancia bodka er té gé zavináč dentbodyxray bodka es ká.',
+  email_repeat: 'E-mail je ambulancia bodka er té gé zavináč dentbodyxray bodka es ká.',
   pricing: 'Presný cenník zatiaľ nemám k dispozícii. Informáciu o cene si prosím overte e-mailom na ambulancia bodka er té gé zavináč dentbodyxray bodka es ká.',
   medical_advice: 'Neviem určiť, ktorý typ RTG vyšetrenia potrebujete. Overte si to prosím u svojho ošetrujúceho lekára.',
 };
@@ -335,6 +343,7 @@ const answerAudioKeys: Record<Exclude<DentbodyIntent, 'office_hours'>, DentbodyA
   certificate: 'certificate',
   retrospective_image: 'retrospectiveImage',
   contact: 'contact',
+  email_repeat: 'emailRepeat',
   pricing: 'pricing',
   medical_advice: 'medicalAdvice',
 };

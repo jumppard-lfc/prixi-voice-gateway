@@ -41,6 +41,7 @@ export const dentbodyAudioFiles = {
   lunchTuesdayThursday: 'dentbody-40-lunch-tuesday-thursday-v1.wav',
   opensToday: 'dentbody-41-opens-today-v1.wav',
   closedToday: 'dentbody-42-closed-today-v1.wav',
+  emailRepeat: 'dentbody-43-email-repeat-v1.wav',
 } as const;
 
 export type DentbodyAudioKey = keyof typeof dentbodyAudioFiles;

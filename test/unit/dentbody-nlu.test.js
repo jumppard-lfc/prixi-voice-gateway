@@ -25,6 +25,7 @@ test('každý informačný zámer je priradený k správnej ElevenLabs nahrávke
     ['certificate', 'certificate'],
     ['retrospective_image', 'retrospectiveImage'],
     ['contact', 'contact'],
+    ['email_repeat', 'emailRepeat'],
     ['pricing', 'pricing'],
     ['medical_advice', 'medicalAdvice'],
   ];
@@ -125,6 +126,9 @@ test('rozpozná prirodzené otázky na polohu pracoviska', () => {
 
   assert.deepEqual(parseDentbodyIntents('Kde môžem zaplatiť kartou?'), ['payment']);
   assert.deepEqual(parseDentbodyIntents('Kde vám môžem poslať e-mail?'), ['contact']);
+  assert.deepEqual(parseDentbodyIntents('Aká je vaša e-mailová adresa?'), ['contact']);
+  assert.deepEqual(parseDentbodyIntents('Zopakujte mi e-mailovú adresu'), ['email_repeat']);
+  assert.deepEqual(parseDentbodyIntents('Môžete povedať e-mail ešte raz?'), ['email_repeat']);
 
   assert.deepEqual(parseDentbodyIntents('Na ktorom poschodí vás nájdem?'), ['floor']);
   assert.match(

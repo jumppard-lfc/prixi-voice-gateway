@@ -12,6 +12,7 @@ export type DentbodyIntent =
   | 'certificate'
   | 'retrospective_image'
   | 'contact'
+  | 'email_repeat'
   | 'pricing'
   | 'medical_advice';
 
