@@ -58,7 +58,7 @@ test('produkčný DID spustí prirodzený Dentbody informačný flow', async () 
   const response = await incoming('CA-DENTBODY-ROUTE-0000000000000001');
 
   assert.equal(response.statusCode, 200);
-  assert.match(response.body, /<Play>https:\/\/127\.0\.0\.1:3000\/media\/dentbody-01-greeting-v2\.wav<\/Play>/);
+  assert.match(response.body, /<Play>https:\/\/127\.0\.0\.1:3000\/media\/dentbody-01-greeting-v3\.wav<\/Play>/);
   assert.doesNotMatch(response.body, /<Say/);
   assert.match(response.body, /action="\/voice\/dentbody\/answer"/);
   assert.match(response.body, /input="speech dtmf"/);
