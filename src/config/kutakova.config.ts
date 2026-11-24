@@ -1,4 +1,5 @@
 export type KutakovaHealthInsurer = 'Všeobecná zdravotná poisťovňa' | 'Dôvera' | 'Union' | 'Iná alebo neuvedená';
+export type KutakovaLanguage = 'sk' | 'en';
 
 export interface KutakovaBotConfig {
   id: string;

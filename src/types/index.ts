@@ -24,6 +24,7 @@ export interface ClinicConfig {
     status: 'open' | 'vacation' | 'outside_hours' | 'disabled';
     message?: string | null;
   };
+  maxConcurrentCalls?: number;
   messages?: {
     vacation?: string | null;
     [key: string]: string | null | undefined;

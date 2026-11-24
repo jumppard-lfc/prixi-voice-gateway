@@ -1,11 +1,15 @@
-import { KutakovaHealthInsurer } from '../config/kutakova.config';
+import { KutakovaHealthInsurer, KutakovaLanguage } from '../config/kutakova.config';
+import { ClinicConfig } from '../types';
 
-export type KutakovaStep = 'consent' | 'name' | 'date_of_birth' | 'health_insurer' | 'municipality' | 'confirmation';
+export type KutakovaStep = 'language' | 'consent' | 'name' | 'date_of_birth' | 'health_insurer' | 'municipality' | 'confirmation';
 
 export interface KutakovaSession {
   callSid: string;
   phone: string;
   step: KutakovaStep;
+  language?: KutakovaLanguage;
+  runtimeConfig?: ClinicConfig;
+  outsideHours?: boolean;
   patientName?: string;
   dateOfBirth?: string;
   healthInsurer?: KutakovaHealthInsurer;
@@ -17,7 +21,7 @@ export interface KutakovaSession {
 }
 
 const SESSION_TTL_MS = 30 * 60 * 1000;
-const MAX_CONCURRENT_CALLS = 20;
+const DEFAULT_MAX_CONCURRENT_CALLS = 20;
 
 export class KutakovaSessionService {
   private readonly sessions = new Map<string, KutakovaSession>();
@@ -29,15 +33,21 @@ export class KutakovaSessionService {
     }
   }
 
-  create(callSid: string, phone: string): KutakovaSession | undefined {
+  create(callSid: string, phone: string, runtimeConfig?: ClinicConfig): KutakovaSession | undefined {
     this.prune();
     const existing = this.sessions.get(callSid);
     if (existing) return existing;
-    if (this.sessions.size >= MAX_CONCURRENT_CALLS) return undefined;
+    const configuredLimit = Number(runtimeConfig?.maxConcurrentCalls);
+    const maxConcurrentCalls = Number.isInteger(configuredLimit) && configuredLimit > 0
+      ? configuredLimit
+      : DEFAULT_MAX_CONCURRENT_CALLS;
+    if (this.sessions.size >= maxConcurrentCalls) return undefined;
     const session: KutakovaSession = {
       callSid,
       phone,
-      step: 'consent',
+      step: 'language',
+      runtimeConfig,
+      outsideHours: runtimeConfig?.availability?.status === 'outside_hours',
       attempts: 0,
       startedAt: new Date().toISOString(),
       expiresAt: Date.now() + SESSION_TTL_MS,

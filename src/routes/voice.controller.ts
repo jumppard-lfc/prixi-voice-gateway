@@ -532,7 +532,7 @@ export async function voiceRoutes(fastify: FastifyInstance) {
 
     if (normalizedTo === KUTAKOVA_PHONE_NUMBER) {
       fastify.log.info({ from: fromNumber, to: body.To }, 'Routing call to MUDr. Kutakova pre-registration voice bot');
-      return startKutakovaVoiceBot(reply, body);
+      return startKutakovaVoiceBot(fastify, reply, body);
     }
 
     if (isNeurocentrumCall) {
