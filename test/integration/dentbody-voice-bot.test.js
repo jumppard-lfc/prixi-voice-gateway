@@ -68,8 +68,8 @@ test('produkčný DID spustí prirodzený Dentbody informačný flow', async () 
   assert.doesNotMatch(response.body, /Kollára|Elissea|Vadkerti/);
 });
 
-test('všetkých 43 Dentbody nahrávok je dostupných v Twilio WAV formáte', async () => {
-  assert.equal(dentbodyAudioFileNames.length, 43);
+test('všetkých 42 aktívnych Dentbody nahrávok je dostupných v Twilio WAV formáte', async () => {
+  assert.equal(dentbodyAudioFileNames.length, 42);
 
   for (const audioFileName of dentbodyAudioFileNames) {
     const response = await app.inject({ method: 'GET', url: `/media/${audioFileName}` });
@@ -145,7 +145,17 @@ test('nepochopená otázka ponúkne krátky číselný fallback', async () => {
   await incoming(callSid);
   const response = await answer(callSid, 'modrá obloha');
 
-  assert.match(response.body, /dentbody-04-retry-v1\.wav/);
+  assert.match(response.body, /dentbody-04-retry-v2\.wav/);
+});
+
+test('číselná voľba päť prehrá novú informáciu o platbe a cenníku', async () => {
+  const callSid = 'CA-DENTBODY-DTMF-PAYMENT-000000001';
+  await incoming(callSid);
+  const response = await answer(callSid, '5', true);
+
+  assert.match(response.body, /dentbody-44-payment-pricing-v1\.wav/);
+  assert.doesNotMatch(response.body, /dentbody-14-payment-v1\.wav|dentbody-21-pricing-v2\.wav/);
+  assert.match(response.body, /dentbody-02-follow-up-v1\.wav/);
 });
 
 test('číselný fallback pre snímky vysvetlí oba spôsoby výstupu', async () => {

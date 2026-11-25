@@ -18,7 +18,7 @@ test('každý informačný zámer je priradený k správnej ElevenLabs nahrávke
     ['address', 'address'],
     ['floor', 'floor'],
     ['patients', 'patients'],
-    ['payment', 'payment'],
+    ['payment', 'paymentPricing'],
     ['dental_images', 'dentalImages'],
     ['general_images', 'generalImages'],
     ['radiology_report', 'radiologyReport'],
@@ -26,7 +26,7 @@ test('každý informačný zámer je priradený k správnej ElevenLabs nahrávke
     ['retrospective_image', 'retrospectiveImage'],
     ['contact', 'contact'],
     ['email_repeat', 'emailRepeat'],
-    ['pricing', 'pricing'],
+    ['pricing', 'paymentPricing'],
     ['medical_advice', 'medicalAdvice'],
   ];
 
@@ -83,6 +83,17 @@ test('rozpozná viac informačných zámerov v jednej prirodzenej otázke', () =
     parseDentbodyIntents('Kde vás nájdem a môžem platiť kartou?'),
     ['address', 'payment']
   );
+});
+
+test('voľba päť a otázky na úhradu použijú spoločnú informáciu o platbe a cenníku', () => {
+  assert.deepEqual(parseDentbodyIntents('5'), ['payment']);
+  assert.deepEqual(parseDentbodyIntents('Ste zmluvná ambulancia?'), ['payment']);
+  assert.deepEqual(parseDentbodyIntents('Prepláca vyšetrenie zdravotná poisťovňa?'), ['payment']);
+  assert.deepEqual(parseDentbodyIntents('Dá sa platiť kartou a kde nájdem cenník?'), ['payment']);
+  assert.deepEqual(buildDentbodyResponse(['payment'], '5').audioKeys, ['paymentPricing']);
+  assert.deepEqual(buildDentbodyResponse(['pricing'], 'Kde nájdem cenník?').audioKeys, ['paymentPricing']);
+  assert.match(buildDentbodyAnswer(['payment'], '5'), /nezmluvné röntgenové ambulancie/);
+  assert.match(buildDentbodyAnswer(['pricing'], 'Kde nájdem cenník?'), /webovej stránke alebo v čakárni/);
 });
 
 test('pokrýva všetky schválené Dentbody informačné témy', () => {

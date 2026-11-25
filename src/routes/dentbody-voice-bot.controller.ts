@@ -26,7 +26,7 @@ const copy = {
   greeting: spoken('Dobrý deň, tu je röntgenové pracovisko na Fedinovej. Ako pomôžem?', 'greeting'),
   followUp: spoken('Môžem vám pomôcť ešte s niečím?', 'followUp'),
   continue: spoken('Nech sa páči, povedzte mi vašu otázku.', 'continue'),
-  retry: spoken('Prepáčte, otázke som nerozumela. Skúste ju prosím povedať ešte raz. Pre ordinačné hodiny stlačte jednotku. Pre objednanie a žiadanku dvojku. Pre snímky a výsledky trojku. Pre adresu a kontakt štvorku.', 'retry'),
+  retry: spoken('Prepáčte, otázke som nerozumela. Skúste ju prosím povedať ešte raz. Pre ordinačné hodiny stlačte jednotku. Pre objednanie a žiadanku dvojku. Pre snímky a výsledky trojku. Pre adresu a kontakt štvorku. Pre platbu a cenník päťku.', 'retry'),
   fallback: spoken('Túto informáciu nemám spoľahlivo potvrdenú. Napíšte prosím na ambulancia bodka er té gé zavináč dentbodyxray bodka es ká. Ďakujem a dovidenia.', 'fallback'),
   closing: spoken('Ďakujem za zavolanie. Prajem vám príjemný zvyšok dňa. Dovidenia.', 'closing'),
   expired: spoken('Hovor sa nepodarilo dokončiť. Zavolajte prosím znova. Dovidenia.', 'expired'),
@@ -106,7 +106,7 @@ function renderPrompt(
     speechTimeout: 1,
     language: 'sk-SK',
     numDigits: 1,
-    hints: 'ordinačné hodiny, otvorené, objednať sa, žiadanka, výmenný lístok, platba kartou, adresa, kde sa nachádza ambulancia, kde vás nájdem, na ktorom poschodí, kam mám ísť, Fedinova, Petržalka, snímka, výsledok, popis, cenník, deti, imobilný pacient',
+    hints: 'ordinačné hodiny, otvorené, objednať sa, žiadanka, výmenný lístok, platba kartou, platba v hotovosti, priama platba, nezmluvná ambulancia, zdravotná poisťovňa, adresa, kde sa nachádza ambulancia, kde vás nájdem, na ktorom poschodí, kam mám ísť, Fedinova, Petržalka, snímka, výsledok, popis, cenník, deti, imobilný pacient',
   } as any);
   twiml.redirect('/voice/dentbody/prompt');
   return reply.type('text/xml').send(twiml.toString());

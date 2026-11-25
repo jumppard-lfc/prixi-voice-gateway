@@ -80,6 +80,7 @@ export function parseDentbodyIntents(value: string): DentbodyIntent[] {
     '2': ['appointment', 'referral'],
     '3': ['dental_images', 'general_images', 'radiology_report'],
     '4': ['address', 'contact'],
+    '5': ['payment'],
   };
   if (digitMap[text]) return digitMap[text];
 
@@ -110,7 +111,7 @@ export function parseDentbodyIntents(value: string): DentbodyIntent[] {
     || /(fedinov|petrzalk|zdravotn.*stredisk)/.test(text));
   if (asksForAddress) intents.push('address');
   add('patients', /(diet|deti|dosp|imobil|vozick|pacientov prijimate|pre koho)/);
-  add('payment', /(plat|kart|hotovost|cash|terminal)/);
+  add('payment', /(plat|kart|hotovost|cash|terminal|zmluv|poistovn|preplac)/);
   add('certificate', /(potvrden|priepust|zamestnavatel|uhrada.*vysetren|doklad)/);
   add('radiology_report', /(popis|radiolog|nale[zž]|vysled|12.*24|dvanast.*dvadsatstyri)/);
   add('dental_images', /(zubn|opan|opg|panoram).*\b(snim|rtg|r[eo]ntgen|fotopapier|email|mail|cede|cd)|\b(snim|rtg|r[eo]ntgen).*\b(zubn|opan|opg|panoram)/);
@@ -147,6 +148,12 @@ export function parseDentbodyIntents(value: string): DentbodyIntent[] {
     )
   ) {
     intents.push('dental_images', 'general_images');
+  }
+
+  // Payment and pricing now share one approved answer and one recording.
+  // Keep only one intent so a combined question never plays it twice.
+  if (intents.includes('payment') && intents.includes('pricing')) {
+    return intents.filter(intent => intent !== 'pricing');
   }
 
   return intents;
@@ -318,7 +325,7 @@ const answers: Record<Exclude<DentbodyIntent, 'office_hours'>, string> = {
   floor: 'RTG ambulancie nájdete na prvom poschodí Zdravotného strediska FEDINOVA na Fedinovej 9 v Bratislave, v Petržalke.',
   referral: 'Prijímame pacientov aj bez žiadanky alebo výmenného lístka.',
   patients: 'Vyšetrujeme deti, dospelých aj imobilných pacientov.',
-  payment: 'Za RTG vyšetrenie môžete zaplatiť kartou alebo v hotovosti.',
+  payment: 'Zatiaľ sme nezmluvné röntgenové ambulancie. Vyšetrujeme na priamu platbu, v hotovosti alebo kartou. Cenník röntgenových výkonov nájdete na našej webovej stránke alebo v čakárni.',
   dental_images: 'Zubné RTG snímky vyhotovujeme na cédečko, fotopapier alebo ich bezplatne posielame e-mailom pacientovi či lekárovi.',
   general_images: 'Snímky zo všeobecného RTG vyhotovujeme iba na cédečko.',
   radiology_report: 'K všeobecnému RTG vyšetreniu poskytujeme popis snímky od rádiológa najneskôr do dvanástich až dvadsiatich štyroch hodín. Bezplatne ho môžeme poslať e-mailom pacientovi alebo lekárovi.',
@@ -326,7 +333,7 @@ const answers: Record<Exclude<DentbodyIntent, 'office_hours'>, string> = {
   retrospective_image: 'Ak potrebujete snímku poslať spätne, napíšte na e-mail ambulancia bodka er té gé zavináč dentbodyxray bodka es ká. Uveďte meno, priezvisko a rodné číslo pacienta. Tieto údaje mi prosím nehovorte telefonicky.',
   contact: 'Webová stránka je vé vé vé bodka dentbodyxray bodka es ká. E-mail je ambulancia bodka er té gé zavináč dentbodyxray bodka es ká.',
   email_repeat: 'E-mail je ambulancia bodka er té gé zavináč dentbodyxray bodka es ká.',
-  pricing: 'Presný cenník zatiaľ nemám k dispozícii. Informáciu o cene si prosím overte e-mailom na ambulancia bodka er té gé zavináč dentbodyxray bodka es ká.',
+  pricing: 'Zatiaľ sme nezmluvné röntgenové ambulancie. Vyšetrujeme na priamu platbu, v hotovosti alebo kartou. Cenník röntgenových výkonov nájdete na našej webovej stránke alebo v čakárni.',
   medical_advice: 'Neviem určiť, ktorý typ RTG vyšetrenia potrebujete. Overte si to prosím u svojho ošetrujúceho lekára.',
 };
 
@@ -336,7 +343,7 @@ const answerAudioKeys: Record<Exclude<DentbodyIntent, 'office_hours'>, DentbodyA
   floor: 'floor',
   referral: 'referral',
   patients: 'patients',
-  payment: 'payment',
+  payment: 'paymentPricing',
   dental_images: 'dentalImages',
   general_images: 'generalImages',
   radiology_report: 'radiologyReport',
@@ -344,7 +351,7 @@ const answerAudioKeys: Record<Exclude<DentbodyIntent, 'office_hours'>, DentbodyA
   retrospective_image: 'retrospectiveImage',
   contact: 'contact',
   email_repeat: 'emailRepeat',
-  pricing: 'pricing',
+  pricing: 'paymentPricing',
   medical_advice: 'medicalAdvice',
 };
 
