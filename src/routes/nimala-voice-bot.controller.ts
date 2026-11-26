@@ -67,6 +67,7 @@ const copy = {
   prescriptionDetail: spoken('Ďakujem. Povedzte, prosím, názov lieku, jeho silu a počet balení.', 'prescriptionDetail'),
   resultsDetail: spoken('Ďakujem. Povedzte, prosím, o aké výsledky ide a približný dátum vyšetrenia.', 'resultsDetail'),
   retry: spoken('Prepáčte, nerozumela som. Skúste to, prosím, ešte raz.', 'retry'),
+  nameRetry: dynamicSpoken('Prepáčte, meno som nezachytila celé. Povedzte, prosím, ešte raz svoje meno a priezvisko.'),
   selectDifferentSlot: spoken('Rozumiem. Vyberte si, prosím, iný termín.', 'selectDifferentSlot'),
   slotBecameUnavailable: spoken('Tento termín sa medzitým obsadil. Pozrime sa na ďalšie voľné možnosti.', 'slotBecameUnavailable'),
   transferStart: spoken('Rozumiem. Prepájam vás na pracovníka kliniky. Prosím, zostaňte na linke.', 'transferStart'),
@@ -318,26 +319,29 @@ function hintsFor(session: NimalaSession): string {
 async function renderPrompt(
   reply: FastifyReply,
   session: NimalaSession,
-  prefix?: NimalaSpokenResponse
+  prefix?: NimalaSpokenResponse,
+  appendCurrentPrompt = true
 ): Promise<FastifyReply> {
   nimalaSessionService.save(session);
   const twiml = new VoiceResponse();
   const menuStep = ['intent', 'main_menu', 'appointment_type', 'slot', 'booking_confirmation', 'existing_booking', 'reschedule_slot', 'reschedule_confirmation', 'cancel_confirmation'].includes(session.step);
   const shortAnswerStep = menuStep || session.step === 'birth_year';
+  const speechTimeout = shortAnswerStep ? 'auto' : session.step === 'name' ? 2 : 1;
   // Put the prompt inside Gather so Twilio can stop it and process the caller's
   // speech or DTMF immediately (barge-in), without waiting for playback to end.
   const gather = twiml.gather({
     input: ['speech', 'dtmf'],
+    bargeIn: true,
     action: '/voice/nimala/answer',
     method: 'POST',
     timeout: shortAnswerStep ? 4 : 6,
-    speechTimeout: shortAnswerStep ? 'auto' : 1,
+    speechTimeout,
     language: 'sk-SK',
     hints: hintsFor(session),
     ...(menuStep ? { numDigits: 1 } : {}),
   } as any);
   if (prefix) await appendSpoken(gather, reply.request, prefix);
-  await appendSpoken(gather, reply.request, promptFor(session));
+  if (appendCurrentPrompt) await appendSpoken(gather, reply.request, promptFor(session));
   twiml.redirect('/voice/nimala/prompt');
   return reply.type('text/xml').send(twiml.toString());
 }
@@ -727,6 +731,7 @@ async function retryOrHandoff(
 ): Promise<FastifyReply> {
   session.attempts += 1;
   if (session.attempts >= 2) return handoffToHuman(fastify, reply, session);
+  if (session.step === 'name') return renderPrompt(reply, session, copy.nameRetry, false);
   return renderPrompt(reply, session, copy.retry);
 }
 
@@ -930,6 +935,16 @@ export async function nimalaVoiceBotRoutes(fastify: FastifyInstance): Promise<vo
     const body = request.body as Record<string, string>;
     const session = nimalaSessionService.get(body.CallSid);
     if (!session) return renderEnd(reply, copy.expired);
+    const speechResult = (body.SpeechResult || '').trim();
+    const parsedConfidence = body.Confidence ? Number.parseFloat(body.Confidence) : undefined;
+    fastify.log.info({
+      callSid: session.callSid,
+      step: session.step,
+      inputType: body.Digits ? 'dtmf' : speechResult ? 'speech' : 'empty',
+      digits: body.Digits || undefined,
+      speechWordCount: speechResult ? speechResult.split(/\s+/).length : 0,
+      confidence: parsedConfidence !== undefined && Number.isFinite(parsedConfidence) ? parsedConfidence : undefined,
+    }, 'Nimala Gather result received');
     const answer = answerFrom(request);
     if (!answer) return retryOrHandoff(fastify, reply, session);
     session.answers.push({ step: session.step, text: answer });

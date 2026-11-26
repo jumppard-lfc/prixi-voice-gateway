@@ -185,6 +185,7 @@ test('produkčný endpoint routuje autoritatívny Nimala DID aj pri cudzom Forwa
   assert.match(response.body, /<Gather[^>]*>[\s\S]*<(?:Say|Play)>/);
   assert.doesNotMatch(response.body, /<\/(?:Say|Play)><Gather/);
   assert.match(response.body, /action="\/voice\/nimala\/answer"/);
+  assert.match(response.body, /bargeIn="true"/);
   assert.match(response.body, /timeout="4"/);
   assert.match(response.body, /speechTimeout="auto"/);
   assert.doesNotMatch(response.body, /Vadkerti/);
@@ -243,8 +244,9 @@ test('preventívna prehliadka sa rezervuje iba po výbere a výslovnom potvrden�
   assert.match(namePrompt.body, /Ďakujem, rozumiem\. Len to ešte pre istotu zhrniem/);
   assert.match(namePrompt.body, /Vybraný typ vyšetrenia je Preventívna prehliadka/);
   assert.match(namePrompt.body, /sedemnásteho novembra, o desiatej tridsať/);
+  assert.match(namePrompt.body, /bargeIn="true"/);
   assert.match(namePrompt.body, /timeout="6"/);
-  assert.match(namePrompt.body, /speechTimeout="1"/);
+  assert.match(namePrompt.body, /speechTimeout="2"/);
   const confirmation = await answer(callSid, 'Ján Novák');
   assert.match(confirmation.body, /Ďakujem\. Prosím, potvrďte rezerváciu/);
   assert.match(confirmation.body, /voice="Google\.sk-SK-Wavenet-B"/);
@@ -269,6 +271,22 @@ test('preventívna prehliadka sa rezervuje iba po výbere a výslovnom potvrden�
   assert.equal(bookingInputs[0].metadata.externalReference, callSid);
   assert.match(bookingInputs[0].idempotencyKey, /^[0-9a-f-]{36}$/i);
   assert.equal(sentEvents.length, 0);
+});
+
+test('neúplné meno sa zopakuje bez opätovného čítania zhrnutia rezervácie', async () => {
+  const callSid = 'CA-NIMALA-NAME-RETRY-000000000000001';
+  await incoming(callSid);
+  await answer(callSid, 'Chcem preventívnu prehliadku na urológii');
+  await answer(callSid, 'dva');
+
+  const retry = await answer(callSid, 'Matej');
+
+  assert.match(retry.body, /meno som nezachytila celé/);
+  assert.match(retry.body, /ešte raz svoje meno a priezvisko/);
+  assert.doesNotMatch(retry.body, /Len to ešte pre istotu zhrniem/);
+  assert.doesNotMatch(retry.body, /Vybraný typ vyšetrenia/);
+  assert.match(retry.body, /bargeIn="true"/);
+  assert.match(retry.body, /speechTimeout="2"/);
 });
 
 test('pacient si môže nechať zopakovať voľné termíny a potom pokračovať výberom', async () => {
