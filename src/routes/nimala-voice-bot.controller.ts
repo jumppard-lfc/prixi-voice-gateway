@@ -20,8 +20,10 @@ import {
   parseNimalaDepartment,
   parseNimalaMainMenu,
   parseNimalaName,
+  parseNimalaChoice,
   parseNimalaSlotChoice,
   parseNimalaYesNo,
+  isNimalaRepeatSlotsRequest,
   normalizeNimalaSpeech,
   NimalaDepartment,
 } from '../services/nimala-nlu.service';
@@ -30,6 +32,7 @@ import {
   CreatePrixiBookingInput,
   PrixiCalendarService,
   PrixiCalendarSlot,
+  PrixiPatientBooking,
   prixiCalendarService,
 } from '../services/prixi-calendar.service';
 import { prixiService } from '../services/prixi.service';
@@ -57,7 +60,7 @@ function dynamicSpoken(text: string): NimalaSpokenResponse {
 
 const copy = {
   greeting: spoken('Dobrý deň, som PriXi, virtuálna asistentka kliniky Nimala. V tejto demo verzii vám viem pomôcť s urologickou ambulanciou. Povedzte mi, prosím, kvôli čomu voláte. Ak voláte kvôli inému odboru, povedzte jeho názov.', 'greeting'),
-  urologyMenu: spoken('Rozumiem, ide o urológiu. Potrebujete sa objednať, požiadať o e-recept, informovať sa o výsledkoch, alebo hovoriť s človekom?', 'urologyMenu'),
+  urologyMenu: dynamicSpoken('Rozumiem, ide o urológiu. Potrebujete sa objednať, zmeniť alebo zrušiť termín, požiadať o e-recept, informovať sa o výsledkoch, alebo hovoriť s človekom?'),
   appointmentType: spoken('Rozumiem, rada vám pomôžem s objednaním. Vyberte si, prosím, typ vyšetrenia. Pre VIP termín urológia stlačte jednotku. Pre preventívnu prehliadku dvojku. Pre konzultáciu trojku. Pre kontrolu po operácii štvorku. Pre konzultáciu k operácii prostaty vodnou parou päťku. Pre U F M stlačte šestku.', 'appointmentType'),
   name: spoken('Ďakujem. Povedzte, prosím, svoje meno a priezvisko.', 'askName'),
   birthYear: spoken('Ďakujem. Povedzte, prosím, svoj rok narodenia.', 'askBirthYear'),
@@ -84,10 +87,16 @@ const copy = {
   startupTechnical: spoken('Momentálne máme technické problémy. Skúste, prosím, zavolať neskôr. Ďakujem za pochopenie a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'startupTechnical'),
   bookingStatusUncertain: spoken('Výsledok rezervácie sa mi nepodarilo spoľahlivo overiť. Aby nevznikla duplicitná rezervácia, požiadavku preverí personál kliniky a bude vás kontaktovať. Ďakujem a prajem vám ešte príjemný zvyšok dňa. Dovidenia.', 'bookingStatusUncertain'),
   noSlotInSession: spoken('Momentálne som nenašla žiadny voľný termín.', 'noSlotInSession'),
+  patientVerificationFailed: dynamicSpoken('Z tohto telefónneho čísla sa mi nepodarilo pacienta jednoznačne overiť. Vašu požiadavku odovzdám personálu kliniky, ktorý vás bude kontaktovať. Ďakujem a prajem vám ešte príjemný zvyšok dňa. Dovidenia.'),
+  noUpcomingBookings: dynamicSpoken('Pre toto telefónne číslo som nenašla žiadnu budúcu rezerváciu, ktorú by bolo možné zmeniť alebo zrušiť. Vašu požiadavku odovzdám personálu kliniky. Ďakujem a prajem vám ešte príjemný zvyšok dňa. Dovidenia.'),
+  managementFailed: dynamicSpoken('Zmenu rezervácie sa momentálne nepodarilo bezpečne dokončiť. Vašu požiadavku odovzdám personálu kliniky, ktorý ju preverí. Ďakujem a prajem vám ešte príjemný zvyšok dňa. Dovidenia.'),
+  cancellationDeclined: dynamicSpoken('Rozumiem. Rezerváciu som nezrušila. Ďakujem a prajem vám ešte príjemný zvyšok dňa. Dovidenia.'),
 };
 
 const requestLabels: Record<NimalaRequestType, string> = {
   appointment: 'objednanie na vyšetrenie',
+  reschedule: 'zmena termínu',
+  cancel: 'zrušenie termínu',
   prescription: 'žiadosť o e-recept',
   results: 'informácie o výsledkoch vyšetrenia',
   human: 'žiadosť o spojenie s človekom',
@@ -196,16 +205,50 @@ function bookingConfirmation(session: NimalaSession): NimalaSpokenResponse {
   return dynamicSpoken(`Ďakujem. Prosím, potvrďte rezerváciu: ${service}${duration ? ` v trvaní ${spokenCardinal(duration)} minút` : ''}, ${slot}, u lekára ${doctor}. Ak sú údaje správne, povedzte áno alebo stlačte jednotku. Ak chcete vybrať iný termín, povedzte nie alebo stlačte dvojku.`);
 }
 
+function selectedSlotSummary(session: NimalaSession): NimalaSpokenResponse {
+  if (!session.selectedSlot || !session.appointmentType) return copy.name;
+  const service = appointmentLabels[session.appointmentType];
+  const doctor = session.selectedSlot.calendarName || 'MUDr. Dávid Anovčin';
+  return dynamicSpoken(`Ďakujem, rozumiem. Len to ešte pre istotu zhrniem. Vybraný typ vyšetrenia je ${service}. Termín je ${formatNimalaSlotForSpeech(session.selectedSlot)}, u lekára ${doctor}. Pred potvrdením rezervácie mi ešte povedzte svoje meno a priezvisko.`);
+}
+
+function managedBookingName(booking: PrixiPatientBooking): string {
+  return booking.serviceName || 'urologické vyšetrenie';
+}
+
+function existingBookingOffer(session: NimalaSession): NimalaSpokenResponse {
+  const bookings = session.offeredBookings || [];
+  const optionNames = ['jedna', 'dva', 'tri'];
+  return dynamicSpoken(`Našla som tieto budúce rezervácie. ${bookings.map((booking, index) => `Možnosť ${optionNames[index] || index + 1}. ${managedBookingName(booking)}, ${formatNimalaSlotForSpeech(booking)}, u lekára ${booking.calendarName || 'ambulancie'}.`).join(' ')} Povedzte číslo rezervácie, ktorú chcete ${session.requestType === 'cancel' ? 'zrušiť' : 'zmeniť'}, alebo ho stlačte na klávesnici.`);
+}
+
+function rescheduleConfirmation(session: NimalaSession): NimalaSpokenResponse {
+  const original = session.selectedBooking;
+  const replacement = session.selectedSlot;
+  if (!original || !replacement) return copy.technical;
+  return dynamicSpoken(`Ďakujem, rozumiem. Len to ešte pre istotu zhrniem. Pôvodný termín je ${formatNimalaSlotForSpeech(original)}. Nový termín je ${formatNimalaSlotForSpeech(replacement)}, u lekára ${replacement.calendarName || original.calendarName || 'ambulancie'}. Potvrďte, prosím, zmenu rezervácie slovom áno alebo stlačením jednotky. Ak chcete vybrať iný termín, povedzte nie alebo stlačte dvojku.`);
+}
+
+function cancellationConfirmation(session: NimalaSession): NimalaSpokenResponse {
+  const booking = session.selectedBooking;
+  if (!booking) return copy.technical;
+  return dynamicSpoken(`Prosím, potvrďte zrušenie rezervácie: ${managedBookingName(booking)}, ${formatNimalaSlotForSpeech(booking)}, u lekára ${booking.calendarName || 'ambulancie'}. Ak ju chcete naozaj zrušiť, povedzte áno alebo stlačte jednotku. Ak ju nechcete zrušiť, povedzte nie alebo stlačte dvojku.`);
+}
+
 function promptFor(session: NimalaSession): NimalaSpokenResponse {
   switch (session.step) {
     case 'intent': return copy.greeting;
     case 'main_menu': return copy.urologyMenu;
     case 'appointment_type': return copy.appointmentType;
     case 'slot': return slotOffer(session);
-    case 'name': return copy.name;
+    case 'name': return session.requestType === 'appointment' ? selectedSlotSummary(session) : copy.name;
     case 'birth_year': return copy.birthYear;
     case 'detail': return session.requestType === 'prescription' ? copy.prescriptionDetail : copy.resultsDetail;
     case 'booking_confirmation': return bookingConfirmation(session);
+    case 'existing_booking': return existingBookingOffer(session);
+    case 'reschedule_slot': return slotOffer(session);
+    case 'reschedule_confirmation': return rescheduleConfirmation(session);
+    case 'cancel_confirmation': return cancellationConfirmation(session);
   }
 }
 
@@ -224,7 +267,7 @@ function hasAudioFiles(audioKeys: NimalaAudioKey[]): boolean {
 }
 
 async function appendSpoken(
-  twiml: InstanceType<typeof VoiceResponse>,
+  twiml: { play(url: string): unknown; say(options: any, text: string): unknown },
   request: FastifyRequest,
   content: NimalaSpokenResponse
 ): Promise<void> {
@@ -255,15 +298,18 @@ async function appendSpoken(
 
 function hintsFor(session: NimalaSession): string {
   if (session.step === 'intent' || session.step === 'main_menu') {
-    return 'objednať sa, rezervovať termín, preventívna prehliadka, konzultácia, e-recept, predpísať liek, výsledky vyšetrenia, urológia, estetika, sonografia, proktológia, dermatológia, hovoriť s človekom';
+    return 'objednať sa, rezervovať termín, zmeniť termín, presunúť termín, preobjednať, zrušiť termín, stornovať rezerváciu, preventívna prehliadka, konzultácia, e-recept, predpísať liek, výsledky vyšetrenia, urológia, estetika, sonografia, proktológia, dermatológia, hovoriť s človekom';
   }
   if (session.step === 'appointment_type') {
     return 'VIP termín urológia, preventívna prehliadka, konzultácia, kontrola po operácii, operácia prostaty vodnou parou, UFM, uroflowmetria, jedna, dva, tri, štyri, päť, šesť';
   }
-  if (session.step === 'slot') {
-    return 'možnosť jedna, možnosť dva, možnosť tri, prvý termín, druhý termín, tretí termín, jedna, dva, tri';
+  if (session.step === 'slot' || session.step === 'reschedule_slot') {
+    return 'možnosť jedna, možnosť dva, možnosť tri, prvý termín, druhý termín, tretí termín, jedna, dva, tri, zopakujte termíny, zopakovať možnosti, ešte raz, znova';
   }
-  if (session.step === 'booking_confirmation') {
+  if (session.step === 'existing_booking') {
+    return 'možnosť jedna, možnosť dva, možnosť tri, prvá rezervácia, druhá rezervácia, tretia rezervácia, jedna, dva, tri';
+  }
+  if (session.step === 'booking_confirmation' || session.step === 'reschedule_confirmation' || session.step === 'cancel_confirmation') {
     return 'áno, súhlasím, potvrdzujem, správne, platí, nie, iný termín, zmeniť termín';
   }
   return '';
@@ -276,13 +322,11 @@ async function renderPrompt(
 ): Promise<FastifyReply> {
   nimalaSessionService.save(session);
   const twiml = new VoiceResponse();
-  const menuStep = ['intent', 'main_menu', 'appointment_type', 'slot', 'booking_confirmation'].includes(session.step);
+  const menuStep = ['intent', 'main_menu', 'appointment_type', 'slot', 'booking_confirmation', 'existing_booking', 'reschedule_slot', 'reschedule_confirmation', 'cancel_confirmation'].includes(session.step);
   const shortAnswerStep = menuStep || session.step === 'birth_year';
-  // As in the Dentbody flow, finish speaking before listening. This avoids
-  // capturing the bot's own prompt or ambient speech as the caller's answer.
-  if (prefix) await appendSpoken(twiml, reply.request, prefix);
-  await appendSpoken(twiml, reply.request, promptFor(session));
-  twiml.gather({
+  // Put the prompt inside Gather so Twilio can stop it and process the caller's
+  // speech or DTMF immediately (barge-in), without waiting for playback to end.
+  const gather = twiml.gather({
     input: ['speech', 'dtmf'],
     action: '/voice/nimala/answer',
     method: 'POST',
@@ -292,6 +336,8 @@ async function renderPrompt(
     hints: hintsFor(session),
     ...(menuStep ? { numDigits: 1 } : {}),
   } as any);
+  if (prefix) await appendSpoken(gather, reply.request, prefix);
+  await appendSpoken(gather, reply.request, promptFor(session));
   twiml.redirect('/voice/nimala/prompt');
   return reply.type('text/xml').send(twiml.toString());
 }
@@ -393,10 +439,161 @@ async function continueWithAppointmentType(
   }
 }
 
+async function loadRescheduleSlots(session: NimalaSession): Promise<boolean> {
+  const booking = session.selectedBooking;
+  if (!booking) return false;
+  const now = DateTime.now().setZone(nimalaBotConfig.clinic.timezone);
+  const slots = await prixiCalendarService.getAvailableSlots({
+    clinicId: Number(session.clinicId),
+    eventTypeUid: booking.eventTypeUid,
+    from: now.toISODate()!,
+    to: now.plus({ days: nimalaBotConfig.booking.availabilityDays }).toISODate()!,
+    limit: 30,
+  });
+  const unique = new Map(
+    slots
+      .filter(slot => slot.startAt !== booking.startAt || slot.calendarId !== booking.calendarId)
+      .map(slot => [`${slot.startAt}:${slot.calendarId}`, slot])
+  );
+  session.eventTypeUid = booking.eventTypeUid;
+  session.offeredSlots = [...unique.values()].slice(0, nimalaBotConfig.booking.offeredSlotCount);
+  session.selectedSlot = undefined;
+  return session.offeredSlots.length > 0;
+}
+
+async function continueWithManagedBooking(
+  fastify: FastifyInstance,
+  reply: FastifyReply,
+  session: NimalaSession,
+  booking: PrixiPatientBooking
+): Promise<FastifyReply> {
+  session.selectedBooking = booking;
+  session.attempts = 0;
+  if (session.requestType === 'cancel') {
+    session.step = 'cancel_confirmation';
+    return renderPrompt(reply, session);
+  }
+  try {
+    const hasSlots = await loadRescheduleSlots(session);
+    if (!hasSlots) return callbackFallback(fastify, reply, session, copy.noFreeSlot);
+    session.step = 'reschedule_slot';
+    return renderPrompt(reply, session);
+  } catch (error) {
+    fastify.log.error(error, 'Failed to load Nimala reschedule availability');
+    return callbackFallback(fastify, reply, session, copy.technical);
+  }
+}
+
+async function beginBookingManagement(
+  fastify: FastifyInstance,
+  reply: FastifyReply,
+  session: NimalaSession,
+  requestType: 'reschedule' | 'cancel'
+): Promise<FastifyReply> {
+  session.requestType = requestType;
+  session.attempts = 0;
+  const verification = await prixiCalendarService.verifyPatient({
+    clinicId: Number(session.clinicId),
+    phone: normalizePhone(session.phone),
+  });
+  if (verification.status !== 'verified') {
+    fastify.log.warn({
+      callSid: session.callSid,
+      verificationStatus: verification.status,
+      httpStatus: verification.httpStatus,
+      apiCode: verification.code,
+    }, 'Nimala patient verification did not succeed');
+    const message = verification.status === 'uncertain' || verification.status === 'failed'
+      ? copy.technical
+      : copy.patientVerificationFailed;
+    return callbackFallback(fastify, reply, session, message);
+  }
+  session.patientVerificationToken = verification.verificationToken;
+
+  const listed = await prixiCalendarService.listPatientBookings(
+    Number(session.clinicId),
+    verification.verificationToken
+  );
+  if (listed.status !== 'ok') {
+    fastify.log.warn({
+      callSid: session.callSid,
+      listStatus: listed.status,
+      httpStatus: listed.httpStatus,
+      apiCode: listed.code,
+    }, 'Nimala patient bookings could not be loaded');
+    return callbackFallback(
+      fastify,
+      reply,
+      session,
+      listed.status === 'verification_failed' ? copy.patientVerificationFailed : copy.technical
+    );
+  }
+  if (!listed.bookings.length) return callbackFallback(fastify, reply, session, copy.noUpcomingBookings);
+
+  let serviceNames = new Map<string, string>();
+  try {
+    const services = await prixiCalendarService.listServices(Number(session.clinicId));
+    serviceNames = new Map(services.map(service => [service.eventTypeUid, service.name]));
+  } catch (error) {
+    fastify.log.warn(error, 'Nimala service names could not be loaded for managed bookings');
+  }
+  session.offeredBookings = listed.bookings.slice(0, 3).map(booking => ({
+    ...booking,
+    serviceName: booking.serviceName || serviceNames.get(booking.eventTypeUid),
+  }));
+  if (session.offeredBookings.length === 1) {
+    return continueWithManagedBooking(fastify, reply, session, session.offeredBookings[0]);
+  }
+  session.step = 'existing_booking';
+  return renderPrompt(reply, session);
+}
+
+async function continueWithRequestType(
+  fastify: FastifyInstance,
+  reply: FastifyReply,
+  session: NimalaSession,
+  requestType: NimalaRequestType,
+  originalAnswer?: string
+): Promise<FastifyReply> {
+  session.requestType = requestType;
+  session.attempts = 0;
+  if (requestType === 'human') return handoffToHuman(fastify, reply, session);
+  if (requestType === 'reschedule' || requestType === 'cancel') {
+    return beginBookingManagement(fastify, reply, session, requestType);
+  }
+  if (requestType === 'appointment') {
+    const appointmentType = originalAnswer ? parseNimalaAppointmentType(originalAnswer) : undefined;
+    if (appointmentType) return continueWithAppointmentType(fastify, reply, session, appointmentType);
+    session.step = 'appointment_type';
+    return renderPrompt(reply, session);
+  }
+  session.step = 'name';
+  return renderPrompt(reply, session);
+}
+
 function requestSummary(session: NimalaSession): string {
   if (session.requestType === 'prescription') return `Pacient žiada e-recept: ${session.detail || 'detail nebol dokončený'}.`;
   if (session.requestType === 'results') return `Pacient žiada informácie o výsledkoch: ${session.detail || 'detail nebol dokončený'}.`;
   if (session.requestType === 'human') return 'Pacient žiada telefonický kontakt s človekom.';
+  if (session.requestType === 'reschedule') {
+    const original = session.selectedBooking ? formatSlot(session.selectedBooking) : 'pôvodná rezervácia nebola vybraná';
+    const replacement = session.selectedSlot ? formatSlot(session.selectedSlot) : 'nový termín nebol vybraný';
+    const state = session.managementStatus === 'rescheduled'
+      ? 'Termín bol úspešne zmenený.'
+      : session.managementStatus === 'uncertain'
+        ? 'Výsledok zmeny sa nepodarilo spoľahlivo overiť.'
+        : 'Zmenu termínu sa nepodarilo dokončiť; požiadavka bola odovzdaná personálu.';
+    return `Pacient žiada zmenu termínu z ${original} na ${replacement}. ${state}`;
+  }
+  if (session.requestType === 'cancel') {
+    const booking = session.selectedBooking ? formatSlot(session.selectedBooking) : 'rezervácia nebola vybraná';
+    const state = session.managementStatus === 'cancelled'
+      ? 'Rezervácia bola úspešne zrušená.'
+      : session.managementStatus === 'uncertain'
+        ? 'Výsledok zrušenia sa nepodarilo spoľahlivo overiť.'
+        : 'Zrušenie sa nepodarilo dokončiť; požiadavka bola odovzdaná personálu.';
+    return `Pacient žiada zrušenie termínu ${booking}. ${state}`;
+  }
   const service = session.appointmentType ? appointmentLabels[session.appointmentType] : 'nezistený typ vyšetrenia';
   const slot = session.selectedSlot ? formatSlot(session.selectedSlot) : 'termín nebol vybraný';
   const bookingState = session.bookingStatus === 'created'
@@ -593,6 +790,87 @@ async function confirmBooking(fastify: FastifyInstance, reply: FastifyReply, ses
   );
 }
 
+async function confirmReschedule(fastify: FastifyInstance, reply: FastifyReply, session: NimalaSession): Promise<FastifyReply> {
+  if (!session.selectedBooking || !session.selectedSlot || !session.patientVerificationToken) {
+    throw new Error('Incomplete Nimala reschedule session');
+  }
+  session.managementIdempotencyKey = session.managementIdempotencyKey || uuidv4();
+  const input = {
+    bookingId: session.selectedBooking.id,
+    clinicId: Number(session.clinicId),
+    calendarId: session.selectedSlot.calendarId,
+    eventTypeUid: session.selectedBooking.eventTypeUid,
+    startAt: session.selectedSlot.startAt,
+    verificationToken: session.patientVerificationToken,
+    idempotencyKey: session.managementIdempotencyKey,
+  };
+  let result = await prixiCalendarService.rescheduleBooking(input);
+  if (result.status === 'uncertain') result = await prixiCalendarService.rescheduleBooking(input);
+  if (result.status === 'rescheduled') {
+    session.managementStatus = 'rescheduled';
+    session.outcome = 'rescheduled';
+    session.endedAt = new Date().toISOString();
+    const doctor = result.booking.calendarName || session.selectedSlot.calendarName || 'ambulancie';
+    const emailMessage = result.emailNotification === 'sent'
+      ? ' Potvrdenie sme vám poslali e-mailom.'
+      : '';
+    const message = dynamicSpoken(`Termín na ${managedBookingName(session.selectedBooking)} bol úspešne zmenený na ${formatNimalaSlotForSpeech(result.booking)}, u lekára ${doctor}.${emailMessage} ${copy.farewell.text}`);
+    nimalaSessionService.delete(session.callSid);
+    return renderEnd(reply, message);
+  }
+  if (result.status === 'slot_unavailable') {
+    session.managementStatus = 'slot_unavailable';
+    const hasSlots = await loadRescheduleSlots(session);
+    if (hasSlots) {
+      session.step = 'reschedule_slot';
+      session.attempts = 0;
+      session.managementIdempotencyKey = undefined;
+      return renderPrompt(reply, session, copy.slotBecameUnavailable);
+    }
+  }
+  session.managementStatus = result.status === 'uncertain' ? 'uncertain' : 'failed';
+  fastify.log.warn({
+    callSid: session.callSid,
+    managementOperation: 'reschedule',
+    managementStatus: result.status,
+    httpStatus: 'httpStatus' in result ? result.httpStatus : undefined,
+    apiCode: 'code' in result ? result.code : undefined,
+  }, 'Nimala booking reschedule was not confirmed');
+  return callbackFallback(fastify, reply, session, copy.managementFailed);
+}
+
+async function confirmCancellation(fastify: FastifyInstance, reply: FastifyReply, session: NimalaSession): Promise<FastifyReply> {
+  if (!session.selectedBooking || !session.patientVerificationToken) {
+    throw new Error('Incomplete Nimala cancellation session');
+  }
+  session.managementIdempotencyKey = session.managementIdempotencyKey || uuidv4();
+  const input = {
+    bookingId: session.selectedBooking.id,
+    clinicId: Number(session.clinicId),
+    verificationToken: session.patientVerificationToken,
+    idempotencyKey: session.managementIdempotencyKey,
+  };
+  let result = await prixiCalendarService.cancelBooking(input);
+  if (result.status === 'uncertain') result = await prixiCalendarService.cancelBooking(input);
+  if (result.status === 'cancelled' || result.status === 'already_cancelled') {
+    session.managementStatus = 'cancelled';
+    session.outcome = 'cancelled';
+    session.endedAt = new Date().toISOString();
+    const message = dynamicSpoken(`Rezervácia na ${managedBookingName(session.selectedBooking)}, ${formatNimalaSlotForSpeech(session.selectedBooking)}, bola úspešne zrušená. ${copy.farewell.text}`);
+    nimalaSessionService.delete(session.callSid);
+    return renderEnd(reply, message);
+  }
+  session.managementStatus = result.status === 'uncertain' ? 'uncertain' : 'failed';
+  fastify.log.warn({
+    callSid: session.callSid,
+    managementOperation: 'cancel',
+    managementStatus: result.status,
+    httpStatus: 'httpStatus' in result ? result.httpStatus : undefined,
+    apiCode: 'code' in result ? result.code : undefined,
+  }, 'Nimala booking cancellation was not confirmed');
+  return callbackFallback(fastify, reply, session, copy.managementFailed);
+}
+
 export async function startNimalaVoiceBot(
   fastify: FastifyInstance,
   reply: FastifyReply,
@@ -614,7 +892,7 @@ export function finalizeAbandonedNimalaCall(
 ): boolean {
   const session = nimalaSessionService.get(callSid);
   if (!session) return false;
-  if (!hasMeaningfulRequest(session) || session.outcome === 'booked') {
+  if (!hasMeaningfulRequest(session) || ['booked', 'rescheduled', 'cancelled'].includes(session.outcome || '')) {
     nimalaSessionService.delete(callSid);
     return false;
   }
@@ -673,27 +951,13 @@ export async function nimalaVoiceBotRoutes(fastify: FastifyInstance): Promise<vo
         return retryOrHandoff(fastify, reply, session);
       }
 
-      session.requestType = requestType;
-      session.attempts = 0;
-      if (requestType === 'human') return handoffToHuman(fastify, reply, session);
-      if (requestType === 'appointment') {
-        const appointmentType = parseNimalaAppointmentType(answer);
-        if (appointmentType) return continueWithAppointmentType(fastify, reply, session, appointmentType);
-        session.step = 'appointment_type';
-        return renderPrompt(reply, session);
-      }
-      session.step = 'name';
-      return renderPrompt(reply, session);
+      return continueWithRequestType(fastify, reply, session, requestType, answer);
     }
 
     if (session.step === 'main_menu') {
       const requestType = parseNimalaMainMenu(answer);
       if (!requestType) return retryOrHandoff(fastify, reply, session);
-      session.requestType = requestType;
-      session.attempts = 0;
-      if (requestType === 'human') return handoffToHuman(fastify, reply, session);
-      session.step = requestType === 'appointment' ? 'appointment_type' : 'name';
-      return renderPrompt(reply, session);
+      return continueWithRequestType(fastify, reply, session, requestType);
     }
 
     if (session.step === 'appointment_type') {
@@ -702,7 +966,74 @@ export async function nimalaVoiceBotRoutes(fastify: FastifyInstance): Promise<vo
       return continueWithAppointmentType(fastify, reply, session, appointmentType);
     }
 
+    if (session.step === 'existing_booking') {
+      const index = parseNimalaChoice(answer, session.offeredBookings?.length || 0);
+      if (index === undefined) return retryOrHandoff(fastify, reply, session);
+      return continueWithManagedBooking(fastify, reply, session, session.offeredBookings![index]);
+    }
+
+    if (session.step === 'reschedule_slot') {
+      if (isNimalaRepeatSlotsRequest(answer)) {
+        session.attempts = 0;
+        return renderPrompt(reply, session);
+      }
+      const index = parseNimalaSlotChoice(answer, session.offeredSlots || []);
+      if (index === undefined) return retryOrHandoff(fastify, reply, session);
+      session.selectedSlot = session.offeredSlots![index];
+      session.attempts = 0;
+      session.managementIdempotencyKey = undefined;
+      session.step = 'reschedule_confirmation';
+      return renderPrompt(reply, session);
+    }
+
+    if (session.step === 'reschedule_confirmation') {
+      if (isNimalaRepeatSlotsRequest(answer)) {
+        session.step = 'reschedule_slot';
+        session.selectedSlot = undefined;
+        session.managementIdempotencyKey = undefined;
+        session.attempts = 0;
+        return renderPrompt(reply, session);
+      }
+      const confirmed = parseNimalaYesNo(answer);
+      if (confirmed === undefined) return retryOrHandoff(fastify, reply, session);
+      session.attempts = 0;
+      if (!confirmed) {
+        session.step = 'reschedule_slot';
+        session.selectedSlot = undefined;
+        session.managementIdempotencyKey = undefined;
+        return renderPrompt(reply, session, copy.selectDifferentSlot);
+      }
+      try {
+        return await confirmReschedule(fastify, reply, session);
+      } catch (error) {
+        session.managementStatus = 'failed';
+        fastify.log.error(error, 'Failed to reschedule Nimala booking');
+        return callbackFallback(fastify, reply, session, copy.managementFailed);
+      }
+    }
+
+    if (session.step === 'cancel_confirmation') {
+      const confirmed = parseNimalaYesNo(answer);
+      if (confirmed === undefined) return retryOrHandoff(fastify, reply, session);
+      session.attempts = 0;
+      if (!confirmed) {
+        nimalaSessionService.delete(session.callSid);
+        return renderEnd(reply, copy.cancellationDeclined);
+      }
+      try {
+        return await confirmCancellation(fastify, reply, session);
+      } catch (error) {
+        session.managementStatus = 'failed';
+        fastify.log.error(error, 'Failed to cancel Nimala booking');
+        return callbackFallback(fastify, reply, session, copy.managementFailed);
+      }
+    }
+
     if (session.step === 'slot') {
+      if (isNimalaRepeatSlotsRequest(answer)) {
+        session.attempts = 0;
+        return renderPrompt(reply, session);
+      }
       const index = parseNimalaSlotChoice(answer, session.offeredSlots || []);
       if (index === undefined) return retryOrHandoff(fastify, reply, session);
       session.selectedSlot = session.offeredSlots![index];
@@ -737,6 +1068,13 @@ export async function nimalaVoiceBotRoutes(fastify: FastifyInstance): Promise<vo
     }
 
     if (session.step === 'booking_confirmation') {
+      if (isNimalaRepeatSlotsRequest(answer)) {
+        session.step = 'slot';
+        session.selectedSlot = undefined;
+        session.bookingIdempotencyKey = undefined;
+        session.attempts = 0;
+        return renderPrompt(reply, session);
+      }
       const confirmed = parseNimalaYesNo(answer);
       if (confirmed === undefined) return retryOrHandoff(fastify, reply, session);
       session.attempts = 0;

@@ -1,5 +1,5 @@
 import { NimalaAppointmentType, NimalaRequestType } from '../config/nimala.config';
-import { PrixiCalendarSlot } from './prixi-calendar.service';
+import { PrixiCalendarSlot, PrixiPatientBooking } from './prixi-calendar.service';
 
 export type NimalaStep =
   | 'intent'
@@ -9,7 +9,11 @@ export type NimalaStep =
   | 'name'
   | 'birth_year'
   | 'detail'
-  | 'booking_confirmation';
+  | 'booking_confirmation'
+  | 'existing_booking'
+  | 'reschedule_slot'
+  | 'reschedule_confirmation'
+  | 'cancel_confirmation';
 
 export interface NimalaSession {
   callSid: string;
@@ -28,9 +32,14 @@ export interface NimalaSession {
   detail?: string;
   bookingIdempotencyKey?: string;
   bookingStatus?: 'created' | 'uncertain' | 'failed' | 'slot_unavailable';
+  patientVerificationToken?: string;
+  offeredBookings?: PrixiPatientBooking[];
+  selectedBooking?: PrixiPatientBooking;
+  managementIdempotencyKey?: string;
+  managementStatus?: 'rescheduled' | 'cancelled' | 'uncertain' | 'failed' | 'slot_unavailable';
   answers: Array<{ step: NimalaStep; text: string }>;
   attempts: number;
-  outcome?: 'booked' | 'completed' | 'abandoned' | 'handoff';
+  outcome?: 'booked' | 'rescheduled' | 'cancelled' | 'completed' | 'abandoned' | 'handoff';
   startedAt: string;
   endedAt?: string;
   expiresAt: number;

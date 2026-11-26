@@ -28,9 +28,21 @@ export function parseNimalaMainMenu(value: string): NimalaRequestType | undefine
   // Specific administrative intents must win over generic words such as
   // "vyšetrenie" (for example in "výsledky vyšetrenia").
   if (/^(0|nula)$/.test(text) || /(clovek|recepci|spojit|personal|sestra)/.test(text)) return 'human';
+  if (/^(5|pat|patka)$/.test(text) || ((/zrus|storn|odvol/.test(text)) && /(termin|rezerv|objednan)/.test(text))) return 'cancel';
+  if (/^(4|styri|stvorka)$/.test(text) || ((/zmen|presun|preloz|preobjed|prebook/.test(text)) && /(termin|rezerv|objednan)/.test(text))) return 'reschedule';
   if (/^(2|dva|dvojka)$/.test(text) || /(recept|predpis|liek)/.test(text)) return 'prescription';
   if (/^(3|tri|trojka)$/.test(text) || /vysled/.test(text)) return 'results';
   if (/^(1|jeden|jedna|jednotka)$/.test(text) || /(objedna|rezerv|termin|vysetren|prehliad|kontrol|konzult|ufm)/.test(text)) return 'appointment';
+  return undefined;
+}
+
+export function parseNimalaChoice(value: string, itemCount: number): number | undefined {
+  const text = normalizeNimalaSpeech(value);
+  const numeric = text.match(/(?:^|\s)([1-3])(?:\s|$)/)?.[1];
+  if (numeric && Number(numeric) <= itemCount) return Number(numeric) - 1;
+  if (/\b(jeden|jedna|jednotka|prv\p{L}*)\b/u.test(text) && itemCount >= 1) return 0;
+  if (/\b(dva|dvojka|druh\p{L}*)\b/u.test(text) && itemCount >= 2) return 1;
+  if (/\b(tri|trojka|tret\p{L}*)\b/u.test(text) && itemCount >= 3) return 2;
   return undefined;
 }
 
@@ -53,13 +65,12 @@ export function parseNimalaYesNo(value: string): boolean | undefined {
 }
 
 export function parseNimalaSlotChoice(value: string, slots: PrixiCalendarSlot[]): number | undefined {
+  return parseNimalaChoice(value, slots.length);
+}
+
+export function isNimalaRepeatSlotsRequest(value: string): boolean {
   const text = normalizeNimalaSpeech(value);
-  const numeric = text.match(/(?:^|\s)([1-3])(?:\s|$)/)?.[1];
-  if (numeric && slots[Number(numeric) - 1]) return Number(numeric) - 1;
-  if (/\b(jeden|jedna|jednotka|prv\p{L}*)\b/u.test(text) && slots[0]) return 0;
-  if (/\b(dva|dvojka|druh\p{L}*)\b/u.test(text) && slots[1]) return 1;
-  if (/\b(tri|trojka|tret\p{L}*)\b/u.test(text) && slots[2]) return 2;
-  return undefined;
+  return /(zopak|opakuj|znova|este raz|odznovu)/.test(text);
 }
 
 export function parseNimalaName(value: string): { firstName: string; lastName: string; fullName: string } | undefined {

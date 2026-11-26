@@ -1,4 +1,10 @@
-export type NimalaRequestType = 'appointment' | 'prescription' | 'results' | 'human';
+export type NimalaRequestType =
+  | 'appointment'
+  | 'reschedule'
+  | 'cancel'
+  | 'prescription'
+  | 'results'
+  | 'human';
 
 export type NimalaAppointmentType =
   | 'vip_urology'

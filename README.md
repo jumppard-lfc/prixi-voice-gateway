@@ -11,17 +11,23 @@ nastavte tieto `POST` callbacky:
 - terminal status callback: `/voice/call-status`
 
 PriXi sa v úvode stručne predstaví a otvorenou otázkou zistí dôvod volania.
-Prirodzenou odpoveďou rozpozná objednanie, recept, výsledky alebo žiadosť o
-človeka. Z odborov kliniky rozumie urológii, estetike, sonografii, proktológii
-a dermatológii. Iba urológia je v tejto demo verzii aktívna; pri inom odbore
-bot pomenuje zvolenú ambulanciu, oznámi obmedzenie a nevytvorí urologickú
-požiadavku.
+Prirodzenou odpoveďou rozpozná objednanie, zmenu alebo zrušenie termínu,
+recept, výsledky alebo žiadosť o človeka. Z odborov kliniky rozumie urológii,
+estetike, sonografii, proktológii a dermatológii. Iba urológia je v tejto demo
+verzii aktívna; pri inom odbore bot pomenuje zvolenú ambulanciu, oznámi
+obmedzenie a nevytvorí urologickú požiadavku.
 
-Urologický flow obsluhuje objednanie, e-recept a výsledky. Pri objednaní načíta aktuálny
-katalóg a dostupnosť cez PriXi Calendar API a rezerváciu vytvorí až po
-výslovnom potvrdení pacienta. Štandardne používa existujúce `PRIXI_API_URL` a
-`PRIXI_API_KEY`; `PRIXI_CALENDAR_API_URL` a `PRIXI_CALENDAR_API_TOKEN` sú iba
-voliteľné overrides pre samostatný Calendar server alebo token.
+Pri objednaní načíta aktuálny katalóg a dostupnosť cez PriXi Calendar API a
+rezerváciu vytvorí až po výslovnom potvrdení pacienta. Pri zmene alebo zrušení
+najprv overí pacienta podľa telefónneho čísla volajúceho, načíta jeho budúce
+rezervácie a mutáciu vykoná až po ďalšom výslovnom potvrdení. Ak je číslo
+nejednoznačné alebo API pacienta neoverí, bot neprezradí žiadnu rezerváciu a
+odovzdá požiadavku personálu. Pri úspešnom presune oznámi odoslanie e-mailu
+iba vtedy, keď Calendar API v odpovedi potvrdí stav `notification.email=sent`.
+
+Gateway štandardne používa existujúce `PRIXI_API_URL` a `PRIXI_API_KEY`;
+`PRIXI_CALENDAR_API_URL` a `PRIXI_CALENDAR_API_TOKEN` sú iba voliteľné
+overrides pre samostatný Calendar server alebo token.
 
 Voliteľné `NIMALA_HUMAN_TRANSFER_NUMBER` musí byť samostatné priame číslo na
 človeka. Gateway zámerne odmietne bot DID aj verejné číslo kliniky ako cieľ

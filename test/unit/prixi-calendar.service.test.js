@@ -135,3 +135,92 @@ test('Calendar klient zachová bezpečnú diagnostiku validačnej chyby', async 
   });
 });
 
+test('Calendar klient overí pacienta a načíta jeho budúce rezervácie s krátkodobým tokenom', async () => {
+  const calls = [];
+  const client = new PrixiCalendarServiceClient({
+    post: async (path, payload) => {
+      calls.push({ method: 'post', path, payload });
+      return { data: { success: true, verificationToken: 'verification-token', expiresIn: 600 } };
+    },
+    get: async (path, options) => {
+      calls.push({ method: 'get', path, options });
+      return { data: { success: true, bookings: [{
+        id: 456,
+        clinicId: 168,
+        calendarId: 7,
+        calendarName: 'MUDr. Dávid Anovčin',
+        eventTypeUid: 'preventive-exam',
+        startAt: '2026-11-23T09:00:00+01:00',
+        endAt: '2026-11-23T09:30:00+01:00',
+        durationMinutes: 30,
+        status: 'accepted',
+      }] } };
+    },
+  });
+
+  assert.deepEqual(await client.verifyPatient({ clinicId: 168, phone: '+421900000000' }), {
+    status: 'verified',
+    verificationToken: 'verification-token',
+    expiresIn: 600,
+  });
+  const listed = await client.listPatientBookings(168, 'verification-token');
+  assert.equal(listed.status, 'ok');
+  assert.equal(listed.bookings[0].id, 456);
+  assert.deepEqual(calls[0], {
+    method: 'post',
+    path: '/api/calendar/patients/verify',
+    payload: { clinicId: 168, phone: '+421900000000' },
+  });
+  assert.equal(calls[1].path, '/api/calendar/bookings');
+  assert.equal(calls[1].options.headers['X-Patient-Verification-Token'], 'verification-token');
+});
+
+test('Calendar klient presunie a zruší rezerváciu s pacientskym tokenom a idempotency kľúčom', async () => {
+  const calls = [];
+  const client = new PrixiCalendarServiceClient({
+    patch: async (path, payload, options) => {
+      calls.push({ method: 'patch', path, payload, options });
+      return { data: {
+        success: true,
+        booking: {
+          id: 456,
+          clinicId: 168,
+          calendarId: 7,
+          calendarName: 'MUDr. Dávid Anovčin',
+          eventTypeUid: 'preventive-exam',
+          startAt: payload.startAt,
+          endAt: '2026-11-25T11:00:00+01:00',
+          status: 'accepted',
+        },
+        notification: { email: 'sent' },
+      } };
+    },
+    post: async (path, payload, options) => {
+      calls.push({ method: 'post', path, payload, options });
+      return { data: { success: true, code: 'CANCELLED' } };
+    },
+  });
+  const shared = {
+    bookingId: 456,
+    clinicId: 168,
+    verificationToken: 'patient-token',
+    idempotencyKey: 'same-operation-key',
+  };
+  const rescheduled = await client.rescheduleBooking({
+    ...shared,
+    calendarId: 7,
+    eventTypeUid: 'preventive-exam',
+    startAt: '2026-11-25T10:30:00+01:00',
+  });
+  assert.equal(rescheduled.status, 'rescheduled');
+  assert.equal(rescheduled.emailNotification, 'sent');
+  assert.equal(calls[0].path, '/api/calendar/bookings/456/reschedule');
+  assert.equal(calls[0].options.headers['X-Patient-Verification-Token'], 'patient-token');
+  assert.equal(calls[0].options.headers['Idempotency-Key'], 'same-operation-key');
+
+  assert.deepEqual(await client.cancelBooking(shared), { status: 'cancelled' });
+  assert.equal(calls[1].path, '/api/calendar/bookings/456/cancel');
+  assert.deepEqual(calls[1].payload, { clinicId: 168 });
+  assert.equal(calls[1].options.headers['Idempotency-Key'], 'same-operation-key');
+});
+

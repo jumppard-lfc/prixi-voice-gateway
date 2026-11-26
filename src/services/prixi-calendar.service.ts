@@ -31,6 +31,48 @@ export interface CreatePrixiBookingInput {
   idempotencyKey: string;
 }
 
+export interface PrixiPatientBooking {
+  id: string | number;
+  clinicId: number;
+  calendarId: number;
+  calendarName?: string;
+  eventTypeUid: string;
+  serviceName?: string;
+  startAt: string;
+  endAt?: string;
+  durationMinutes?: number;
+  status?: string;
+}
+
+export type PrixiPatientVerificationResult =
+  | { status: 'verified'; verificationToken: string; expiresIn: number }
+  | { status: 'verification_failed' | 'rate_limited' | 'uncertain' | 'failed'; httpStatus?: number; code?: string; message?: string };
+
+export type PrixiPatientBookingsResult =
+  | { status: 'ok'; bookings: PrixiPatientBooking[] }
+  | { status: 'verification_failed' | 'uncertain' | 'failed'; httpStatus?: number; code?: string; message?: string };
+
+export interface ManagePrixiBookingInput {
+  bookingId: string | number;
+  clinicId: number;
+  verificationToken: string;
+  idempotencyKey: string;
+}
+
+export interface ReschedulePrixiBookingInput extends ManagePrixiBookingInput {
+  calendarId: number;
+  eventTypeUid: string;
+  startAt: string;
+}
+
+export type PrixiRescheduleResult =
+  | { status: 'rescheduled'; booking: PrixiPatientBooking; emailNotification?: string }
+  | { status: 'slot_unavailable' | 'verification_failed' | 'not_found' | 'conflict' | 'validation_error' | 'uncertain' | 'failed'; httpStatus?: number; code?: string; message?: string };
+
+export type PrixiCancelResult =
+  | { status: 'cancelled' | 'already_cancelled' }
+  | { status: 'verification_failed' | 'not_found' | 'conflict' | 'validation_error' | 'uncertain' | 'failed'; httpStatus?: number; code?: string; message?: string };
+
 export type PrixiBookingResult =
   | { status: 'created'; bookingId: string | number; startAt: string; endAt?: string }
   | { status: 'slot_unavailable'; httpStatus?: number; code?: string }
@@ -59,6 +101,43 @@ function validationDetails(data: any): { fields?: string[]; details?: string[] }
   return {
     ...(fields.length ? { fields } : {}),
     ...(details.length ? { details } : {}),
+  };
+}
+
+function mapPatientBooking(value: any): PrixiPatientBooking | undefined {
+  const id = value?.id ?? value?.bookingId ?? value?.booking_id;
+  const clinicId = asPositiveInteger(value?.clinicId ?? value?.clinic_id);
+  const calendarId = asPositiveInteger(value?.calendarId ?? value?.calendar_id);
+  const eventTypeUid = firstString(value?.eventTypeUid, value?.event_type_uid);
+  const startAt = firstString(value?.startAt, value?.start_at);
+  if ((typeof id !== 'string' && typeof id !== 'number') || !clinicId || !calendarId || !eventTypeUid || !startAt || Number.isNaN(Date.parse(startAt))) {
+    return undefined;
+  }
+  return {
+    id,
+    clinicId,
+    calendarId,
+    calendarName: firstString(value?.calendarName, value?.calendar_name),
+    eventTypeUid,
+    serviceName: firstString(value?.serviceName, value?.service_name, value?.eventTypeName, value?.event_type_name),
+    startAt,
+    endAt: firstString(value?.endAt, value?.end_at),
+    durationMinutes: asPositiveInteger(value?.durationMinutes ?? value?.duration_minutes),
+    status: firstString(value?.status),
+  };
+}
+
+function apiError(error: unknown): { httpStatus?: number; code?: string; message?: string; hasResponse: boolean } {
+  const axiosError = error as AxiosError<any>;
+  return {
+    httpStatus: axiosError.response?.status,
+    code: firstString(axiosError.response?.data?.code, axiosError.response?.data?.error?.code),
+    message: firstString(
+      axiosError.response?.data?.message,
+      axiosError.response?.data?.error?.message,
+      axiosError.message
+    ),
+    hasResponse: Boolean(axiosError.response),
   };
 }
 
@@ -138,6 +217,101 @@ export class PrixiCalendarServiceClient {
     }
 
     return slots.sort((left, right) => Date.parse(left.startAt) - Date.parse(right.startAt));
+  }
+
+  async verifyPatient(input: { clinicId: number; phone: string }): Promise<PrixiPatientVerificationResult> {
+    try {
+      const response = await this.client.post('/api/calendar/patients/verify', input);
+      const verificationToken = firstString(response.data?.verificationToken, response.data?.verification_token);
+      if (response.data?.success === true && verificationToken) {
+        return {
+          status: 'verified',
+          verificationToken,
+          expiresIn: asPositiveInteger(response.data?.expiresIn ?? response.data?.expires_in) || 600,
+        };
+      }
+      return { status: 'failed', httpStatus: response.status, message: 'PriXi Calendar API returned an invalid verification response' };
+    } catch (error) {
+      const details = apiError(error);
+      const { hasResponse, ...publicDetails } = details;
+      if (details.httpStatus === 403) return { status: 'verification_failed', ...publicDetails };
+      if (details.httpStatus === 429) return { status: 'rate_limited', ...publicDetails };
+      if (!hasResponse || (details.httpStatus !== undefined && details.httpStatus >= 500)) return { status: 'uncertain', ...publicDetails };
+      return { status: 'failed', ...publicDetails };
+    }
+  }
+
+  async listPatientBookings(clinicId: number, verificationToken: string): Promise<PrixiPatientBookingsResult> {
+    try {
+      const response = await this.client.get('/api/calendar/bookings', {
+        params: { clinicId },
+        headers: { 'X-Patient-Verification-Token': verificationToken },
+      });
+      const values = Array.isArray(response.data?.bookings) ? response.data.bookings : [];
+      return { status: 'ok', bookings: values.flatMap((value: any) => mapPatientBooking(value) || []) };
+    } catch (error) {
+      const details = apiError(error);
+      const { hasResponse, ...publicDetails } = details;
+      if (details.httpStatus === 403) return { status: 'verification_failed', ...publicDetails };
+      if (!hasResponse || (details.httpStatus !== undefined && details.httpStatus >= 500)) return { status: 'uncertain', ...publicDetails };
+      return { status: 'failed', ...publicDetails };
+    }
+  }
+
+  async rescheduleBooking(input: ReschedulePrixiBookingInput): Promise<PrixiRescheduleResult> {
+    const { bookingId, verificationToken, idempotencyKey, ...payload } = input;
+    try {
+      const response = await this.client.patch(`/api/calendar/bookings/${encodeURIComponent(String(bookingId))}/reschedule`, payload, {
+        headers: {
+          'X-Patient-Verification-Token': verificationToken,
+          'Idempotency-Key': idempotencyKey,
+        },
+      });
+      const booking = mapPatientBooking(response.data?.booking || response.data?.data?.booking || response.data?.data);
+      if (response.data?.success === true && booking) {
+        return {
+          status: 'rescheduled',
+          booking,
+          emailNotification: firstString(response.data?.notification?.email),
+        };
+      }
+      return { status: 'failed', httpStatus: response.status, message: 'PriXi Calendar API returned an invalid reschedule response' };
+    } catch (error) {
+      const details = apiError(error);
+      const { hasResponse, ...publicDetails } = details;
+      if (details.httpStatus === 403) return { status: 'verification_failed', ...publicDetails };
+      if (details.httpStatus === 404) return { status: 'not_found', ...publicDetails };
+      if (details.httpStatus === 409 && details.code === 'SLOT_UNAVAILABLE') return { status: 'slot_unavailable', ...publicDetails };
+      if (details.httpStatus === 409) return { status: 'conflict', ...publicDetails };
+      if (details.httpStatus === 422) return { status: 'validation_error', ...publicDetails };
+      if (!hasResponse || (details.httpStatus !== undefined && details.httpStatus >= 500)) return { status: 'uncertain', ...publicDetails };
+      return { status: 'failed', ...publicDetails };
+    }
+  }
+
+  async cancelBooking(input: ManagePrixiBookingInput): Promise<PrixiCancelResult> {
+    const { bookingId, verificationToken, idempotencyKey, clinicId } = input;
+    try {
+      const response = await this.client.post(`/api/calendar/bookings/${encodeURIComponent(String(bookingId))}/cancel`, { clinicId }, {
+        headers: {
+          'X-Patient-Verification-Token': verificationToken,
+          'Idempotency-Key': idempotencyKey,
+        },
+      });
+      const code = firstString(response.data?.code);
+      if (response.data?.success === true && code === 'CANCELLED') return { status: 'cancelled' };
+      if (response.data?.success === true && code === 'ALREADY_CANCELLED') return { status: 'already_cancelled' };
+      return { status: 'failed', httpStatus: response.status, message: 'PriXi Calendar API returned an invalid cancellation response' };
+    } catch (error) {
+      const details = apiError(error);
+      const { hasResponse, ...publicDetails } = details;
+      if (details.httpStatus === 403) return { status: 'verification_failed', ...publicDetails };
+      if (details.httpStatus === 404) return { status: 'not_found', ...publicDetails };
+      if (details.httpStatus === 409) return { status: 'conflict', ...publicDetails };
+      if (details.httpStatus === 422) return { status: 'validation_error', ...publicDetails };
+      if (!hasResponse || (details.httpStatus !== undefined && details.httpStatus >= 500)) return { status: 'uncertain', ...publicDetails };
+      return { status: 'failed', ...publicDetails };
+    }
   }
 
   async createBooking(input: CreatePrixiBookingInput): Promise<PrixiBookingResult> {

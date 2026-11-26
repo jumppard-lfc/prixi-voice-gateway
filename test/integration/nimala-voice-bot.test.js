@@ -17,8 +17,15 @@ const originalSendEvent = prixiService.sendEvent.bind(prixiService);
 const originalListServices = prixiCalendarService.listServices.bind(prixiCalendarService);
 const originalGetAvailableSlots = prixiCalendarService.getAvailableSlots.bind(prixiCalendarService);
 const originalCreateBooking = prixiCalendarService.createBooking.bind(prixiCalendarService);
+const originalVerifyPatient = prixiCalendarService.verifyPatient.bind(prixiCalendarService);
+const originalListPatientBookings = prixiCalendarService.listPatientBookings.bind(prixiCalendarService);
+const originalRescheduleBooking = prixiCalendarService.rescheduleBooking.bind(prixiCalendarService);
+const originalCancelBooking = prixiCalendarService.cancelBooking.bind(prixiCalendarService);
 let sentEvents = [];
 let bookingInputs = [];
+let verificationInputs = [];
+let rescheduleInputs = [];
+let cancellationInputs = [];
 
 function assertStaticResponse(response, audioKey, fallbackPattern) {
   const fileName = nimalaAudioFiles[audioKey];
@@ -78,6 +85,19 @@ const slots = [
   { startAt: '2026-11-18T13:00:00+01:00', calendarId: 7, calendarName: 'MUDr. Dávid Anovčin', durationMinutes: 30 },
 ];
 
+const patientBookings = [{
+  id: 456,
+  clinicId: 168,
+  calendarId: 7,
+  calendarName: 'MUDr. Dávid Anovčin',
+  eventTypeUid: 'preventive-exam',
+  serviceName: 'Preventívna prehliadka',
+  startAt: '2026-12-03T09:00:00+01:00',
+  endAt: '2026-12-03T09:30:00+01:00',
+  durationMinutes: 30,
+  status: 'accepted',
+}];
+
 test.before(async () => {
   prixiService.getConfig = async phone => {
     assert.ok(['+420910921238', '+421940621456'].includes(phone));
@@ -90,12 +110,32 @@ test.before(async () => {
     bookingInputs.push(input);
     return { status: 'created', bookingId: 456, startAt: input.startAt };
   };
+  prixiCalendarService.verifyPatient = async input => {
+    verificationInputs.push(input);
+    return { status: 'verified', verificationToken: 'patient-token', expiresIn: 600 };
+  };
+  prixiCalendarService.listPatientBookings = async () => ({ status: 'ok', bookings: patientBookings });
+  prixiCalendarService.rescheduleBooking = async input => {
+    rescheduleInputs.push(input);
+    return {
+      status: 'rescheduled',
+      booking: { ...patientBookings[0], calendarId: input.calendarId, startAt: input.startAt },
+      emailNotification: 'sent',
+    };
+  };
+  prixiCalendarService.cancelBooking = async input => {
+    cancellationInputs.push(input);
+    return { status: 'cancelled' };
+  };
   await app.ready();
 });
 
 test.beforeEach(() => {
   sentEvents = [];
   bookingInputs = [];
+  verificationInputs = [];
+  rescheduleInputs = [];
+  cancellationInputs = [];
   delete process.env.NIMALA_HUMAN_TRANSFER_NUMBER;
   delete process.env.ELEVENLABS_API_KEY;
   prixiCalendarService.listServices = async () => services;
@@ -103,6 +143,23 @@ test.beforeEach(() => {
   prixiCalendarService.createBooking = async input => {
     bookingInputs.push(input);
     return { status: 'created', bookingId: 456, startAt: input.startAt };
+  };
+  prixiCalendarService.verifyPatient = async input => {
+    verificationInputs.push(input);
+    return { status: 'verified', verificationToken: 'patient-token', expiresIn: 600 };
+  };
+  prixiCalendarService.listPatientBookings = async () => ({ status: 'ok', bookings: patientBookings });
+  prixiCalendarService.rescheduleBooking = async input => {
+    rescheduleInputs.push(input);
+    return {
+      status: 'rescheduled',
+      booking: { ...patientBookings[0], calendarId: input.calendarId, startAt: input.startAt },
+      emailNotification: 'sent',
+    };
+  };
+  prixiCalendarService.cancelBooking = async input => {
+    cancellationInputs.push(input);
+    return { status: 'cancelled' };
   };
 });
 
@@ -112,6 +169,10 @@ test.after(async () => {
   prixiCalendarService.listServices = originalListServices;
   prixiCalendarService.getAvailableSlots = originalGetAvailableSlots;
   prixiCalendarService.createBooking = originalCreateBooking;
+  prixiCalendarService.verifyPatient = originalVerifyPatient;
+  prixiCalendarService.listPatientBookings = originalListPatientBookings;
+  prixiCalendarService.rescheduleBooking = originalRescheduleBooking;
+  prixiCalendarService.cancelBooking = originalCancelBooking;
   delete process.env.NIMALA_HUMAN_TRANSFER_NUMBER;
   delete process.env.ELEVENLABS_API_KEY;
   await app.close();
@@ -121,7 +182,8 @@ test('produkčný endpoint routuje autoritatívny Nimala DID aj pri cudzom Forwa
   const response = await incoming('CA-NIMALA-ROUTE-000000000000000001', { ForwardedFrom: '+421902647072' });
   assert.equal(response.statusCode, 200);
   assertStaticResponse(response, 'greeting', /som PriXi, virtuálna asistentka/);
-  assert.match(response.body, /<\/(?:Say|Play)><Gather/);
+  assert.match(response.body, /<Gather[^>]*>[\s\S]*<(?:Say|Play)>/);
+  assert.doesNotMatch(response.body, /<\/(?:Say|Play)><Gather/);
   assert.match(response.body, /action="\/voice\/nimala\/answer"/);
   assert.match(response.body, /timeout="4"/);
   assert.match(response.body, /speechTimeout="auto"/);
@@ -178,6 +240,9 @@ test('preventívna prehliadka sa rezervuje iba po výbere a výslovnom potvrden�
   assert.match(offer.body, /timeout="4"/);
   assert.match(offer.body, /speechTimeout="auto"/);
   const namePrompt = await answer(callSid, 'dva');
+  assert.match(namePrompt.body, /Ďakujem, rozumiem\. Len to ešte pre istotu zhrniem/);
+  assert.match(namePrompt.body, /Vybraný typ vyšetrenia je Preventívna prehliadka/);
+  assert.match(namePrompt.body, /sedemnásteho novembra, o desiatej tridsať/);
   assert.match(namePrompt.body, /timeout="6"/);
   assert.match(namePrompt.body, /speechTimeout="1"/);
   const confirmation = await answer(callSid, 'Ján Novák');
@@ -204,6 +269,103 @@ test('preventívna prehliadka sa rezervuje iba po výbere a výslovnom potvrden�
   assert.equal(bookingInputs[0].metadata.externalReference, callSid);
   assert.match(bookingInputs[0].idempotencyKey, /^[0-9a-f-]{36}$/i);
   assert.equal(sentEvents.length, 0);
+});
+
+test('pacient si môže nechať zopakovať voľné termíny a potom pokračovať výberom', async () => {
+  const callSid = 'CA-NIMALA-REPEAT-SLOTS-000000000001';
+  await incoming(callSid);
+  const firstOffer = await answer(callSid, 'Chcem preventívnu prehliadku na urológii');
+  const repeatedOffer = await answer(callSid, 'Zopakujte mi, prosím, voľné termíny');
+
+  assert.match(firstOffer.body, /Možnosť jedna/);
+  assert.match(repeatedOffer.body, /Možnosť jedna/);
+  assert.match(repeatedOffer.body, /Možnosť dva/);
+  assert.match(repeatedOffer.body, /Možnosť tri/);
+  assert.match(repeatedOffer.body, /šestnásteho novembra/);
+  assert.match(repeatedOffer.body, /sedemnásteho novembra/);
+  assert.equal(bookingInputs.length, 0);
+
+  const summary = await answer(callSid, 'dva');
+  assert.match(summary.body, /Len to ešte pre istotu zhrniem/);
+  assert.match(summary.body, /sedemnásteho novembra, o desiatej tridsať/);
+});
+
+test('existujúca rezervácia sa po overení telefónu presunie až po potvrdení', async () => {
+  const callSid = 'CA-NIMALA-RESCHEDULE-000000000000001';
+  await incoming(callSid);
+  const offer = await answer(callSid, 'Potrebujem zmeniť termín rezervácie');
+
+  assert.deepEqual(verificationInputs, [{ clinicId: 168, phone: '+421905111222' }]);
+  assert.match(offer.body, /Mám pre vás tieto voľné termíny/);
+  assert.equal(rescheduleInputs.length, 0);
+
+  const confirmation = await answer(callSid, 'dva');
+  assert.match(confirmation.body, /potvrďte.*zmenu rezervácie/i);
+  assert.match(confirmation.body, /Pôvodný termín/);
+  assert.match(confirmation.body, /Nový termín/);
+
+  const completed = await answer(callSid, 'áno');
+  assert.equal(rescheduleInputs.length, 1);
+  assert.equal(rescheduleInputs[0].bookingId, 456);
+  assert.equal(rescheduleInputs[0].clinicId, 168);
+  assert.equal(rescheduleInputs[0].calendarId, 7);
+  assert.equal(rescheduleInputs[0].eventTypeUid, 'preventive-exam');
+  assert.equal(rescheduleInputs[0].startAt, '2026-11-17T10:30:00+01:00');
+  assert.equal(rescheduleInputs[0].verificationToken, 'patient-token');
+  assert.match(rescheduleInputs[0].idempotencyKey, /^[0-9a-f-]{36}$/i);
+  assert.match(completed.body, /úspešne zmenený/);
+  assert.match(completed.body, /poslali e-mailom/);
+  assert.equal(sentEvents.length, 0);
+});
+
+test('existujúca rezervácia sa zruší až po výslovnom potvrdení', async () => {
+  const callSid = 'CA-NIMALA-CANCEL-00000000000000001';
+  await incoming(callSid);
+  const confirmation = await answer(callSid, 'Chcem zrušiť termín');
+
+  assert.deepEqual(verificationInputs, [{ clinicId: 168, phone: '+421905111222' }]);
+  assert.match(confirmation.body, /potvrďte zrušenie rezervácie/i);
+  assert.equal(cancellationInputs.length, 0);
+
+  const completed = await answer(callSid, 'áno');
+  assert.equal(cancellationInputs.length, 1);
+  assert.equal(cancellationInputs[0].bookingId, 456);
+  assert.equal(cancellationInputs[0].clinicId, 168);
+  assert.equal(cancellationInputs[0].verificationToken, 'patient-token');
+  assert.match(cancellationInputs[0].idempotencyKey, /^[0-9a-f-]{36}$/i);
+  assert.match(completed.body, /úspešne zrušená/);
+  assert.equal(sentEvents.length, 0);
+});
+
+test('odmietnutie potvrdenia nezruší rezerváciu ani nevytvorí požiadavku', async () => {
+  const callSid = 'CA-NIMALA-CANCEL-DECLINED-00000000001';
+  await incoming(callSid);
+  const confirmation = await answer(callSid, 'Chcem zrušiť rezerváciu');
+
+  assert.match(confirmation.body, /potvrďte zrušenie rezervácie/i);
+  const completed = await answer(callSid, 'nie');
+
+  assert.equal(cancellationInputs.length, 0);
+  assert.equal(sentEvents.length, 0);
+  assert.match(completed.body, /Rezerváciu som nezrušila/);
+});
+
+test('nejednoznačný telefón neprezradí rezervácie a odovzdá požiadavku personálu', async () => {
+  prixiCalendarService.verifyPatient = async input => {
+    verificationInputs.push(input);
+    return { status: 'verification_failed', httpStatus: 403, code: 'VERIFICATION_FAILED' };
+  };
+  const callSid = 'CA-NIMALA-AMBIGUOUS-0000000000001';
+  await incoming(callSid);
+  const response = await answer(callSid, 'Chcem prebookovať termín');
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.match(response.body, /nepodarilo pacienta jednoznačne overiť/);
+  assert.doesNotMatch(response.body, /Našla som tieto budúce rezervácie|Pôvodný termín/);
+  assert.equal(rescheduleInputs.length, 0);
+  assert.equal(cancellationInputs.length, 0);
+  assert.equal(sentEvents.length, 1);
+  assert.match(sentEvents[0].problemTranscript, /Kategória: zmena termínu/);
 });
 
 test('dynamická ponuka termínov používa ElevenLabs a krátkodobý μ-law media endpoint', async () => {
@@ -277,7 +439,8 @@ test('otvorená úvodná otázka rozlíši samotnú urológiu aj výsledky vyše
   const urologyCallSid = 'CA-NIMALA-NATURAL-UROLOGY-000000001';
   await incoming(urologyCallSid);
   const urologyMenu = await answer(urologyCallSid, 'Volám na urológiu');
-  assertStaticResponse(urologyMenu, 'urologyMenu', /Rozumiem, ide o urológiu/);
+  assert.match(urologyMenu.body, /Rozumiem, ide o urológiu/);
+  assert.match(urologyMenu.body, /zmeniť alebo zrušiť termín/);
 
   const resultsCallSid = 'CA-NIMALA-NATURAL-RESULTS-0000000001';
   await incoming(resultsCallSid);
@@ -331,6 +494,25 @@ test('timeout rezervácie zopakuje identický payload a kľúč a potom nevyrob�
   assert.equal(sentEvents.length, 1);
   assert.match(sentEvents[0].problemTranscript, /Výsledok rezervácie sa nepodarilo spoľahlivo overiť/);
   assert.doesNotMatch(sentEvents[0].problemTranscript, /Rezervácia nebola potvrdená Calendar API/);
+});
+
+test('timeout presunu zopakuje identický payload a idempotency kľúč a odovzdá kontrolu personálu', async () => {
+  prixiCalendarService.rescheduleBooking = async input => {
+    rescheduleInputs.push(input);
+    return { status: 'uncertain', message: 'timeout' };
+  };
+  const callSid = 'CA-NIMALA-RESCHEDULE-TIMEOUT-0000001';
+  await incoming(callSid);
+  await answer(callSid, 'Potrebujem presunúť termín');
+  await answer(callSid, 'dva');
+  const response = await answer(callSid, 'áno');
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(rescheduleInputs.length, 2);
+  assert.deepEqual(rescheduleInputs[1], rescheduleInputs[0]);
+  assert.match(response.body, /nepodarilo bezpečne dokončiť/);
+  assert.equal(sentEvents.length, 1);
+  assert.match(sentEvents[0].problemTranscript, /Výsledok zmeny sa nepodarilo spoľahlivo overiť/);
 });
 
 test('nedokončené potvrdenie presne vysvetlí, že rezervácia nebola odoslaná do Calendar API', async () => {
