@@ -24,7 +24,7 @@ const VoiceResponse = twilio.twiml.VoiceResponse;
 const sayOptions: Record<string, any> = { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-B' };
 
 const copy = {
-  greeting: 'Dobrý deň, dovolali ste sa virtuálnej sestričke psychiatrickej ambulancie pani doktorky Lenerovej. Ako vám môžem pomôcť? Môžete požiadať o recept, termín kontroly, zmenu termínu, nahlásiť zhoršenie stavu, požiadať o dokument, prihlásiť sa ako nový pacient alebo získať organizačné informácie.',
+  greeting: 'Dobrý deň, dovolali ste sa virtuálnej sestričke pani doktorky Lenerovej. Ako pomôžem?',
   menuRetry: 'Prepáčte, nerozumela som. Pre recept stlačte jednotku. Pre požiadavku na termín dvojku. Pre zmenu alebo zrušenie termínu trojku. Pre zhoršenie stavu štvorku. Pre dokumenty a administratívu päťku. Ak ste nový pacient šestku. Pre organizačné informácie sedmičku.',
   name: 'Povedzte, prosím, meno a priezvisko pacienta, ktorého sa požiadavka týka.',
   birthYear: 'Povedzte, prosím, rok narodenia pacienta.',
