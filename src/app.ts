@@ -16,6 +16,7 @@ import { dentbodyVoiceBotRoutes } from './routes/dentbody-voice-bot.controller';
 import { malakovaVoiceBotRoutes } from './routes/malakova-voice-bot.controller';
 import { nimalaVoiceBotRoutes } from './routes/nimala-voice-bot.controller';
 import { stefancikVoiceBotRoutes } from './routes/stefancik-voice-bot.controller';
+import { lenerovaVoiceBotRoutes } from './routes/lenerova-voice-bot.controller';
 import { dentbodyAudioFileNames } from './config/dentbody-audio.config';
 import { nimalaAudioFileNames } from './config/nimala-audio.config';
 import { zdrahalovaAudioFileNames } from './config/zdrahalova-audio.config';
@@ -265,6 +266,7 @@ app.register(dentbodyVoiceBotRoutes, { prefix: '/voice' });
 app.register(malakovaVoiceBotRoutes, { prefix: '/voice' });
 app.register(nimalaVoiceBotRoutes, { prefix: '/voice' });
 app.register(stefancikVoiceBotRoutes, { prefix: '/voice' });
+app.register(lenerovaVoiceBotRoutes, { prefix: '/voice' });
 app.register(voiceBotBuilderRoutes);
 
 const start = async () => {
