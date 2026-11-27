@@ -22,7 +22,10 @@ test('Lenerovej menu rozpozná všetkých sedem volieb cez DTMF', () => {
 
 test('Lenerovej menu rozlíši prirodzené psychiatrické a administratívne požiadavky', () => {
   assert.equal(parseLenerovaRequestType('Potrebujem opakovaný recept'), 'prescription');
+  assert.equal(parseLenerovaRequestType('Chcel by som si objednať lieky'), 'prescription');
+  assert.equal(parseLenerovaRequestType('Potrebujem objednať tablety'), 'prescription');
   assert.equal(parseLenerovaRequestType('Chcem termín kontroly'), 'appointment');
+  assert.equal(parseLenerovaRequestType('Chcem sa objednať na kontrolu kvôli liekom'), 'appointment');
   assert.equal(parseLenerovaRequestType('Potrebujem zrušiť termín kontroly'), 'appointment_change');
   assert.equal(parseLenerovaRequestType('Mám vedľajšie účinky lieku'), 'worsening');
   assert.equal(parseLenerovaRequestType('Potrebujem lekársku správu'), 'administration');

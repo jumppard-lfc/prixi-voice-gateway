@@ -152,6 +152,17 @@ test('recept odošle meno, rok narodenia a detail do PriXi kliniky 172', async (
   assert.equal(emailedEvents[0], sentEvents[0]);
 });
 
+test('objednanie liekov sa rozpozná ako recept, nie ako termín', async () => {
+  const callSid = 'CA-LENEROVA-MEDICATION-ORDER-00000001';
+  await incoming(callSid);
+  const response = await answer(callSid, 'Chcel by som si objednať lieky');
+
+  assert.match(response.body, /meno a priezvisko pacienta/i);
+  assert.doesNotMatch(response.body, /pravidelnú kontrolu|požiadavku na termín/i);
+  assert.equal(sentEvents.length, 0);
+  assert.equal(emailedEvents.length, 0);
+});
+
 test('žiadosť o termín nevytvorí rezerváciu ani neponúka voľné sloty', async () => {
   const callSid = 'CA-LENEROVA-APPOINTMENT-00000000001';
   await incoming(callSid);

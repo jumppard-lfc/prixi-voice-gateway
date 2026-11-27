@@ -66,7 +66,12 @@ export function parseLenerovaRequestType(value: string): LenerovaRequestType | u
   if (/(novy pacient|nova pacientka|prve vysetren|vstupne vysetren|prihlasit)/.test(text)) return 'new_patient';
   if (/(lekarsk.*sprav|potvrden|vysled|nalez|dokument|administrativ|peenka|pn)/.test(text)) return 'administration';
   if (/(ordinac|kedy.*ordin|otvoren|adres|kde.*(ambul|ordin|pracovisk)|pracovisk|poistovn|zmluv|zastup|dovolenk|nepritomn|kontakt|telefon|email|e mail|stupav|malack)/.test(text)) return 'information';
-  if (/(recept|predpis|dochadz.*liek|potrebujem.*liek|pravideln.*liek)/.test(text)) return 'prescription';
+  const mentionsExplicitAppointment = /(termin|kontrol|vysetren|navstev)/.test(text);
+  if (mentionsExplicitAppointment && /(objedna|chcem|potrebujem|prosim)/.test(text)) return 'appointment';
+  if (
+    /(recept|predpis|e recept|dochadz.*liek|dosl.*liek|min.*sa.*liek|pravideln.*liek)/.test(text)
+    || /\b(objedna|chcem|potrebujem|prosim|vystavit).*\b(liek|tablet|medikament)/.test(text)
+  ) return 'prescription';
   if (/(objedna|termin|kontrol)/.test(text)) return 'appointment';
   return undefined;
 }
