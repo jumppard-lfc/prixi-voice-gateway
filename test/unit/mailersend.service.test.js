@@ -29,6 +29,18 @@ function event(overrides = {}) {
   };
 }
 
+function lenerovaEvent(overrides = {}) {
+  return event({
+    clinicId: '172',
+    routingPhoneNumber: '+421907808677',
+    providerCallId: 'CAtest-mailersend-lenerova',
+    nameTranscript: 'Ján Novák',
+    birthYearTranscript: '1980',
+    problemTranscript: '[Voice-bot psychiatrická ambulancia MUDr. Slávky Lenerovej]\nStav hovoru: dokončený\nKategória: žiadosť o opakovaný recept\nTelefón: +421900123456\nMeno a priezvisko: Ján Novák\nRok narodenia: 1980\nPožiadavka: Sertralín päťdesiat miligramov, zostávajú tri tablety.',
+    ...overrides,
+  });
+}
+
 test.beforeEach(() => {
   process.env.MAILERSEND_API_TOKEN = 'test-mailersend-token';
   process.env.MAILERSEND_FROM_EMAIL = 'no-reply@prixi.sk';
@@ -44,6 +56,33 @@ test.after(() => {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
+});
+
+test('zaradí požiadavku MUDr. Lenerovej do samostatnej MailerSend notifikácie', async () => {
+  let captured;
+  const service = new MailerSendService({
+    post: async (url, data, config) => {
+      captured = { url, data, config };
+      return { status: 202, headers: { 'x-message-id': 'mailer-message-172' } };
+    },
+  }, async () => { });
+
+  assert.equal(service.isLenerovaConfigured(), true);
+  assert.equal(await service.sendLenerovaRequest(lenerovaEvent()), 'mailer-message-172');
+
+  assert.equal(captured.url, 'https://api.mailersend.com/v1/email');
+  assert.deepEqual(captured.data.to, [{
+    email: 'matoskok1@gmail.com',
+    name: 'Psychiatrická ambulancia MUDr. Slávky Lenerovej',
+  }]);
+  assert.equal(captured.data.subject, '🔵 Recept – PriXi telefonická požiadavka');
+  assert.match(captured.data.text, /Meno a priezvisko: Ján Novák/);
+  assert.match(captured.data.text, /Rok narodenia: 1980/);
+  assert.match(captured.data.text, /Telefón volajúceho: \+421900123456/);
+  assert.match(captured.data.text, /POŽIADAVKA\nSertralín päťdesiat miligramov/);
+  assert.doesNotMatch(captured.data.text, /\[Voice-bot/);
+  assert.match(captured.data.html, /href="tel:\+421900123456"/);
+  assert.equal(captured.config.headers.Authorization, 'Bearer test-mailersend-token');
 });
 
 test('zaradí požiadavku MUDr. Zdráhalovej do MailerSend fronty', async () => {

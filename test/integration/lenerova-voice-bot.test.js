@@ -7,10 +7,14 @@ process.env.TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || 'test-auth-toke
 
 const app = require('../../src/app').default;
 const { prixiService } = require('../../src/services/prixi.service');
+const { mailerSendService } = require('../../src/services/mailersend.service');
 
 const originalGetVoiceAssistantConfig = prixiService.getVoiceAssistantConfig.bind(prixiService);
 const originalSendEvent = prixiService.sendEvent.bind(prixiService);
+const originalIsLenerovaConfigured = mailerSendService.isLenerovaConfigured.bind(mailerSendService);
+const originalSendLenerovaRequest = mailerSendService.sendLenerovaRequest.bind(mailerSendService);
 let sentEvents = [];
+let emailedEvents = [];
 let configuredClinicId = '172';
 let configuredAssistantType = 'lenerova';
 
@@ -63,19 +67,32 @@ test.before(async () => {
     };
   };
   prixiService.sendEvent = async event => sentEvents.push(event);
+  mailerSendService.isLenerovaConfigured = () => true;
+  mailerSendService.sendLenerovaRequest = async event => {
+    emailedEvents.push(event);
+    return 'mailer-message-172';
+  };
   await app.ready();
 });
 
 test.beforeEach(() => {
   sentEvents = [];
+  emailedEvents = [];
   configuredClinicId = '172';
   configuredAssistantType = 'lenerova';
   prixiService.sendEvent = async event => sentEvents.push(event);
+  mailerSendService.isLenerovaConfigured = () => true;
+  mailerSendService.sendLenerovaRequest = async event => {
+    emailedEvents.push(event);
+    return 'mailer-message-172';
+  };
 });
 
 test.after(async () => {
   prixiService.getVoiceAssistantConfig = originalGetVoiceAssistantConfig;
   prixiService.sendEvent = originalSendEvent;
+  mailerSendService.isLenerovaConfigured = originalIsLenerovaConfigured;
+  mailerSendService.sendLenerovaRequest = originalSendLenerovaRequest;
   await app.close();
 });
 
@@ -121,6 +138,8 @@ test('recept odošle meno, rok narodenia a detail do PriXi kliniky 172', async (
   assert.match(sentEvents[0].problemTranscript, /Kategória: žiadosť o opakovaný recept/);
   assert.match(sentEvents[0].problemTranscript, /Sertralín/);
   assert.doesNotMatch(sentEvents[0].problemTranscript, /Demo požiadavka/);
+  assert.equal(emailedEvents.length, 1);
+  assert.equal(emailedEvents[0], sentEvents[0]);
 });
 
 test('žiadosť o termín nevytvorí rezerváciu ani neponúka voľné sloty', async () => {
@@ -177,6 +196,21 @@ test('pri chybe PriXi bot nepotvrdí, že bola požiadavka odoslaná', async () 
 
   assert.match(completion.body, /technický problém/);
   assert.doesNotMatch(completion.body, /požiadavku som odoslala/);
+  assert.equal(emailedEvents.length, 0);
+});
+
+test('chyba MailerSend nezahodí požiadavku uloženú v PriXi', async () => {
+  mailerSendService.sendLenerovaRequest = async () => {
+    throw new Error('MailerSend unavailable');
+  };
+  const callSid = 'CA-LENEROVA-MAIL-FAILURE-00000000001';
+  await incoming(callSid);
+  await answer(callSid, '7', true);
+  const completion = await answer(callSid, 'Potrebujem informáciu o zastupovaní');
+
+  assert.match(completion.body, /požiadavku som odoslala ambulancii/);
+  assert.equal(sentEvents.length, 1);
+  assert.equal(emailedEvents.length, 0);
 });
 
 test('nedokončená zvolená požiadavka sa uloží iba raz cez call-status', async () => {
@@ -193,6 +227,7 @@ test('nedokončená zvolená požiadavka sa uloží iba raz cez call-status', as
   await post('/voice/call-status', status);
 
   assert.equal(sentEvents.length, 1);
+  assert.equal(emailedEvents.length, 1);
   assert.match(sentEvents[0].problemTranscript, /Stav hovoru: NEDOKONČENÝ/);
   assert.match(sentEvents[0].problemTranscript, /zmena alebo zrušenie existujúceho termínu/);
 });

@@ -11,6 +11,7 @@ import {
   lenerovaSessionService,
 } from '../services/lenerova-session.service';
 import { prixiService } from '../services/prixi.service';
+import { mailerSendService } from '../services/mailersend.service';
 import { ClinicConfig, VoicemailRecordedEvent } from '../types';
 import {
   claimVoiceEvent,
@@ -147,13 +148,41 @@ function buildEvent(session: LenerovaSession): VoicemailRecordedEvent {
   };
 }
 
+async function notifyLenerovaByEmail(
+  fastify: FastifyInstance,
+  event: VoicemailRecordedEvent
+): Promise<void> {
+  if (!mailerSendService.isLenerovaConfigured()) {
+    fastify.log.warn(
+      { providerCallId: event.providerCallId, clinicId: event.clinicId },
+      'MailerSend or MUDr. Lenerova recipient is not configured; request was stored in PriXi without email notification'
+    );
+    return;
+  }
+
+  try {
+    const messageId = await mailerSendService.sendLenerovaRequest(event);
+    fastify.log.info(
+      { providerCallId: event.providerCallId, clinicId: event.clinicId, messageId },
+      'MUDr. Lenerova request queued in MailerSend'
+    );
+  } catch (error) {
+    fastify.log.error(
+      { err: error, providerCallId: event.providerCallId, clinicId: event.clinicId },
+      'Failed to queue MUDr. Lenerova email notification; request remains stored in PriXi'
+    );
+  }
+}
+
 async function dispatchRequest(fastify: FastifyInstance, session: LenerovaSession): Promise<boolean> {
   if (!hasMeaningfulRequest(session)) return false;
   const eventKey = createVoiceEventKey('voicemail_recorded', session.callSid);
   if (!claimVoiceEvent(eventKey)) return true;
 
   try {
-    await prixiService.sendEvent(buildEvent(session), 3, eventKey);
+    const event = buildEvent(session);
+    await prixiService.sendEvent(event, 3, eventKey);
+    await notifyLenerovaByEmail(fastify, event);
     completeVoiceEvent(eventKey);
     return true;
   } catch (error) {

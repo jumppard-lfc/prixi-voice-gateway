@@ -4,6 +4,7 @@ import { VoicemailRecordedEvent } from '../types';
 
 const MAILERSEND_EMAIL_URL = 'https://api.mailersend.com/v1/email';
 const ZDRAHALOVA_NOTIFICATION_EMAIL = 'pediatriamaneli@gmail.com';
+const LENEROVA_NOTIFICATION_EMAIL = 'matoskok1@gmail.com';
 const MAX_ATTEMPTS = 3;
 
 type RequestPresentation = {
@@ -50,6 +51,58 @@ const DEFAULT_REQUEST_PRESENTATION: RequestPresentation = {
   color: '#475569',
   backgroundColor: '#f8fafc',
 };
+
+const LENEROVA_REQUEST_PRESENTATIONS: Array<RequestPresentation & { matches: RegExp }> = [
+  {
+    label: 'Recept',
+    icon: '🔵',
+    color: '#1d4ed8',
+    backgroundColor: '#eff6ff',
+    matches: /recept/i,
+  },
+  {
+    label: 'Termín kontroly',
+    icon: '🟢',
+    color: '#15803d',
+    backgroundColor: '#f0fdf4',
+    matches: /term[ií]n kontroly/i,
+  },
+  {
+    label: 'Zmena alebo zrušenie termínu',
+    icon: '🟣',
+    color: '#7e22ce',
+    backgroundColor: '#faf5ff',
+    matches: /zmena alebo zru[sš]enie/i,
+  },
+  {
+    label: 'Zhoršenie stavu alebo problém s liekom',
+    icon: '🔴',
+    color: '#b91c1c',
+    backgroundColor: '#fef2f2',
+    matches: /zhor[sš]enie stavu|probl[eé]m s liekom/i,
+  },
+  {
+    label: 'Dokumenty a administratíva',
+    icon: '🟠',
+    color: '#c2410c',
+    backgroundColor: '#fff7ed',
+    matches: /lek[aá]rska spr[aá]va|administrat/i,
+  },
+  {
+    label: 'Nový pacient',
+    icon: '🟦',
+    color: '#0369a1',
+    backgroundColor: '#f0f9ff',
+    matches: /nov[eé]ho pacienta/i,
+  },
+  {
+    label: 'Organizačná informácia',
+    icon: '⚪',
+    color: '#475569',
+    backgroundColor: '#f8fafc',
+    matches: /organiza[cč]n[aá] inform[aá]cia/i,
+  },
+];
 
 type HttpResponse = {
   status: number;
@@ -106,6 +159,22 @@ function parseZdrahalovaTranscript(value: string): {
   return { presentation, request };
 }
 
+function parseLenerovaTranscript(value: string): {
+  presentation: RequestPresentation;
+  request: string;
+  status: string;
+} {
+  const transcript = value.trim();
+  const category = transcript.match(/^Kategória:\s*(.+)$/im)?.[1]?.trim() || '';
+  const request = transcript.match(/^Požiadavka:\s*(.+)$/im)?.[1]?.trim()
+    || 'Detail požiadavky nebol uvedený.';
+  const status = transcript.match(/^Stav hovoru:\s*(.+)$/im)?.[1]?.trim() || 'dokončený';
+  const presentation = LENEROVA_REQUEST_PRESENTATIONS.find(item => item.matches.test(category))
+    || DEFAULT_REQUEST_PRESENTATION;
+
+  return { presentation, request, status };
+}
+
 export class MailerSendService {
   constructor(
     private readonly httpClient: HttpClient = axios,
@@ -117,6 +186,10 @@ export class MailerSendService {
       process.env.MAILERSEND_API_TOKEN?.trim()
       && process.env.MAILERSEND_FROM_EMAIL?.trim()
     );
+  }
+
+  isLenerovaConfigured(): boolean {
+    return this.isConfigured() && isEmail(LENEROVA_NOTIFICATION_EMAIL);
   }
 
   async sendZdrahalovaRequest(event: VoicemailRecordedEvent): Promise<string> {
@@ -184,6 +257,89 @@ export class MailerSendService {
       ].join(''),
     };
 
+    return this.queueEmail(apiToken, payload);
+  }
+
+  async sendLenerovaRequest(event: VoicemailRecordedEvent): Promise<string> {
+    const apiToken = process.env.MAILERSEND_API_TOKEN?.trim();
+    const fromEmail = process.env.MAILERSEND_FROM_EMAIL?.trim();
+    const fromName = process.env.MAILERSEND_FROM_NAME?.trim() || 'PriXi';
+    const recipient = LENEROVA_NOTIFICATION_EMAIL;
+
+    if (!apiToken || !fromEmail) {
+      throw new Error('MailerSend credentials and sender are not configured');
+    }
+    if (!isEmail(fromEmail) || !isEmail(recipient)) {
+      throw new Error('MailerSend sender or MUDr. Lenerova recipient email is invalid');
+    }
+
+    const localStartedAt = DateTime.fromISO(event.callStartedAt, { setZone: true })
+      .setZone('Europe/Bratislava');
+    const callTime = localStartedAt.isValid
+      ? localStartedAt.toFormat('dd. MM. yyyy HH:mm')
+      : event.callStartedAt;
+    const { presentation, request, status } = parseLenerovaTranscript(event.problemTranscript);
+    const patientName = event.nameTranscript.trim() || 'Neuvedené';
+    const birthYear = event.birthYearTranscript.trim() || 'Neuvedený';
+    const safePhone = escapeHtml(event.phone);
+    const safeCallTime = escapeHtml(callTime);
+    const safePatientName = escapeHtml(patientName);
+    const safeBirthYear = escapeHtml(birthYear);
+    const safeStatus = escapeHtml(status);
+    const safeRequest = escapeHtml(request).replace(/\n/g, '<br>');
+    const telephoneHref = event.phone.replace(/[^+\d]/g, '');
+    const footerText = `Prosím, neodpovedajte na tento e-mail. V prípade potreby kontaktovania pacienta zavolajte priamo pacientovi na ${event.phone}.`;
+
+    const payload = {
+      from: { email: fromEmail, name: fromName },
+      to: [{ email: recipient, name: 'Psychiatrická ambulancia MUDr. Slávky Lenerovej' }],
+      subject: `${presentation.icon} ${presentation.label} – PriXi telefonická požiadavka`,
+      text: [
+        'Dobrý deň,',
+        '',
+        'PriXi zaznamenala novú telefonickú požiadavku pre psychiatrickú ambulanciu MUDr. Slávky Lenerovej.',
+        '',
+        `Typ požiadavky: ${presentation.label}`,
+        `Stav hovoru: ${status}`,
+        `Čas hovoru: ${callTime}`,
+        `Meno a priezvisko: ${patientName}`,
+        `Rok narodenia: ${birthYear}`,
+        `Telefón volajúceho: ${event.phone}`,
+        '',
+        'POŽIADAVKA',
+        request,
+        '',
+        'Požiadavka bola zároveň uložená v PriXi.',
+        '',
+        footerText,
+      ].filter((line, index, lines) => line !== '' || lines[index - 1] !== '').join('\n'),
+      html: [
+        '<div style="font-family:Arial,Helvetica,sans-serif;color:#172033;line-height:1.5;max-width:680px;margin:0 auto;">',
+        '<p>Dobrý deň,</p>',
+        '<p>PriXi zaznamenala novú telefonickú požiadavku pre psychiatrickú ambulanciu MUDr. Slávky Lenerovej.</p>',
+        '<table role="presentation" style="border-collapse:collapse;margin:20px 0;width:100%;font-size:15px;">',
+        `<tr><td style="padding:6px 16px 6px 0;color:#64748b;width:170px;">Typ požiadavky</td><td style="padding:6px 0;font-weight:700;color:${presentation.color};">${presentation.icon} ${escapeHtml(presentation.label)}</td></tr>`,
+        `<tr><td style="padding:6px 16px 6px 0;color:#64748b;">Stav hovoru</td><td style="padding:6px 0;">${safeStatus}</td></tr>`,
+        `<tr><td style="padding:6px 16px 6px 0;color:#64748b;">Čas hovoru</td><td style="padding:6px 0;">${safeCallTime}</td></tr>`,
+        `<tr><td style="padding:6px 16px 6px 0;color:#64748b;">Meno a priezvisko</td><td style="padding:6px 0;">${safePatientName}</td></tr>`,
+        `<tr><td style="padding:6px 16px 6px 0;color:#64748b;">Rok narodenia</td><td style="padding:6px 0;">${safeBirthYear}</td></tr>`,
+        `<tr><td style="padding:6px 16px 6px 0;color:#64748b;">Telefón volajúceho</td><td style="padding:6px 0;"><a href="tel:${telephoneHref}" style="color:#2563eb;text-decoration:none;">${safePhone}</a></td></tr>`,
+        '</table>',
+        `<div style="margin:24px 0;padding:18px 20px;border-left:5px solid ${presentation.color};background:${presentation.backgroundColor};border-radius:6px;">`,
+        '<div style="margin-bottom:6px;font-size:12px;font-weight:700;letter-spacing:0.08em;color:#64748b;">POŽIADAVKA</div>',
+        `<div style="font-size:20px;font-weight:700;line-height:1.45;color:#172033;">${safeRequest}</div>`,
+        '</div>',
+        '<p style="color:#475569;">Požiadavka bola zároveň uložená v PriXi.</p>',
+        '<hr style="margin:28px 0 16px;border:0;border-top:1px solid #e2e8f0;">',
+        `<p style="margin:0;font-size:13px;font-style:italic;color:#64748b;">Prosím, neodpovedajte na tento e-mail. V prípade potreby kontaktovania pacienta zavolajte priamo pacientovi na <a href="tel:${telephoneHref}" style="color:#2563eb;">${safePhone}</a>.</p>`,
+        '</div>',
+      ].join(''),
+    };
+
+    return this.queueEmail(apiToken, payload);
+  }
+
+  private async queueEmail(apiToken: string, payload: unknown): Promise<string> {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
       try {
         const response = await this.httpClient.post(
