@@ -23,6 +23,10 @@ test('Lenerovej menu rozpozná všetkých sedem volieb cez DTMF', () => {
 test('Lenerovej menu rozlíši prirodzené psychiatrické a administratívne požiadavky', () => {
   assert.equal(parseLenerovaRequestType('Potrebujem opakovaný recept'), 'prescription');
   assert.equal(parseLenerovaRequestType('Chcel by som si objednať lieky'), 'prescription');
+  assert.equal(
+    parseLenerovaRequestType('Dobrý deň, pri telefóne Matej Skok a chcel by som si objednať lieky'),
+    'prescription'
+  );
   assert.equal(parseLenerovaRequestType('Potrebujem objednať tablety'), 'prescription');
   assert.equal(parseLenerovaRequestType('Chcem termín kontroly'), 'appointment');
   assert.equal(parseLenerovaRequestType('Chcem sa objednať na kontrolu kvôli liekom'), 'appointment');
@@ -53,6 +57,7 @@ test('Lenerovej organizačné otázky rozdelí bez vytvorenia pacientskej požia
   assert.equal(parseLenerovaInformationTopic('Máte zmluvu s Dôverou?'), 'insurance');
   assert.equal(parseLenerovaInformationTopic('Kto zastupuje počas dovolenky?'), 'substitution');
   assert.equal(parseLenerovaInformationTopic('Aký máte e-mail?'), 'contact');
+  assert.equal(parseLenerovaInformationTopic('Dobrý deň, pri telefóne Matej Skok'), 'other');
   assert.equal(isLenerovaInformationMenuChoice('7'), true);
   assert.equal(isLenerovaInformationMenuChoice('organizačné informácie'), true);
   assert.equal(isLenerovaInformationMenuChoice('Kto vás zastupuje?'), false);

@@ -23,13 +23,18 @@ export type LenerovaInformationTopic =
   | 'contact'
   | 'other';
 
+function isLenerovaContactQuestion(text: string): boolean {
+  return /(kontakt|email|e mail|mail)/.test(text)
+    || /((aky|ake|povedzte|dajte).*(telefon|cislo)|(telefon|cislo).*(ambulanc|ordinac|kontakt)|telefon.*cislo|kam.*volat)/.test(text);
+}
+
 export function parseLenerovaInformationTopic(value: string): LenerovaInformationTopic {
   const text = normalizeLenerovaSpeech(value);
   if (isLenerovaOfficeHoursQuestion(text)) return 'office_hours';
   if (/(adres|kde.*(ambul|ordin|pracovisk)|pracovisk|stupav|malack)/.test(text)) return 'location';
   if (/(poistovn|zmluv)/.test(text)) return 'insurance';
   if (/(zastup|dovolenk|nepritomn)/.test(text)) return 'substitution';
-  if (/(kontakt|telefon|email|e mail|mail)/.test(text)) return 'contact';
+  if (isLenerovaContactQuestion(text)) return 'contact';
   return 'other';
 }
 
@@ -65,7 +70,10 @@ export function parseLenerovaRequestType(value: string): LenerovaRequestType | u
   if (/(zhors|vedlajs|neziaduc|problem.*liek|liek.*problem|je mi horsie)/.test(text)) return 'worsening';
   if (/(novy pacient|nova pacientka|prve vysetren|vstupne vysetren|prihlasit)/.test(text)) return 'new_patient';
   if (/(lekarsk.*sprav|potvrden|vysled|nalez|dokument|administrativ|peenka|pn)/.test(text)) return 'administration';
-  if (/(ordinac|kedy.*ordin|otvoren|adres|kde.*(ambul|ordin|pracovisk)|pracovisk|poistovn|zmluv|zastup|dovolenk|nepritomn|kontakt|telefon|email|e mail|stupav|malack)/.test(text)) return 'information';
+  if (
+    /(ordinac|kedy.*ordin|otvoren|adres|kde.*(ambul|ordin|pracovisk)|pracovisk|poistovn|zmluv|zastup|dovolenk|nepritomn|stupav|malack)/.test(text)
+    || isLenerovaContactQuestion(text)
+  ) return 'information';
   const mentionsExplicitAppointment = /(termin|kontrol|vysetren|navstev)/.test(text);
   if (mentionsExplicitAppointment && /(objedna|chcem|potrebujem|prosim)/.test(text)) return 'appointment';
   if (
