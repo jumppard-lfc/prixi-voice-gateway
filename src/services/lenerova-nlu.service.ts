@@ -10,6 +10,45 @@ export function normalizeLenerovaSpeech(value: string): string {
     .trim();
 }
 
+export function isLenerovaOfficeHoursQuestion(value: string): boolean {
+  const text = normalizeLenerovaSpeech(value);
+  return /(ordinac|kedy.*ordin|otvoren|otvarac|dokedy|pracovn.*hodin)/.test(text);
+}
+
+export type LenerovaInformationTopic =
+  | 'office_hours'
+  | 'location'
+  | 'insurance'
+  | 'substitution'
+  | 'contact'
+  | 'other';
+
+export function parseLenerovaInformationTopic(value: string): LenerovaInformationTopic {
+  const text = normalizeLenerovaSpeech(value);
+  if (isLenerovaOfficeHoursQuestion(text)) return 'office_hours';
+  if (/(adres|kde.*(ambul|ordin|pracovisk)|pracovisk|stupav|malack)/.test(text)) return 'location';
+  if (/(poistovn|zmluv)/.test(text)) return 'insurance';
+  if (/(zastup|dovolenk|nepritomn)/.test(text)) return 'substitution';
+  if (/(kontakt|telefon|email|e mail|mail)/.test(text)) return 'contact';
+  return 'other';
+}
+
+export function isLenerovaInformationMenuChoice(value: string): boolean {
+  const text = normalizeLenerovaSpeech(value);
+  return /^(7|sedem|sedmicka|organizacna informacia|organizacne informacie)$/.test(text);
+}
+
+export function isLenerovaConversationFinish(value: string): boolean {
+  const text = normalizeLenerovaSpeech(value);
+  return /^(2|nie|nie dakujem|dakujem|dovidenia|(nie )?(dakujem )?(to je vsetko|to bude vsetko|uz nic|nic viac|staci)( dakujem)?)$/.test(text)
+    || /^(nie )?(uz )?(nepotrebujem|netreba mi) (uz )?nic( viac| dalsie)?( dakujem)?$/.test(text);
+}
+
+export function isLenerovaConversationContinue(value: string): boolean {
+  const text = normalizeLenerovaSpeech(value);
+  return /^(1|ano|ano prosim|hej|este nieco|mam este otazku)$/.test(text);
+}
+
 export function parseLenerovaRequestType(value: string): LenerovaRequestType | undefined {
   const text = normalizeLenerovaSpeech(value);
   if (/^(1|jeden|jedna|jednotka)$/.test(text)) return 'prescription';
@@ -26,7 +65,7 @@ export function parseLenerovaRequestType(value: string): LenerovaRequestType | u
   if (/(zhors|vedlajs|neziaduc|problem.*liek|liek.*problem|je mi horsie)/.test(text)) return 'worsening';
   if (/(novy pacient|nova pacientka|prve vysetren|vstupne vysetren|prihlasit)/.test(text)) return 'new_patient';
   if (/(lekarsk.*sprav|potvrden|vysled|nalez|dokument|administrativ|peenka|pn)/.test(text)) return 'administration';
-  if (/(ordinac|kedy.*ordin|otvoren|adresa|pracovisko|poistovn|zastupovan|stupava|malacky)/.test(text)) return 'information';
+  if (/(ordinac|kedy.*ordin|otvoren|adres|kde.*(ambul|ordin|pracovisk)|pracovisk|poistovn|zmluv|zastup|dovolenk|nepritomn|kontakt|telefon|email|e mail|stupav|malack)/.test(text)) return 'information';
   if (/(recept|predpis|dochadz.*liek|potrebujem.*liek|pravideln.*liek)/.test(text)) return 'prescription';
   if (/(objedna|termin|kontrol)/.test(text)) return 'appointment';
   return undefined;

@@ -1,7 +1,7 @@
 import { LenerovaRequestType } from '../config/lenerova.config';
 import { ClinicConfig } from '../types';
 
-export type LenerovaStep = 'main_menu' | 'name' | 'birth_year' | 'detail';
+export type LenerovaStep = 'main_menu' | 'name' | 'birth_year' | 'detail' | 'information_follow_up';
 
 export interface LenerovaSession {
   callSid: string;
@@ -14,6 +14,7 @@ export interface LenerovaSession {
   birthYear?: string;
   detail?: string;
   answers: Array<{ step: LenerovaStep; text: string }>;
+  answeredInformationQuestions: number;
   attempts: number;
   outcome?: 'completed' | 'abandoned';
   startedAt: string;
@@ -34,6 +35,7 @@ export class LenerovaSessionService {
       config,
       step: 'main_menu',
       answers: [],
+      answeredInformationQuestions: 0,
       attempts: 0,
       startedAt: new Date().toISOString(),
       expiresAt: Date.now() + SESSION_TTL_MS,

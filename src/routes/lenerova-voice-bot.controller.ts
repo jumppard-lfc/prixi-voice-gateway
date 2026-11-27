@@ -5,7 +5,13 @@ import {
   lenerovaRequestLabels,
   LenerovaRequestType,
 } from '../config/lenerova.config';
-import { parseLenerovaRequestType } from '../services/lenerova-nlu.service';
+import {
+  isLenerovaConversationContinue,
+  isLenerovaConversationFinish,
+  isLenerovaInformationMenuChoice,
+  parseLenerovaRequestType,
+} from '../services/lenerova-nlu.service';
+import { buildLenerovaInformationAnswer } from '../services/lenerova-information.service';
 import {
   LenerovaSession,
   lenerovaSessionService,
@@ -22,6 +28,7 @@ import {
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 const sayOptions: Record<string, any> = { language: 'sk-SK', voice: 'Google.sk-SK-Wavenet-B' };
+const MAX_ANSWERED_INFORMATION_QUESTIONS = 10;
 
 const copy = {
   greeting: 'Dobrý deň, dovolali ste sa virtuálnej sestričke pani doktorky Lenerovej. Ako pomôžem?',
@@ -29,6 +36,9 @@ const copy = {
   name: 'Povedzte, prosím, meno a priezvisko pacienta, ktorého sa požiadavka týka.',
   birthYear: 'Povedzte, prosím, rok narodenia pacienta.',
   retry: 'Prepáčte, odpoveď som nezachytila. Skúste to, prosím, ešte raz. ',
+  informationFollowUp: 'Je to všetko, alebo vám môžem pomôcť ešte s niečím?',
+  continue: 'Nech sa páči. S čím ďalším vám môžem pomôcť?',
+  closing: 'Ďakujem za zavolanie. Prajem príjemný deň. Dovidenia.',
   expired: 'Hovor sa nepodarilo dokončiť. Zavolajte, prosím, znova. Dovidenia.',
   technical: 'Momentálne máme technický problém a vašu požiadavku nevieme bezpečne zaznamenať. Skúste, prosím, zavolať neskôr. Dovidenia.',
 };
@@ -50,16 +60,22 @@ function answerFrom(request: FastifyRequest): string {
 
 function promptFor(session: LenerovaSession, retry: boolean): string {
   if (session.step === 'main_menu') return retry ? copy.menuRetry : copy.greeting;
+  if (session.step === 'information_follow_up') return copy.informationFollowUp;
   if (session.step === 'name') return `${retry ? copy.retry : ''}${copy.name}`;
   if (session.step === 'birth_year') return `${retry ? copy.retry : ''}${copy.birthYear}`;
   const detailPrompt = session.requestType ? detailPrompts[session.requestType] : copy.menuRetry;
   return `${retry ? copy.retry : ''}${detailPrompt}`;
 }
 
-function renderPrompt(reply: FastifyReply, session: LenerovaSession, retry = false): FastifyReply {
+function renderPrompt(
+  reply: FastifyReply,
+  session: LenerovaSession,
+  retry = false,
+  promptOverride?: string
+): FastifyReply {
   lenerovaSessionService.save(session);
   const twiml = new VoiceResponse();
-  const isMenu = session.step === 'main_menu';
+  const isMenu = session.step === 'main_menu' || session.step === 'information_follow_up';
   const gather = twiml.gather({
     input: isMenu ? ['speech', 'dtmf'] : ['speech'],
     action: '/voice/lenerova/answer',
@@ -69,10 +85,10 @@ function renderPrompt(reply: FastifyReply, session: LenerovaSession, retry = fal
     language: 'sk-SK',
     ...(isMenu ? {
       numDigits: 1,
-      hints: 'recept, termín kontroly, zmena termínu, zrušenie termínu, zhoršenie stavu, dokument, nový pacient, ordinačné hodiny',
+      hints: 'áno, nie, ďakujem, recept, termín kontroly, zmena termínu, zrušenie termínu, zhoršenie stavu, dokument, nový pacient, ordinačné hodiny',
     } : {}),
   } as any);
-  gather.say(sayOptions, promptFor(session, retry));
+  gather.say(sayOptions, promptOverride || promptFor(session, retry));
   twiml.redirect('/voice/lenerova/prompt');
   return reply.type('text/xml').send(twiml.toString());
 }
@@ -82,6 +98,31 @@ function renderEnd(reply: FastifyReply, message: string): FastifyReply {
   twiml.say(sayOptions, message);
   twiml.hangup();
   return reply.type('text/xml').send(twiml.toString());
+}
+
+function resetForNextRequest(session: LenerovaSession): void {
+  session.step = 'main_menu';
+  session.requestType = undefined;
+  session.patientName = undefined;
+  session.birthYear = undefined;
+  session.detail = undefined;
+  session.attempts = 0;
+}
+
+function renderInformationAnswer(reply: FastifyReply, session: LenerovaSession, question: string): FastifyReply {
+  session.step = 'information_follow_up';
+  session.requestType = undefined;
+  session.patientName = undefined;
+  session.birthYear = undefined;
+  session.detail = undefined;
+  session.attempts = 0;
+  const answer = buildLenerovaInformationAnswer(session.config, question);
+  session.answeredInformationQuestions += 1;
+  if (session.answeredInformationQuestions >= MAX_ANSWERED_INFORMATION_QUESTIONS) {
+    lenerovaSessionService.delete(session.callSid);
+    return renderEnd(reply, `${answer} ${copy.closing}`);
+  }
+  return renderPrompt(reply, session, false, `${answer} ${copy.informationFollowUp}`);
 }
 
 async function loadConfig(): Promise<ClinicConfig> {
@@ -99,7 +140,7 @@ async function loadConfig(): Promise<ClinicConfig> {
 }
 
 function hasMeaningfulRequest(session: LenerovaSession): boolean {
-  return Boolean(session.requestType);
+  return Boolean(session.requestType && session.requestType !== 'information');
 }
 
 function requestSummary(session: LenerovaSession): string {
@@ -280,12 +321,48 @@ export async function lenerovaVoiceBotRoutes(fastify: FastifyInstance): Promise<
     if (!answer) return renderPrompt(reply, session, true);
     session.answers.push({ step: session.step, text: answer });
 
+    if (session.step === 'information_follow_up') {
+      if (isLenerovaConversationFinish(answer)) {
+        lenerovaSessionService.delete(session.callSid);
+        return renderEnd(reply, copy.closing);
+      }
+      if (isLenerovaConversationContinue(answer)) {
+        resetForNextRequest(session);
+        return renderPrompt(reply, session, false, copy.continue);
+      }
+
+      const nextRequestType = parseLenerovaRequestType(answer);
+      if (!nextRequestType) return renderPrompt(reply, session, true, copy.menuRetry);
+      if (nextRequestType === 'information') {
+        if (isLenerovaInformationMenuChoice(answer)) {
+          session.requestType = 'information';
+          session.attempts = 0;
+          session.step = 'detail';
+          return renderPrompt(reply, session);
+        }
+        return renderInformationAnswer(reply, session, answer);
+      }
+      session.requestType = nextRequestType;
+      session.attempts = 0;
+      session.step = 'name';
+      return renderPrompt(reply, session);
+    }
+
     if (session.step === 'main_menu') {
       const requestType = parseLenerovaRequestType(answer);
       if (!requestType) return renderPrompt(reply, session, true);
+      if (requestType === 'information') {
+        if (isLenerovaInformationMenuChoice(answer)) {
+          session.requestType = 'information';
+          session.attempts = 0;
+          session.step = 'detail';
+          return renderPrompt(reply, session);
+        }
+        return renderInformationAnswer(reply, session, answer);
+      }
       session.requestType = requestType;
       session.attempts = 0;
-      session.step = requestType === 'information' ? 'detail' : 'name';
+      session.step = 'name';
       return renderPrompt(reply, session);
     }
 
@@ -301,6 +378,10 @@ export async function lenerovaVoiceBotRoutes(fastify: FastifyInstance): Promise<
       session.attempts = 0;
       session.step = 'detail';
       return renderPrompt(reply, session);
+    }
+
+    if (session.requestType === 'information') {
+      return renderInformationAnswer(reply, session, answer);
     }
 
     session.detail = answer;
