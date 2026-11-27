@@ -72,7 +72,7 @@ test('zaradí požiadavku MUDr. Lenerovej do samostatnej MailerSend notifikácie
 
   assert.equal(captured.url, 'https://api.mailersend.com/v1/email');
   assert.deepEqual(captured.data.to, [{
-    email: 'matoskok1@gmail.com',
+    email: 's.lenerova@centrum.sk',
     name: 'Psychiatrická ambulancia MUDr. Slávky Lenerovej',
   }]);
   assert.equal(captured.data.subject, '🔵 Recept – PriXi telefonická požiadavka');
